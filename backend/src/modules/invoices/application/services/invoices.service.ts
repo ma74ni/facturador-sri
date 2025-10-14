@@ -7,6 +7,7 @@ import { XmlStorageService } from '../../infrastructure/xml/xml-storage.service'
 import { DigitalSignatureService } from '../../infrastructure/xml/digital-signature.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import { existsSync } from 'fs';
+import { SriWebServiceService } from '../../infrastructure/sri/sri-web-service.service';
 
 @Injectable()
 export class InvoicesService {
@@ -310,4 +311,74 @@ export class InvoicesService {
       },
     };
   }
+  // ==================== ENVÍO AL SRI ====================
+
+async sendToSri(invoiceId: string, companyId: string) {
+  // 1. Obtener la factura
+  const invoice = await this.prisma.invoice.findFirst({
+    where: { id: invoiceId, companyId },
+    include: { company: true },
+  });
+
+  if (!invoice) {
+    throw new NotFoundException('Factura no encontrada');
+  }
+
+  // 2. Verificar que tenga XML firmado
+  if (!invoice.xmlSignedPath) {
+    throw new BadRequestException(
+      'La factura debe estar firmada digitalmente antes de enviarla al SRI',
+    );
+  }
+
+  if (!existsSync(invoice.xmlSignedPath)) {
+    throw new NotFoundException('Archivo XML firmado no encontrado');
+  }
+
+  // 3. Actualizar estado a "enviando"
+  await this.prisma.invoice.update({
+    where: { id: invoiceId },
+    data: { sriStatus: 'SENT' },
+  });
+
+  // 4. Enviar al SRI
+  const sriService = new SriWebServiceService();
+  const result = await sriService.sendAndAuthorize(
+    invoice.xmlSignedPath,
+    invoice.company.environment,
+  );
+
+  // 5. Actualizar estado según resultado
+  if (result.authorized) {
+    await this.prisma.invoice.update({
+      where: { id: invoiceId },
+      data: {
+        sriStatus: 'AUTHORIZED',
+        authorizationNumber: result.authorizationNumber,
+        authorizationDate: result.authorizationDate,
+      },
+    });
+
+    return {
+      message: 'Factura autorizada por el SRI',
+      status: 'AUTHORIZED',
+      authorizationNumber: result.authorizationNumber,
+      authorizationDate: result.authorizationDate,
+    };
+  } else {
+    await this.prisma.invoice.update({
+      where: { id: invoiceId },
+      data: {
+        sriStatus: result.sent ? 'REJECTED' : 'ERROR',
+        sriErrors: { errors: result.errors },
+      },
+    });
+
+    return {
+      message: 'La factura no fue autorizada',
+      status: result.sent ? 'REJECTED' : 'ERROR',
+      errors: result.errors,
+    };
+  }
+}
 }

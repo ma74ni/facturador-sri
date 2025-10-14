@@ -6,6 +6,7 @@ import { XmlGeneratorService } from './infrastructure/xml/xml-generator.service'
 import { XmlStorageService } from './infrastructure/xml/xml-storage.service';
 import { DigitalSignatureService } from './infrastructure/xml/digital-signature.service';
 import { PrismaService } from '../../shared/database/prisma.service';
+import { SriWebServiceService } from './infrastructure/sri/sri-web-service.service';
 
 @Module({
   controllers: [InvoicesController],
@@ -15,6 +16,7 @@ import { PrismaService } from '../../shared/database/prisma.service';
     XmlGeneratorService,
     XmlStorageService,
     DigitalSignatureService,
+    SriWebServiceService,
     PrismaService,
   ],
   exports: [InvoicesService],

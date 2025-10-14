@@ -107,4 +107,11 @@ export class InvoicesController {
     const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
     return this.invoicesService.findOne(id, companyId);
   }
+
+  @Post(':id/send-to-sri')
+  @ApiOperation({ summary: 'Enviar factura al SRI para autorización' })
+  async sendToSri(@Param('id') id: string, @Request() req: any) {
+    const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
+    return this.invoicesService.sendToSri(id, companyId);
+  }
 }
