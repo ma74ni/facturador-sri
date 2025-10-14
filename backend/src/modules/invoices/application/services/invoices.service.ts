@@ -2,17 +2,23 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../../../shared/database/prisma.service';
 import { CreateInvoiceDto } from '../dto/create-invoice.dto';
 import { AccessKeyService } from '../../domain/services/access-key.service';
-import { Decimal } from '@prisma/client/runtime/library';
 import { XmlGeneratorService } from '../../infrastructure/xml/xml-generator.service';
 import { XmlStorageService } from '../../infrastructure/xml/xml-storage.service';
+import { DigitalSignatureService } from '../../infrastructure/xml/digital-signature.service';
+import { Decimal } from '@prisma/client/runtime/library';
+import { join } from 'path';
 
 @Injectable()
 export class InvoicesService {
+  private readonly certificatePath = join(process.cwd(), 'certificates', 'certificate.p12');
+  private readonly certificatePassword = process.env.CERTIFICATE_PASSWORD || 'password';
+
   constructor(
     private prisma: PrismaService,
     private accessKeyService: AccessKeyService,
     private xmlGenerator: XmlGeneratorService,
     private xmlStorage: XmlStorageService,
+    private digitalSignature: DigitalSignatureService,
   ) {}
 
   async create(dto: CreateInvoiceDto, companyId: string, userId: string) {
@@ -132,35 +138,66 @@ export class InvoicesService {
       },
     });
 
-    // ==================== GENERAR XML ====================
+    // ==================== GENERAR Y FIRMAR XML ====================
+    let xmlPath: string | undefined;
+    let xmlSignedPath: string | undefined;
+    let signatureStatus = 'sin_firma';
+
     try {
+      // 8. Generar XML
       const xml = this.xmlGenerator.generateInvoiceXml(invoice, company);
       
       // Validar estructura
       const validation = this.xmlGenerator.validateXmlStructure(xml);
       if (!validation.valid) {
-        console.error('XML validation errors:', validation.errors);
+        console.warn('⚠️ Advertencias en XML:', validation.errors);
       }
 
-      // Guardar XML
-      const xmlPath = await this.xmlStorage.saveXml(accessKey, xml);
+      // Guardar XML sin firmar
+      xmlPath = await this.xmlStorage.saveXml(accessKey, xml);
+      console.log(`✅ XML generado: ${xmlPath}`);
 
-      // Actualizar factura con ruta del XML
+      // 9. Intentar firmar el XML (si existe certificado)
+      try {
+        const signedXml = await this.digitalSignature.signXml(
+          xml,
+          this.certificatePath,
+          this.certificatePassword,
+        );
+
+        // Guardar XML firmado
+        xmlSignedPath = await this.xmlStorage.saveSignedXml(accessKey, signedXml);
+        console.log(`✅ XML firmado: ${xmlSignedPath}`);
+        
+        signatureStatus = 'firmado';
+      } catch (signError) {
+        console.warn('⚠️ No se pudo firmar el XML:', signError.message);
+        console.warn('💡 El XML sin firmar está disponible para pruebas');
+        signatureStatus = 'error_firma';
+      }
+
+      // 10. Actualizar factura con rutas de archivos
       await this.prisma.invoice.update({
         where: { id: invoice.id },
-        data: { xmlPath },
+        data: { 
+          xmlPath,
+          xmlSignedPath,
+        },
       });
 
-      console.log(`✅ XML generado: ${xmlPath}`);
     } catch (error) {
-      console.error('Error generando XML:', error);
+      console.error('❌ Error generando XML:', error);
+      // No lanzamos error, la factura ya está creada
     }
 
     return {
       message: 'Factura creada exitosamente',
+      signatureStatus,
       invoice: {
         ...invoice,
         formattedNumber: `${establishment.code}-${emissionPoint.code}-${sequential}`,
+        xmlPath,
+        xmlSignedPath,
       },
     };
   }
