@@ -205,6 +205,12 @@ model Invoice {
   sriStatus           SRIStatus   @default(PENDING)
   authorizationNumber String?
   authorizationDate   DateTime?
+  sriErrors           Json?
+  
+  // Rutas de archivos
+  xmlPath             String?
+  xmlSignedPath       String?
+  ridePdfPath         String?
   
   companyId           String
   company             Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)

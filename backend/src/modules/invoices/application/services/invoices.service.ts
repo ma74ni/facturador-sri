@@ -3,12 +3,16 @@ import { PrismaService } from '../../../../shared/database/prisma.service';
 import { CreateInvoiceDto } from '../dto/create-invoice.dto';
 import { AccessKeyService } from '../../domain/services/access-key.service';
 import { Decimal } from '@prisma/client/runtime/library';
+import { XmlGeneratorService } from '../../infrastructure/xml/xml-generator.service';
+import { XmlStorageService } from '../../infrastructure/xml/xml-storage.service';
 
 @Injectable()
 export class InvoicesService {
   constructor(
     private prisma: PrismaService,
     private accessKeyService: AccessKeyService,
+    private xmlGenerator: XmlGeneratorService,
+    private xmlStorage: XmlStorageService,
   ) {}
 
   async create(dto: CreateInvoiceDto, companyId: string, userId: string) {
@@ -127,6 +131,30 @@ export class InvoicesService {
         emissionPoint: true,
       },
     });
+
+    // ==================== GENERAR XML ====================
+    try {
+      const xml = this.xmlGenerator.generateInvoiceXml(invoice, company);
+      
+      // Validar estructura
+      const validation = this.xmlGenerator.validateXmlStructure(xml);
+      if (!validation.valid) {
+        console.error('XML validation errors:', validation.errors);
+      }
+
+      // Guardar XML
+      const xmlPath = await this.xmlStorage.saveXml(accessKey, xml);
+
+      // Actualizar factura con ruta del XML
+      await this.prisma.invoice.update({
+        where: { id: invoice.id },
+        data: { xmlPath },
+      });
+
+      console.log(`✅ XML generado: ${xmlPath}`);
+    } catch (error) {
+      console.error('Error generando XML:', error);
+    }
 
     return {
       message: 'Factura creada exitosamente',

@@ -7,12 +7,17 @@ import {
   UseGuards,
   Request,
   UnauthorizedException,
+  Res,
+  NotFoundException,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { InvoicesService } from '../../application/services/invoices.service';
 import { CreateInvoiceDto } from '../../application/dto/create-invoice.dto';
 import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
 import { PrismaService } from '../../../../shared/database/prisma.service';
+import { readFile } from 'fs/promises';
+import { existsSync } from 'fs';
 
 @ApiTags('invoices')
 @Controller('invoices')
@@ -56,6 +61,37 @@ export class InvoicesController {
   async getStats(@Request() req: any) {
     const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
     return this.invoicesService.getStats(companyId);
+  }
+
+  @Get(':id/xml')
+  @ApiOperation({ summary: 'Descargar XML de la factura' })
+  async downloadXml(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Res() res: Response,
+  ) {
+    const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
+    
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id, companyId },
+    });
+
+    if (!invoice) {
+      throw new NotFoundException('Factura no encontrada');
+    }
+
+    if (!invoice.xmlPath || !existsSync(invoice.xmlPath)) {
+      throw new NotFoundException('XML no encontrado');
+    }
+
+    const xmlContent = await readFile(invoice.xmlPath, 'utf-8');
+    
+    res.setHeader('Content-Type', 'application/xml');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${invoice.accessKey}.xml"`,
+    );
+    res.send(xmlContent);
   }
 
   @Get('access-key/:accessKey')
