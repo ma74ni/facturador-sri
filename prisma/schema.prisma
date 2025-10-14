@@ -1,0 +1,245 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== ENUMS ====================
+
+enum Role {
+  ADMIN
+  MANAGER
+  USER
+  VIEWER
+}
+
+enum SRIEnvironment {
+  TEST
+  PRODUCTION
+}
+
+enum SRIStatus {
+  PENDING
+  SENT
+  AUTHORIZED
+  REJECTED
+  ERROR
+}
+
+// ==================== USERS ====================
+
+model User {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  password    String
+  firstName   String
+  lastName    String
+  isActive    Boolean   @default(true)
+  role        Role      @default(USER)
+  
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  invoices    Invoice[] @relation("CreatedBy")
+  
+  @@index([email])
+  @@index([companyId])
+  @@map("users")
+}
+
+// ==================== COMPANY ====================
+
+model Company {
+  id                  String          @id @default(cuid())
+  ruc                 String          @unique
+  businessName        String
+  tradeName           String?
+  address             String
+  phone               String?
+  email               String
+  
+  environment         SRIEnvironment  @default(TEST)
+  isActive            Boolean         @default(true)
+  
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  
+  users               User[]
+  establishments      Establishment[]
+  customers           Customer[]
+  products            Product[]
+  invoices            Invoice[]
+  
+  @@index([ruc])
+  @@map("companies")
+}
+
+// ==================== ESTABLISHMENTS ====================
+
+model Establishment {
+  id            String          @id @default(cuid())
+  code          String
+  name          String
+  address       String
+  
+  companyId     String
+  company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  emissionPoints EmissionPoint[]
+  invoices       Invoice[]
+  
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@map("establishments")
+}
+
+model EmissionPoint {
+  id                String        @id @default(cuid())
+  code              String
+  description       String?
+  
+  establishmentId   String
+  establishment     Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+  
+  invoiceSequence   Int           @default(1)
+  
+  invoices          Invoice[]
+  
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  @@unique([establishmentId, code])
+  @@index([establishmentId])
+  @@map("emission_points")
+}
+
+// ==================== CUSTOMERS ====================
+
+model Customer {
+  id                 String    @id @default(cuid())
+  identificationType String
+  identification     String
+  businessName       String?
+  firstName          String?
+  lastName           String?
+  email              String?
+  phone              String?
+  address            String?
+  
+  companyId          String
+  company            Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  invoices           Invoice[]
+  
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  
+  @@unique([companyId, identification])
+  @@index([companyId])
+  @@index([identification])
+  @@map("customers")
+}
+
+// ==================== PRODUCTS ====================
+
+model Product {
+  id                 String        @id @default(cuid())
+  mainCode           String
+  name               String
+  description        String?
+  unitPrice          Decimal       @db.Decimal(12, 6)
+  
+  taxCode            String
+  taxPercentageCode  String
+  
+  companyId          String
+  company            Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  invoiceItems       InvoiceItem[]
+  
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  
+  @@unique([companyId, mainCode])
+  @@index([companyId])
+  @@map("products")
+}
+
+// ==================== INVOICES ====================
+
+model Invoice {
+  id                  String      @id @default(cuid())
+  
+  documentType        String
+  accessKey           String      @unique
+  establishmentCode   String
+  emissionPointCode   String
+  sequential          String
+  
+  issueDate           DateTime
+  
+  customerId          String
+  customer            Customer    @relation(fields: [customerId], references: [id])
+  
+  establishmentId     String
+  establishment       Establishment @relation(fields: [establishmentId], references: [id])
+  
+  emissionPointId     String
+  emissionPoint       EmissionPoint @relation(fields: [emissionPointId], references: [id])
+  
+  subtotal            Decimal     @db.Decimal(12, 2)
+  totalDiscount       Decimal     @db.Decimal(12, 2) @default(0)
+  ivaValue            Decimal     @db.Decimal(12, 2)
+  total               Decimal     @db.Decimal(12, 2)
+  
+  sriStatus           SRIStatus   @default(PENDING)
+  authorizationNumber String?
+  authorizationDate   DateTime?
+  
+  companyId           String
+  company             Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  createdById         String
+  createdBy           User        @relation("CreatedBy", fields: [createdById], references: [id])
+  
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  
+  items               InvoiceItem[]
+  
+  @@index([accessKey])
+  @@index([sriStatus])
+  @@index([companyId, issueDate])
+  @@index([customerId])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id            String    @id @default(cuid())
+  invoiceId     String
+  invoice       Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  productId     String?
+  product       Product?  @relation(fields: [productId], references: [id])
+  
+  mainCode      String
+  description   String
+  quantity      Decimal   @db.Decimal(12, 6)
+  unitPrice     Decimal   @db.Decimal(12, 6)
+  discount      Decimal   @db.Decimal(12, 2) @default(0)
+  subtotal      Decimal   @db.Decimal(12, 2)
+  
+  createdAt     DateTime  @default(now())
+  
+  @@index([invoiceId])
+  @@map("invoice_items")
+}
