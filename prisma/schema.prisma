@@ -87,6 +87,7 @@ model Establishment {
   code          String
   name          String
   address       String
+  phone         String?
   
   companyId     String
   company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)

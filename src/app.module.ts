@@ -4,6 +4,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { ProductsModule } from './modules/products/products.module';
 import { EstablishmentsModule } from './modules/establishments/establishments.module';
+import { InvoicesModule } from './modules/invoices/invoices.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { EstablishmentsModule } from './modules/establishments/establishments.mo
     CustomersModule,
     ProductsModule,
     EstablishmentsModule,
+    InvoicesModule,
   ],
   controllers: [],
   providers: [],
