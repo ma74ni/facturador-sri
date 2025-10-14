@@ -6,13 +6,10 @@ import { XmlGeneratorService } from '../../infrastructure/xml/xml-generator.serv
 import { XmlStorageService } from '../../infrastructure/xml/xml-storage.service';
 import { DigitalSignatureService } from '../../infrastructure/xml/digital-signature.service';
 import { Decimal } from '@prisma/client/runtime/library';
-import { join } from 'path';
+import { existsSync } from 'fs';
 
 @Injectable()
 export class InvoicesService {
-  private readonly certificatePath = join(process.cwd(), 'certificates', 'certificate.p12');
-  private readonly certificatePassword = process.env.CERTIFICATE_PASSWORD || 'password';
-
   constructor(
     private prisma: PrismaService,
     private accessKeyService: AccessKeyService,
@@ -45,7 +42,7 @@ export class InvoicesService {
       throw new NotFoundException('Punto de emisión no encontrado');
     }
 
-    // 3. Obtener compañía (para RUC y ambiente)
+    // 3. Obtener compañía (para RUC, ambiente y certificado)
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
     });
@@ -75,7 +72,6 @@ export class InvoicesService {
       subtotal = subtotal.add(itemTotal);
       totalDiscount = totalDiscount.add(itemDiscount);
 
-      // Por ahora, aplicamos IVA 15% a todos los productos
       const itemIva = itemTotal.mul(0.15);
       ivaValue = ivaValue.add(itemIva);
 
@@ -91,7 +87,7 @@ export class InvoicesService {
     const issueDate = new Date(dto.issueDate);
     const accessKey = this.accessKeyService.generateAccessKey(
       issueDate,
-      '01', // 01 = Factura
+      '01',
       company.ruc,
       company.environment,
       establishment.code,
@@ -147,7 +143,6 @@ export class InvoicesService {
       // 8. Generar XML
       const xml = this.xmlGenerator.generateInvoiceXml(invoice, company);
       
-      // Validar estructura
       const validation = this.xmlGenerator.validateXmlStructure(xml);
       if (!validation.valid) {
         console.warn('⚠️ Advertencias en XML:', validation.errors);
@@ -157,23 +152,33 @@ export class InvoicesService {
       xmlPath = await this.xmlStorage.saveXml(accessKey, xml);
       console.log(`✅ XML generado: ${xmlPath}`);
 
-      // 9. Intentar firmar el XML (si existe certificado)
-      try {
-        const signedXml = await this.digitalSignature.signXml(
-          xml,
-          this.certificatePath,
-          this.certificatePassword,
-        );
+      // 9. Intentar firmar el XML con certificado de la empresa
+      if (company.hasCertificate && company.certificatePath && company.certificatePassword) {
+        // Verificar que el certificado existe físicamente
+        if (!existsSync(company.certificatePath)) {
+          console.warn(`⚠️ El certificado registrado no existe en: ${company.certificatePath}`);
+          signatureStatus = 'certificado_no_encontrado';
+        } else {
+          try {
+            const signedXml = await this.digitalSignature.signXml(
+              xml,
+              company.certificatePath,
+              company.certificatePassword,
+            );
 
-        // Guardar XML firmado
-        xmlSignedPath = await this.xmlStorage.saveSignedXml(accessKey, signedXml);
-        console.log(`✅ XML firmado: ${xmlSignedPath}`);
-        
-        signatureStatus = 'firmado';
-      } catch (signError) {
-        console.warn('⚠️ No se pudo firmar el XML:', signError.message);
-        console.warn('💡 El XML sin firmar está disponible para pruebas');
-        signatureStatus = 'error_firma';
+            xmlSignedPath = await this.xmlStorage.saveSignedXml(accessKey, signedXml);
+            console.log(`✅ XML firmado digitalmente: ${xmlSignedPath}`);
+            
+            signatureStatus = 'firmado';
+          } catch (signError) {
+            console.error('❌ Error al firmar XML:', signError.message);
+            signatureStatus = 'error_firma';
+          }
+        }
+      } else {
+        console.warn('⚠️ La empresa no tiene certificado digital configurado');
+        console.warn('💡 Sube un certificado en /companies/certificate');
+        signatureStatus = 'sin_certificado';
       }
 
       // 10. Actualizar factura con rutas de archivos
@@ -186,13 +191,15 @@ export class InvoicesService {
       });
 
     } catch (error) {
-      console.error('❌ Error generando XML:', error);
-      // No lanzamos error, la factura ya está creada
+      console.error('❌ Error generando/firmando XML:', error);
     }
 
     return {
       message: 'Factura creada exitosamente',
       signatureStatus,
+      warnings: signatureStatus !== 'firmado' 
+        ? ['La factura no está firmada digitalmente. Sube un certificado para firmar facturas.']
+        : [],
       invoice: {
         ...invoice,
         formattedNumber: `${establishment.code}-${emissionPoint.code}-${sequential}`,

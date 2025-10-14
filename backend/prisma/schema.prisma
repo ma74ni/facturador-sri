@@ -67,6 +67,12 @@ model Company {
   environment         SRIEnvironment  @default(TEST)
   isActive            Boolean         @default(true)
   
+  // Certificado Digital
+  certificatePath     String?
+  certificatePassword String?
+  certificateExpiry   DateTime?
+  hasCertificate      Boolean         @default(false)
+  
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
   

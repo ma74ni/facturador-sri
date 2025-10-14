@@ -42,7 +42,11 @@ export class DigitalSignatureService {
       const parser = new DOMParser();
       const xmlDoc = parser.parseFromString(xmlContent, 'text/xml');
 
-      // 5. Preparar el XML para firma (calcular digest)
+      if (!xmlDoc || !xmlDoc.documentElement) {
+        throw new InternalServerErrorException('XML inválido');
+      }
+
+      // 5. Preparar el XML para firma (calcular digest del documento completo)
       const digestValue = this.calculateDigest(xmlContent);
 
       // 6. Crear estructura de firma XML-DSig
@@ -52,22 +56,28 @@ export class DigitalSignatureService {
         keyData.certificate,
       );
 
-      // 7. Calcular SignedInfo
-      const signedInfoC14n = this.canonicalize(
-        signatureNode.getElementsByTagName('SignedInfo')[0],
-      );
+      // 7. Obtener SignedInfo para firmarlo
+      const signedInfoNodes = signatureNode.getElementsByTagName('ds:SignedInfo');
+      if (!signedInfoNodes || signedInfoNodes.length === 0) {
+        throw new InternalServerErrorException('No se pudo crear SignedInfo');
+      }
+
+      const signedInfoC14n = this.canonicalize(signedInfoNodes[0]);
 
       // 8. Firmar con la clave privada
       const signatureValue = this.signData(signedInfoC14n, keyData.privateKey);
 
       // 9. Insertar SignatureValue
-      const signatureValueNode = signatureNode.getElementsByTagName('SignatureValue')[0];
-      signatureValueNode.textContent = signatureValue;
+      const signatureValueNodes = signatureNode.getElementsByTagName('ds:SignatureValue');
+      if (signatureValueNodes && signatureValueNodes.length > 0) {
+        signatureValueNodes[0].textContent = signatureValue;
+      }
 
       // 10. Insertar certificado en KeyInfo
-      const x509CertNode = signatureNode
-        .getElementsByTagName('X509Certificate')[0];
-      x509CertNode.textContent = this.getCertificateBase64(keyData.certificate);
+      const x509CertNodes = signatureNode.getElementsByTagName('ds:X509Certificate');
+      if (x509CertNodes && x509CertNodes.length > 0) {
+        x509CertNodes[0].textContent = this.getCertificateBase64(keyData.certificate);
+      }
 
       // 11. Insertar firma en el documento
       const rootElement = xmlDoc.documentElement;
@@ -101,12 +111,14 @@ export class DigitalSignatureService {
     const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
 
     // Extraer clave privada
-    if (keyBags[forge.pki.oids.pkcs8ShroudedKeyBag]) {
+    if (keyBags[forge.pki.oids.pkcs8ShroudedKeyBag] && 
+        keyBags[forge.pki.oids.pkcs8ShroudedKeyBag].length > 0) {
       privateKey = keyBags[forge.pki.oids.pkcs8ShroudedKeyBag][0].key;
     }
 
     // Extraer certificado
-    if (certBags[forge.pki.oids.certBag]) {
+    if (certBags[forge.pki.oids.certBag] && 
+        certBags[forge.pki.oids.certBag].length > 0) {
       certificate = certBags[forge.pki.oids.certBag][0].cert;
     }
 
@@ -123,7 +135,7 @@ export class DigitalSignatureService {
   }
 
   /**
-   * Crea la estructura del nodo Signature según XML-DSig
+   * Crea la estructura del nodo Signature según XML-DSig (SIMPLIFICADA)
    */
   private createSignatureNode(
     xmlDoc: Document,
@@ -137,7 +149,6 @@ export class DigitalSignatureService {
 
     // SignedInfo
     const signedInfo = xmlDoc.createElement('ds:SignedInfo');
-    signedInfo.setAttribute('Id', 'Signature-SignedInfo');
 
     // CanonicalizationMethod
     const canonMethod = xmlDoc.createElement('ds:CanonicalizationMethod');
@@ -151,9 +162,7 @@ export class DigitalSignatureService {
 
     // Reference
     const reference = xmlDoc.createElement('ds:Reference');
-    reference.setAttribute('Id', 'SignedPropertiesID');
-    reference.setAttribute('Type', 'http://uri.etsi.org/01903#SignedProperties');
-    reference.setAttribute('URI', '#Signature');
+    reference.setAttribute('URI', '#comprobante');
 
     // Transforms
     const transforms = xmlDoc.createElement('ds:Transforms');
@@ -175,10 +184,9 @@ export class DigitalSignatureService {
     signedInfo.appendChild(reference);
     signature.appendChild(signedInfo);
 
-    // SignatureValue
+    // SignatureValue (vacío por ahora)
     const signatureValue = xmlDoc.createElement('ds:SignatureValue');
     signatureValue.setAttribute('Id', 'SignatureValue');
-    signatureValue.textContent = ''; // Se llenará después
     signature.appendChild(signatureValue);
 
     // KeyInfo
@@ -186,15 +194,17 @@ export class DigitalSignatureService {
     keyInfo.setAttribute('Id', 'Certificate');
 
     const x509Data = xmlDoc.createElement('ds:X509Data');
+    
+    // X509Certificate (vacío por ahora)
     const x509Cert = xmlDoc.createElement('ds:X509Certificate');
-    x509Cert.textContent = ''; // Se llenará después
     x509Data.appendChild(x509Cert);
 
-    // Agregar información del certificado
+    // X509SubjectName
     const x509SubjectName = xmlDoc.createElement('ds:X509SubjectName');
     x509SubjectName.textContent = this.getCertificateSubject(certificate);
     x509Data.appendChild(x509SubjectName);
 
+    // X509IssuerSerial
     const x509IssuerSerial = xmlDoc.createElement('ds:X509IssuerSerial');
     const x509IssuerName = xmlDoc.createElement('ds:X509IssuerName');
     x509IssuerName.textContent = this.getCertificateIssuer(certificate);
@@ -207,7 +217,7 @@ export class DigitalSignatureService {
     keyInfo.appendChild(x509Data);
     signature.appendChild(keyInfo);
 
-    // Object (XAdES-BES QualifyingProperties)
+    // Object con propiedades XAdES-BES
     const object = this.createXAdESObject(xmlDoc, certificate);
     signature.appendChild(object);
 
@@ -219,13 +229,12 @@ export class DigitalSignatureService {
    */
   private createXAdESObject(xmlDoc: Document, certificate: any): Element {
     const object = xmlDoc.createElement('ds:Object');
-    object.setAttribute('Id', 'Signature-Object');
 
     const qualProps = xmlDoc.createElement('etsi:QualifyingProperties');
     qualProps.setAttribute('Target', '#Signature');
 
     const signedProps = xmlDoc.createElement('etsi:SignedProperties');
-    signedProps.setAttribute('Id', 'Signature-SignedProperties');
+    signedProps.setAttribute('Id', 'SignedProperties');
 
     const signedSigProps = xmlDoc.createElement('etsi:SignedSignatureProperties');
 
@@ -276,13 +285,12 @@ export class DigitalSignatureService {
   }
 
   /**
-   * Firma los datos con la clave privada (CORREGIDO)
+   * Firma los datos con la clave privada
    */
   private signData(data: string, privateKey: any): string {
     const md = forge.md.sha256.create();
     md.update(data, 'utf8');
     
-    // Usar el método correcto de node-forge
     const signature = (privateKey as any).sign(md);
     return forge.util.encode64(signature);
   }
