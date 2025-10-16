@@ -1,0 +1,11 @@
+server:
+  port: 8081
+
+sri:
+  signing:
+    keystore-path: "/certificados/mi-certificado.p12"
+    keystore-password: "cambia-esta-clave"
+    certificate-alias: "mi-alias"
+    policy-identifier: "https://facturaelectronica.sri.gob.ec/firma/v2/politicafirma.xml"
+    policy-digest-algorithm: "http://www.w3.org/2000/09/xmldsig#sha1"
+    policy-digest-value: "Ohixl6upD6av8N7pEvDABhEL6hM="
