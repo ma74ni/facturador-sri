@@ -142,50 +142,48 @@ export class InvoicesService {
 
     try {
       // 8. Generar XML
+      console.log('📄 Generando XML de la factura...');
       const xml = this.xmlGenerator.generateInvoiceXml(invoice, company);
-      
-      const validation = this.xmlGenerator.validateXmlStructure(xml);
-      if (!validation.valid) {
-        console.warn('⚠️ Advertencias en XML:', validation.errors);
-      }
-
-      // Guardar XML sin firmar
       xmlPath = await this.xmlStorage.saveXml(accessKey, xml);
-      console.log(`✅ XML generado: ${xmlPath}`);
+      console.log(`✅ XML generado correctamente: ${xmlPath}`);
 
       // 9. Intentar firmar el XML con certificado de la empresa
       if (company.hasCertificate && company.certificatePath && company.certificatePassword) {
-        // Verificar que el certificado existe físicamente
+        console.log('🔐 Iniciando proceso de firma digital...');
+        
+        // Verificar que el certificado existe
         if (!existsSync(company.certificatePath)) {
-          console.warn(`⚠️ El certificado registrado no existe en: ${company.certificatePath}`);
+          console.warn(`⚠️ El certificado no existe: ${company.certificatePath}`);
           signatureStatus = 'certificado_no_encontrado';
         } else {
           try {
+            // ✅ FIRMA DIGITAL CON XAdES-BES
+            // Usar el método signXml que recibe la ruta del certificado
             const signedXml = await this.digitalSignature.signXml(
               xml,
               company.certificatePath,
               company.certificatePassword,
             );
 
+            // Guardar XML firmado
             xmlSignedPath = await this.xmlStorage.saveSignedXml(accessKey, signedXml);
-            console.log(`✅ XML firmado digitalmente: ${xmlSignedPath}`);
-            
+            console.log(`✅ XML firmado digitalmente con XAdES-BES: ${xmlSignedPath}`);
             signatureStatus = 'firmado';
           } catch (signError) {
-            console.error('❌ Error al firmar XML:', signError.message);
+            console.error('❌ Error al firmar XML:', signError);
+            console.error('Detalles:', signError.message);
             signatureStatus = 'error_firma';
           }
         }
       } else {
         console.warn('⚠️ La empresa no tiene certificado digital configurado');
-        console.warn('💡 Sube un certificado en /companies/certificate');
         signatureStatus = 'sin_certificado';
       }
 
       // 10. Actualizar factura con rutas de archivos
       await this.prisma.invoice.update({
         where: { id: invoice.id },
-        data: { 
+        data: {
           xmlPath,
           xmlSignedPath,
         },
@@ -193,6 +191,7 @@ export class InvoicesService {
 
     } catch (error) {
       console.error('❌ Error generando/firmando XML:', error);
+      signatureStatus = 'error_generacion';
     }
 
     return {
@@ -311,74 +310,78 @@ export class InvoicesService {
       },
     };
   }
+
   // ==================== ENVÍO AL SRI ====================
 
-async sendToSri(invoiceId: string, companyId: string) {
-  // 1. Obtener la factura
-  const invoice = await this.prisma.invoice.findFirst({
-    where: { id: invoiceId, companyId },
-    include: { company: true },
-  });
+  async sendToSri(invoiceId: string, companyId: string) {
+    // 1. Obtener la factura
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id: invoiceId, companyId },
+      include: { company: true },
+    });
 
-  if (!invoice) {
-    throw new NotFoundException('Factura no encontrada');
-  }
+    if (!invoice) {
+      throw new NotFoundException('Factura no encontrada');
+    }
 
-  // 2. Verificar que tenga XML firmado
-  if (!invoice.xmlSignedPath) {
-    throw new BadRequestException(
-      'La factura debe estar firmada digitalmente antes de enviarla al SRI',
-    );
-  }
+    // 2. Verificar que tenga XML firmado
+    if (!invoice.xmlSignedPath) {
+      throw new BadRequestException(
+        'La factura debe estar firmada digitalmente antes de enviarla al SRI',
+      );
+    }
 
-  if (!existsSync(invoice.xmlSignedPath)) {
-    throw new NotFoundException('Archivo XML firmado no encontrado');
-  }
+    if (!existsSync(invoice.xmlSignedPath)) {
+      throw new NotFoundException('Archivo XML firmado no encontrado');
+    }
 
-  // 3. Actualizar estado a "enviando"
-  await this.prisma.invoice.update({
-    where: { id: invoiceId },
-    data: { sriStatus: 'SENT' },
-  });
-
-  // 4. Enviar al SRI
-  const sriService = new SriWebServiceService();
-  const result = await sriService.sendAndAuthorize(
-    invoice.xmlSignedPath,
-    invoice.company.environment,
-  );
-
-  // 5. Actualizar estado según resultado
-  if (result.authorized) {
+    // 3. Actualizar estado a "enviando"
     await this.prisma.invoice.update({
       where: { id: invoiceId },
-      data: {
-        sriStatus: 'AUTHORIZED',
+      data: { sriStatus: 'SENT' },
+    });
+
+    // 4. Enviar al SRI
+    console.log('📤 Enviando factura al SRI...');
+    const sriService = new SriWebServiceService();
+    const result = await sriService.sendAndAuthorize(
+      invoice.xmlSignedPath,
+      invoice.company.environment,
+    );
+
+    // 5. Actualizar estado según resultado
+    if (result.authorized) {
+      await this.prisma.invoice.update({
+        where: { id: invoiceId },
+        data: {
+          sriStatus: 'AUTHORIZED',
+          authorizationNumber: result.authorizationNumber,
+          authorizationDate: result.authorizationDate,
+        },
+      });
+
+      console.log('✅ Factura autorizada por el SRI');
+      return {
+        message: 'Factura autorizada por el SRI',
+        status: 'AUTHORIZED',
         authorizationNumber: result.authorizationNumber,
         authorizationDate: result.authorizationDate,
-      },
-    });
+      };
+    } else {
+      await this.prisma.invoice.update({
+        where: { id: invoiceId },
+        data: {
+          sriStatus: result.sent ? 'REJECTED' : 'ERROR',
+          sriErrors: { errors: result.errors },
+        },
+      });
 
-    return {
-      message: 'Factura autorizada por el SRI',
-      status: 'AUTHORIZED',
-      authorizationNumber: result.authorizationNumber,
-      authorizationDate: result.authorizationDate,
-    };
-  } else {
-    await this.prisma.invoice.update({
-      where: { id: invoiceId },
-      data: {
-        sriStatus: result.sent ? 'REJECTED' : 'ERROR',
-        sriErrors: { errors: result.errors },
-      },
-    });
-
-    return {
-      message: 'La factura no fue autorizada',
-      status: result.sent ? 'REJECTED' : 'ERROR',
-      errors: result.errors,
-    };
+      console.error('❌ Factura rechazada por el SRI');
+      return {
+        message: 'La factura no fue autorizada',
+        status: result.sent ? 'REJECTED' : 'ERROR',
+        errors: result.errors,
+      };
+    }
   }
-}
 }

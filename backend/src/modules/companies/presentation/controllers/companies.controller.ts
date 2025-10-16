@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Put,
   Get,
   Delete,
   UseGuards,
@@ -98,5 +99,40 @@ export class CompaniesController {
   async deleteCertificate(@Request() req: any) {
     const companyId = await this.getCompanyId(req.user.userId);
     return this.companiesService.deleteCertificate(companyId);
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'Obtener información de la empresa' })
+  async getCompanyInfo(@Request() req: any) {
+    const companyId = await this.getCompanyId(req.user.userId);
+    return this.companiesService.getCompanyInfo(companyId);
+  }
+
+  @Put('environment')
+  @ApiOperation({ summary: 'Cambiar ambiente (TEST/PRODUCTION)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['environment'],
+      properties: {
+        environment: {
+          type: 'string',
+          enum: ['TEST', 'PRODUCTION'],
+          description: 'Ambiente del SRI',
+          example: 'TEST',
+        },
+      },
+    },
+  })
+  async updateEnvironment(
+    @Body('environment') environment: 'TEST' | 'PRODUCTION',
+    @Request() req: any,
+  ) {
+    if (!environment || !['TEST', 'PRODUCTION'].includes(environment)) {
+      throw new BadRequestException('Environment debe ser TEST o PRODUCTION');
+    }
+
+    const companyId = await this.getCompanyId(req.user.userId);
+    return this.companiesService.updateEnvironment(companyId, environment);
   }
 }

@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import * as soap from 'soap';
 import { readFile } from 'fs/promises';
+import { DOMParser } from '@xmldom/xmldom';
 
 @Injectable()
 export class SriWebServiceService {
@@ -8,6 +9,28 @@ export class SriWebServiceService {
   private readonly authorizationUrlTest = process.env.SRI_AUTHORIZATION_URL_TEST;
   private readonly receptionUrlProd = process.env.SRI_RECEPTION_URL_PROD;
   private readonly authorizationUrlProd = process.env.SRI_AUTHORIZATION_URL_PROD;
+
+  /**
+   * Extrae la clave de acceso del XML
+   */
+  private extractAccessKeyFromXml(xmlContent: string): string {
+    try {
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xmlContent, 'text/xml');
+      const claveAccessoNodes = xmlDoc.getElementsByTagName('claveAcceso');
+      
+      if (claveAccessoNodes && claveAccessoNodes.length > 0) {
+        const claveAcceso = claveAccessoNodes[0].textContent || '';
+        console.log(`🔑 Clave de acceso extraída del XML: ${claveAcceso} (longitud: ${claveAcceso.length})`);
+        return claveAcceso;
+      }
+      
+      throw new Error('No se encontró la clave de acceso en el XML');
+    } catch (error) {
+      console.error('Error extrayendo clave de acceso:', error);
+      throw error;
+    }
+  }
 
   /**
    * Envía un comprobante electrónico al SRI
@@ -27,14 +50,17 @@ export class SriWebServiceService {
         ? this.receptionUrlProd 
         : this.receptionUrlTest;
 
-        if (!url) {
-            throw new InternalServerErrorException(
-            `URL del SRI no configurada para ambiente ${environment}`,
-            );
-        }
+      if (!url) {
+        throw new InternalServerErrorException(
+          `URL del SRI no configurada para ambiente ${environment}`,
+        );
+      }
 
       console.log(`📤 Enviando factura al SRI (${environment})...`);
       console.log(`🔗 URL: ${url}`);
+
+      // Extraer clave de acceso del XML antes de enviar
+      const claveAcceso = this.extractAccessKeyFromXml(xmlContent);
 
       // Crear cliente SOAP
       const client = await soap.createClientAsync(url, {
@@ -59,9 +85,9 @@ export class SriWebServiceService {
 
       return {
         success: respuesta.estado === 'RECIBIDA',
-        claveAcceso: respuesta.claveAcceso || '',
+        claveAcceso: respuesta.claveAccesoComprobante || claveAcceso, // Usar la del XML si no viene en respuesta
         estado: respuesta.estado,
-        mensaje: respuesta.comprobantes?.[0]?.mensajes?.mensaje?.[0]?.mensaje,
+        mensaje: respuesta.comprobantes?.comprobante?.mensajes?.mensaje?.mensaje,
         comprobantes: respuesta.comprobantes,
       };
 
@@ -91,15 +117,21 @@ export class SriWebServiceService {
         ? this.authorizationUrlProd
         : this.authorizationUrlTest;
 
-       if (!url) {
+      if (!url) {
         throw new InternalServerErrorException(
           `URL de autorización del SRI no configurada para ambiente ${environment}`,
         );
       }
 
+      if (!accessKey || accessKey.length !== 49) {
+        throw new InternalServerErrorException(
+          `Clave de acceso inválida: '${accessKey}' (longitud: ${accessKey?.length || 0})`,
+        );
+      }
+
       console.log(`🔍 Consultando autorización en SRI (${environment})...`);
       console.log(`🔗 URL: ${url}`);
-      console.log(`🔑 Clave de acceso: ${accessKey}`);
+      console.log(`🔑 Clave de acceso: ${accessKey} (longitud: ${accessKey.length})`);
 
       // Crear cliente SOAP
       const client = await soap.createClientAsync(url, {
@@ -170,7 +202,11 @@ export class SriWebServiceService {
       // 1. Leer XML
       const xmlContent = await readFile(xmlPath, 'utf-8');
 
-      // 2. Enviar al SRI
+      // 2. Extraer clave de acceso
+      const claveAcceso = this.extractAccessKeyFromXml(xmlContent);
+      console.log(`📋 Procesando factura con clave: ${claveAcceso}`);
+
+      // 3. Enviar al SRI
       const sendResult = await this.sendInvoice(xmlContent, environment);
 
       if (!sendResult.success) {
@@ -184,14 +220,14 @@ export class SriWebServiceService {
 
       console.log(`✅ Comprobante RECIBIDO por el SRI`);
 
-      // 3. Esperar y consultar autorización (con reintentos)
+      // 4. Esperar y consultar autorización (con reintentos)
       for (let i = 0; i < maxRetries; i++) {
         console.log(`⏳ Intento ${i + 1}/${maxRetries} - Consultando autorización...`);
 
         await this.sleep(retryDelay);
 
         const authResult = await this.checkAuthorization(
-          sendResult.claveAcceso,
+          claveAcceso, // Usar la clave extraída del XML
           environment,
         );
 
@@ -208,8 +244,8 @@ export class SriWebServiceService {
           };
         }
 
-        if (authResult.estado === 'NO_AUTORIZADO') {
-          const mensajes = authResult.mensajes?.map((m: any) => m.mensaje).join(', ');
+        if (authResult.estado === 'NO_AUTORIZADO' || authResult.estado === 'RECHAZADA') {
+          const mensajes = authResult.mensajes?.map((m: any) => m.mensaje || m.informacionAdicional).join(', ');
           errors.push(`Comprobante rechazado: ${mensajes}`);
           console.error(`❌ Comprobante NO AUTORIZADO: ${mensajes}`);
           

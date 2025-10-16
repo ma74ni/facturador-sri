@@ -6,6 +6,7 @@ import * as dayjs from 'dayjs';
 export class XmlGeneratorService {
   /**
    * Genera el XML de una factura según esquema SRI v2.32
+   * Estructura basada en ANEXO 1 - Ficha Técnica SRI
    */
   generateInvoiceXml(invoice: any, company: any): string {
     const root = create({ version: '1.0', encoding: 'UTF-8' })
@@ -33,7 +34,6 @@ export class XmlGeneratorService {
     const infoFactura = root.ele('infoFactura');
     
     infoFactura.ele('fechaEmision').txt(dayjs(invoice.issueDate).format('DD/MM/YYYY'));
-    infoFactura.ele('dirEstablecimiento').txt(invoice.establishment.address);
     
     // Obligado a llevar contabilidad
     infoFactura.ele('obligadoContabilidad').txt('SI');
@@ -46,6 +46,7 @@ export class XmlGeneratorService {
     );
     infoFactura.ele('identificacionComprador').txt(invoice.customer.identification);
     
+    // Dirección comprador (opcional)
     if (invoice.customer.address) {
       infoFactura.ele('direccionComprador').txt(invoice.customer.address);
     }
@@ -57,12 +58,19 @@ export class XmlGeneratorService {
     // ==================== TOTAL CON IMPUESTOS ====================
     const totalConImpuestos = infoFactura.ele('totalConImpuestos');
     
-    // IVA 15%
+    // IVA 15% (código 4)
     const totalImpuesto = totalConImpuestos.ele('totalImpuesto');
     totalImpuesto.ele('codigo').txt('2'); // 2 = IVA
     totalImpuesto.ele('codigoPorcentaje').txt('4'); // 4 = 15%
     totalImpuesto.ele('baseImponible').txt(invoice.subtotal.toFixed(2));
     totalImpuesto.ele('valor').txt(invoice.ivaValue.toFixed(2));
+    
+    // IVA 0% (obligatorio para validación del SRI)
+    const totalImpuesto0 = totalConImpuestos.ele('totalImpuesto');
+    totalImpuesto0.ele('codigo').txt('2');
+    totalImpuesto0.ele('codigoPorcentaje').txt('0'); // 0 = 0%
+    totalImpuesto0.ele('baseImponible').txt('0.00');
+    totalImpuesto0.ele('valor').txt('0.00');
     
     // Propina (generalmente 0)
     infoFactura.ele('propina').txt('0.00');
@@ -78,6 +86,8 @@ export class XmlGeneratorService {
     const pago = pagos.ele('pago');
     pago.ele('formaPago').txt('01'); // 01 = Sin utilización del sistema financiero
     pago.ele('total').txt(invoice.total.toFixed(2));
+    pago.ele('plazo').txt('0');
+    pago.ele('unidadTiempo').txt('dias');
 
     // ==================== DETALLES ====================
     const detalles = root.ele('detalles');
@@ -86,6 +96,7 @@ export class XmlGeneratorService {
       const detalle = detalles.ele('detalle');
       
       detalle.ele('codigoPrincipal').txt(item.mainCode);
+      detalle.ele('codigoAuxiliar').txt(item.mainCode); // Mismo código como auxiliar
       detalle.ele('descripcion').txt(item.description);
       detalle.ele('cantidad').txt(item.quantity.toString());
       detalle.ele('precioUnitario').txt(item.unitPrice.toFixed(6));
@@ -97,7 +108,7 @@ export class XmlGeneratorService {
       const impuesto = impuestos.ele('impuesto');
       impuesto.ele('codigo').txt('2'); // IVA
       impuesto.ele('codigoPorcentaje').txt('4'); // 15%
-      impuesto.ele('tarifa').txt('15');
+      impuesto.ele('tarifa').txt('15'); // Tarifa solo va en detalles
       impuesto.ele('baseImponible').txt(item.subtotal.toFixed(2));
       
       const ivaItem = parseFloat(item.subtotal) * 0.15;
@@ -108,7 +119,7 @@ export class XmlGeneratorService {
     const infoAdicional = root.ele('infoAdicional');
     infoAdicional.ele('campoAdicional', { nombre: 'Email' }).txt(invoice.customer.email || 'N/A');
     if (invoice.customer.phone) {
-      infoAdicional.ele('campoAdicional', { nombre: 'Teléfono' }).txt(invoice.customer.phone);
+      infoAdicional.ele('campoAdicional', { nombre: 'Telefono' }).txt(invoice.customer.phone);
     }
 
     // Generar XML como string
@@ -138,6 +149,12 @@ export class XmlGeneratorService {
     }
     if (!xml.includes('<claveAcceso>')) {
       errors.push('Falta <claveAcceso>');
+    }
+    if (!xml.includes('<totalConImpuestos>')) {
+      errors.push('Falta <totalConImpuestos>');
+    }
+    if (!xml.includes('<totalImpuesto>')) {
+      errors.push('Falta <totalImpuesto> dentro de <totalConImpuestos>');
     }
 
     return {

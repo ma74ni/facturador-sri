@@ -36,30 +36,39 @@ export class AccessKeyService {
     // Secuencial (9 dígitos)
     const seq = sequential.padStart(9, '0');
 
-    // Código numérico (8 dígitos aleatorios)
-    const numericCode = Math.floor(Math.random() * 100000000)
-      .toString()
-      .padStart(8, '0');
+    // Código numérico (8 dígitos EXACTOS - NO 9)
+    // Generar número entre 10000000 y 99999999 (8 dígitos exactos)
+    const numericCode = (Math.floor(Math.random() * 90000000) + 10000000).toString();
 
     // Tipo de emisión (1=Normal)
     const emissionType = '1';
 
     // Concatenar los primeros 48 dígitos
     const base48 = 
-      dateStr + 
-      docType + 
-      rucStr + 
-      env + 
-      serie + 
-      seq + 
-      numericCode + 
-      emissionType;
+      dateStr +       // 8 dígitos
+      docType +       // 2 dígitos
+      rucStr +        // 13 dígitos
+      env +           // 1 dígito
+      serie +         // 6 dígitos
+      seq +           // 9 dígitos
+      numericCode +   // 8 dígitos
+      emissionType;   // 1 dígito
+                      // TOTAL: 48 dígitos
+
+    // Validar que base48 tenga exactamente 48 dígitos
+    if (base48.length !== 48) {
+      throw new Error(`Error: clave base debe tener 48 dígitos, tiene ${base48.length}`);
+    }
 
     // Calcular dígito verificador (módulo 11)
     const checkDigit = this.calculateModule11(base48);
 
     // Retornar clave completa de 49 dígitos
-    return base48 + checkDigit;
+    const fullKey = base48 + checkDigit;
+
+    console.log(`🔑 Clave de acceso generada: ${fullKey} (longitud: ${fullKey.length})`);
+
+    return fullKey;
   }
 
   /**

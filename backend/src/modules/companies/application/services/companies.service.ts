@@ -148,4 +148,57 @@ export class CompaniesService {
       message: 'Certificado eliminado exitosamente',
     };
   }
+
+  async updateEnvironment(companyId: string, environment: 'TEST' | 'PRODUCTION') {
+  const company = await this.prisma.company.findUnique({
+    where: { id: companyId },
+  });
+
+  if (!company) {
+    throw new NotFoundException('Empresa no encontrada');
+  }
+
+  const updated = await this.prisma.company.update({
+    where: { id: companyId },
+    data: { environment },
+    select: {
+      id: true,
+      businessName: true,
+      environment: true,
+    },
+  });
+
+  return {
+    message: `Ambiente actualizado a ${environment}`,
+    company: updated,
+  };
+}
+
+async getCompanyInfo(companyId: string) {
+  const company = await this.prisma.company.findUnique({
+    where: { id: companyId },
+    select: {
+      id: true,
+      ruc: true,
+      businessName: true,
+      tradeName: true,
+      address: true,
+      phone: true,
+      email: true,
+      environment: true,
+      hasCertificate: true,
+      certificateExpiry: true,
+      isActive: true,
+    },
+  });
+
+  if (!company) {
+    throw new NotFoundException('Empresa no encontrada');
+  }
+
+  return {
+    message: 'Información de la empresa',
+    company,
+  };
+}
 }
