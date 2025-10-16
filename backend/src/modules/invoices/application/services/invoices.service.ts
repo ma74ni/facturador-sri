@@ -148,32 +148,20 @@ export class InvoicesService {
       console.log(`✅ XML generado correctamente: ${xmlPath}`);
 
       // 9. Intentar firmar el XML con certificado de la empresa
-      if (company.hasCertificate && company.certificatePath && company.certificatePassword) {
-        console.log('🔐 Iniciando proceso de firma digital...');
-        
-        // Verificar que el certificado existe
-        if (!existsSync(company.certificatePath)) {
-          console.warn(`⚠️ El certificado no existe: ${company.certificatePath}`);
-          signatureStatus = 'certificado_no_encontrado';
-        } else {
-          try {
-            // ✅ FIRMA DIGITAL CON XAdES-BES
-            // Usar el método signXml que recibe la ruta del certificado
-            const signedXml = await this.digitalSignature.signXml(
-              xml,
-              company.certificatePath,
-              company.certificatePassword,
-            );
+      if (company.hasCertificate) {
+        console.log('🔐 Iniciando proceso de firma digital con el microservicio...');
 
-            // Guardar XML firmado
-            xmlSignedPath = await this.xmlStorage.saveSignedXml(accessKey, signedXml);
-            console.log(`✅ XML firmado digitalmente con XAdES-BES: ${xmlSignedPath}`);
-            signatureStatus = 'firmado';
-          } catch (signError) {
-            console.error('❌ Error al firmar XML:', signError);
-            console.error('Detalles:', signError.message);
-            signatureStatus = 'error_firma';
-          }
+        try {
+          const signedXml = await this.digitalSignature.signXml(xml);
+
+          // Guardar XML firmado
+          xmlSignedPath = await this.xmlStorage.saveSignedXml(accessKey, signedXml);
+          console.log(`✅ XML firmado digitalmente con XAdES-BES: ${xmlSignedPath}`);
+          signatureStatus = 'firmado';
+        } catch (signError: any) {
+          console.error('❌ Error al firmar XML:', signError);
+          console.error('Detalles:', signError?.message);
+          signatureStatus = 'error_firma';
         }
       } else {
         console.warn('⚠️ La empresa no tiene certificado digital configurado');
