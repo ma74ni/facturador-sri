@@ -86,44 +86,36 @@ export class RideGeneratorService {
 
   // ========================= Layout principal =========================
   private async buildRideContent(
-    doc: PDFKit.PDFDocument,
-    invoice: any,
-    company: any,
-  ): Promise<void> {
-    let y = 30;
+  doc: PDFKit.PDFDocument,
+  invoice: any,
+  company: any,
+): Promise<void> {
+  let y = 30;
 
-    // Header izquierdo + Cuadro derecho
-    const afterHeader = await this.drawHeaderAndTaxBox(doc, invoice, company, y);
-    y = afterHeader + 10;
+  // Header izquierdo + Cuadro derecho
+  const afterHeader = await this.drawHeaderAndTaxBox(doc, invoice, company, y);
+  y = afterHeader + 10;
 
-    // Línea separadora
-    this.hrule(doc, 40, y, 555);
-    y += 10;
+  // Línea separadora
+  this.hrule(doc, 40, y, 555);
+  y += 10;
 
-    // Info factura
-    y = this.drawInvoiceInfo(doc, invoice, y);
+  // Info factura
+  y = this.drawInvoiceInfo(doc, invoice, y);
 
-    // Info cliente
-    y = this.drawCustomerInfo(doc, invoice.customer, y);
+  // Info cliente
+  y = this.drawCustomerInfo(doc, invoice.customer, y);
 
-    // Línea separadora
-    this.hrule(doc, 40, y, 555);
-    y += 10;
+  // Línea separadora
+  this.hrule(doc, 40, y, 555);
+  y += 10;
 
-    // Detalle
-    y = await this.drawItemsTable(doc, invoice.items || [], y);
+  // Detalle
+  y = await this.drawItemsTable(doc, invoice.items || [], y);
 
-    // Info adicional (si existe)
-    if (invoice.customer?.email || invoice.customer?.phone) {
-      y = this.drawAdditionalInfo(doc, invoice, y);
-    }
-
-    // Forma de pago
-    y = this.drawPaymentMethod(doc, invoice, y);
-
-    // Totales
-    y = this.drawTotals(doc, invoice, y);
-  }
+  // Info adicional + Forma de pago (izq) || Subtotales + Total (der)
+  y = this.drawAdditionalInfoAndTotals(doc, invoice, y);
+}
 
   // ========================= Bloques de dibujo =========================
 
@@ -517,95 +509,127 @@ export class RideGeneratorService {
   }
 
   /**
-   * Información adicional
-   */
-  private drawAdditionalInfo(doc: PDFKit.PDFDocument, invoice: any, y: number): number {
-    doc.fontSize(8).font('Helvetica-Bold').text('Información Adicional', 40, y);
-    y += 12;
+ * Información adicional + Forma de pago (izquierda) || Subtotales + Total (derecha)
+ */
+private drawAdditionalInfoAndTotals(
+  doc: PDFKit.PDFDocument,
+  invoice: any,
+  y: number,
+): number {
+  const leftX = 40;
+  const rightX = 320;
+  const startY = y;
+
+  let leftY = startY;
+  let rightY = startY;
+
+  // ========== IZQUIERDA: INFORMACIÓN ADICIONAL ==========
+  if (invoice.customer?.email || invoice.customer?.phone) {
+    doc.fontSize(8).font('Helvetica-Bold').text('Información Adicional', leftX, leftY);
+    leftY += 12;
 
     doc.fontSize(7).font('Helvetica');
 
     if (invoice.customer?.email) {
-      doc.text(`Email: ${this.pad(invoice.customer.email)}`, 40, y);
-      y += 10;
+      doc.text(`Email: ${this.pad(invoice.customer.email)}`, leftX, leftY, { width: 250 });
+      leftY += 10;
     }
 
     if (invoice.customer?.phone) {
-      doc.text(`Teléfono: ${this.pad(invoice.customer.phone)}`, 40, y);
-      y += 10;
+      doc.text(`Teléfono: ${this.pad(invoice.customer.phone)}`, leftX, leftY, { width: 250 });
+      leftY += 10;
     }
 
-    return y + 5;
+    leftY += 5; // Espacio antes de Forma de Pago
   }
 
-  /**
-   * Forma de pago
-   */
-  private drawPaymentMethod(doc: PDFKit.PDFDocument, invoice: any, y: number): number {
-    doc.fontSize(8).font('Helvetica-Bold');
+  // ========== IZQUIERDA: FORMA DE PAGO (CON ALTURA DINÁMICA) ==========
+  const paymentBoxX = leftX;
+  const paymentBoxWidth = 250;
+  const headerColWidth = 150;
+  const valueColWidth = 100;
 
-    doc.text('Forma de Pago', 40, y, { width: 300 });
-    doc.text('Valor', 340, y, { width: 100 });
+  // Header de tabla
+  const paymentHeaderY = leftY;
+  doc.fontSize(7).font('Helvetica-Bold');
+  doc.text('Forma de Pago', paymentBoxX + 2, paymentHeaderY + 2, { width: headerColWidth - 4 });
+  doc.text('Valor', paymentBoxX + headerColWidth + 2, paymentHeaderY + 2, { width: valueColWidth - 4 });
 
-    y += 12;
-    this.hrule(doc, 40, y, 555);
-    y += 4;
+  leftY += 12;
+  this.hrule(doc, paymentBoxX, leftY, paymentBoxX + paymentBoxWidth);
+  leftY += 4;
 
-    doc.fontSize(7).font('Helvetica');
+  // Contenido (con altura dinámica)
+  doc.font('Helvetica');
+  const formaPago = invoice.paymentMethod || 'SIN UTILIZACION DEL SISTEMA FINANCIERO';
+  
+  // Calcular altura necesaria para el texto de forma de pago
+  const paymentTextHeight = this.getTextHeight(doc, formaPago, headerColWidth - 4);
+  const rowHeight = Math.max(14, paymentTextHeight + 4);
 
-    const formaPago = invoice.paymentMethod || 'SIN UTILIZACION DEL SISTEMA FINANCIERO';
-    doc.text(formaPago, 40, y, { width: 300 });
-    doc.text(this.money(invoice.total), 340, y, { width: 100 });
+  const rowStartY = leftY;
 
-    y += 12;
-    this.hrule(doc, 40, y, 555);
+  // Texto de forma de pago (izquierda)
+  doc.text(formaPago, paymentBoxX + 2, rowStartY, { width: headerColWidth - 4 });
 
-    return y + 15;
-  }
+  // Valor (derecha, centrado verticalmente)
+  doc.text(
+    this.money(invoice.total),
+    paymentBoxX + headerColWidth + 2,
+    rowStartY,
+    { width: valueColWidth - 4 }
+  );
 
-  /**
-   * Totales
-   */
-  private drawTotals(doc: PDFKit.PDFDocument, invoice: any, y: number): number {
-    const labelX = 350;
-    const valueX = 490;
-    const valueW = 65;
+  leftY += rowHeight;
+  this.hrule(doc, paymentBoxX, leftY, paymentBoxX + paymentBoxWidth);
+  leftY += 10;
 
-    doc.fontSize(7).font('Helvetica');
+  // ========== DERECHA: SUBTOTALES ==========
+  const labelX = rightX;
+  const valueX = 485; // Más espacio para el valor
+  const valueW = 70; // Ancho ampliado para valores hasta $999,999.99
 
-    const addRow = (label: string, value: number) => {
-      doc.text(label, labelX, y, { width: 130 });
-      doc.text(this.money(value), valueX, y, { width: valueW, align: 'right' });
-      y += 10;
-    };
+  doc.fontSize(7).font('Helvetica');
 
-    // Subtotales
-    if (invoice.subtotal15) addRow('SUBTOTAL 15%', invoice.subtotal15);
-    if (invoice.subtotal5) addRow('SUBTOTAL 5%', invoice.subtotal5);
-    if (invoice.subtotal0) addRow('SUBTOTAL 0%', invoice.subtotal0);
-    if (invoice.subtotalNoObjeto) addRow('SUBTOTAL NO OBJETO DE IVA', invoice.subtotalNoObjeto);
-    if (invoice.subtotalExento) addRow('SUBTOTAL EXENTO DE IVA', invoice.subtotalExento);
+  const addRow = (label: string, value: number) => {
+    doc.text(label, labelX, rightY, { width: 160 });
+    doc.text(this.money(value), valueX, rightY, { width: valueW, align: 'right' });
+    rightY += 10;
+  };
 
-    addRow('SUBTOTAL SIN IMPUESTOS', invoice.subtotal || 0);
+  // Subtotales por tarifa IVA
+  if (invoice.subtotal15) addRow('SUBTOTAL 15%', invoice.subtotal15);
+  if (invoice.subtotal5) addRow('SUBTOTAL 5%', invoice.subtotal5);
+  if (invoice.subtotal0) addRow('SUBTOTAL 0%', invoice.subtotal0);
+  if (invoice.subtotalNoObjeto) addRow('SUBTOTAL NO OBJETO DE IVA', invoice.subtotalNoObjeto);
+  if (invoice.subtotalExento) addRow('SUBTOTAL EXENTO DE IVA', invoice.subtotalExento);
 
-    if (invoice.totalDiscount) addRow('TOTAL DESCUENTO', invoice.totalDiscount);
-    if (invoice.iceValue) addRow('ICE', invoice.iceValue);
-    if (invoice.irbpnrValue) addRow('IRBPNR', invoice.irbpnrValue);
+  addRow('SUBTOTAL SIN IMPUESTOS', invoice.subtotal || 0);
 
-    if (invoice.iva5Value) addRow('IVA 5%', invoice.iva5Value);
-    addRow('IVA 15%', invoice.ivaValue || 0);
+  if (invoice.totalDiscount) addRow('TOTAL DESCUENTO', invoice.totalDiscount);
+  if (invoice.iceValue) addRow('ICE', invoice.iceValue);
+  if (invoice.irbpnrValue) addRow('IRBPNR', invoice.irbpnrValue);
 
-    if (invoice.tip) addRow('PROPINA', invoice.tip);
+  if (invoice.iva5Value) addRow('IVA 5%', invoice.iva5Value);
+  addRow('IVA 15%', invoice.ivaValue || 0);
 
-    // Línea
-    this.hrule(doc, labelX, y, valueX + valueW);
-    y += 5;
+  if (invoice.tip) addRow('PROPINA', invoice.tip);
 
-    // Total
-    doc.fontSize(9).font('Helvetica-Bold');
-    doc.text('VALOR TOTAL', labelX, y, { width: 130 });
-    doc.text(this.money(invoice.total), valueX, y, { width: valueW, align: 'right' });
+  rightY += 2;
 
-    return y + 15;
-  }
+  // ========== DERECHA: LÍNEA Y TOTAL ==========
+  this.hrule(doc, labelX, rightY, valueX + valueW);
+  rightY += 8;
+
+  // VALOR TOTAL (con más espacio)
+  doc.fontSize(10).font('Helvetica-Bold');
+  doc.text('VALOR TOTAL', labelX, rightY, { width: 160 });
+  doc.text(this.money(invoice.total), valueX, rightY, { width: valueW, align: 'right' });
+  rightY += 15;
+
+  // Retornar la Y más baja de ambas columnas
+  return Math.max(leftY, rightY) + 10;
+}
+
+  
 }
