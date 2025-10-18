@@ -7,6 +7,7 @@ import { XmlStorageService } from './infrastructure/xml/xml-storage.service';
 import { DigitalSignatureService } from './infrastructure/xml/digital-signature.service';
 import { PrismaService } from '../../shared/database/prisma.service';
 import { SriWebServiceService } from './infrastructure/sri/sri-web-service.service';
+import { RideGeneratorService } from './infrastructure/pdf/ride-generator.service';
 
 @Module({
   controllers: [InvoicesController],
@@ -18,6 +19,7 @@ import { SriWebServiceService } from './infrastructure/sri/sri-web-service.servi
     DigitalSignatureService,
     SriWebServiceService,
     PrismaService,
+    RideGeneratorService
   ],
   exports: [InvoicesService],
 })

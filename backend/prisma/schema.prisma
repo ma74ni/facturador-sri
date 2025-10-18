@@ -63,6 +63,8 @@ model Company {
   address             String
   phone               String?
   email               String
+
+  logoPath             String?
   
   environment         SRIEnvironment  @default(TEST)
   isActive            Boolean         @default(true)

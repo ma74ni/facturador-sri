@@ -8,8 +8,15 @@ import * as forge from 'node-forge';
 @Injectable()
 export class CompaniesService {
   private readonly certificatesPath = join(process.cwd(), 'storage', 'certificates');
+  private readonly logosPath = join(process.cwd(), 'storage', 'logos'); 
 
   constructor(private prisma: PrismaService) {}
+
+  async ensureLogosFolder(): Promise<void> {
+    if (!existsSync(this.logosPath)) {
+      await mkdir(this.logosPath, { recursive: true });
+    }
+  }
 
   async ensureCertificatesFolder(): Promise<void> {
     if (!existsSync(this.certificatesPath)) {
@@ -201,4 +208,104 @@ async getCompanyInfo(companyId: string) {
     company,
   };
 }
+async uploadLogo(
+    companyId: string,
+    file: Express.Multer.File,
+  ) {
+    // 1. Verificar que la empresa existe
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+    });
+
+    if (!company) {
+      throw new NotFoundException('Empresa no encontrada');
+    }
+
+    // 2. Validar que sea una imagen
+    const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/jpg'];
+    const allowedExtensions = ['.png', '.jpg', '.jpeg'];
+    
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      throw new BadRequestException(
+        'Formato de archivo no válido. Solo se permiten imágenes PNG, JPG o JPEG',
+      );
+    }
+
+    const fileExtension = file.originalname.toLowerCase().slice(file.originalname.lastIndexOf('.'));
+    if (!allowedExtensions.includes(fileExtension)) {
+      throw new BadRequestException(
+        'Extensión de archivo no válida. Solo se permiten .png, .jpg, .jpeg',
+      );
+    }
+
+    // 3. Validar tamaño (máximo 2MB)
+    const maxSize = 2 * 1024 * 1024; // 2MB
+    if (file.size > maxSize) {
+      throw new BadRequestException(
+        'El archivo es demasiado grande. Tamaño máximo: 2MB',
+      );
+    }
+
+    // 4. Eliminar logo anterior si existe
+    if (company.logoPath && existsSync(company.logoPath)) {
+      try {
+        await unlink(company.logoPath);
+      } catch (error) {
+        console.warn('No se pudo eliminar logo anterior:', error);
+      }
+    }
+
+    // 5. Guardar nuevo logo
+    await this.ensureLogosFolder();
+    const filename = `${companyId}${fileExtension}`;
+    const filepath = join(this.logosPath, filename);
+    
+    await writeFile(filepath, file.buffer);
+
+    // 6. Actualizar empresa en BD
+    const updatedCompany = await this.prisma.company.update({
+      where: { id: companyId },
+      data: {
+        logoPath: filepath,
+      },
+      select: {
+        id: true,
+        businessName: true,
+        logoPath: true,
+      },
+    });
+
+    return {
+      message: 'Logo cargado exitosamente',
+      company: updatedCompany,
+    };
+  }
+
+  async deleteLogo(companyId: string) {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+    });
+
+    if (!company) {
+      throw new NotFoundException('Empresa no encontrada');
+    }
+
+    // Eliminar archivo físico
+    if (company.logoPath && existsSync(company.logoPath)) {
+      await unlink(company.logoPath);
+    }
+
+    // Actualizar BD
+    await this.prisma.company.update({
+      where: { id: companyId },
+      data: {
+        logoPath: null,
+      },
+    });
+
+    return {
+      message: 'Logo eliminado exitosamente',
+    };
+  }
+
 }

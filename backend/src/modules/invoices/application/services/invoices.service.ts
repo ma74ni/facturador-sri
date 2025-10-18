@@ -8,6 +8,7 @@ import { DigitalSignatureService } from '../../infrastructure/xml/digital-signat
 import { Decimal } from '@prisma/client/runtime/library';
 import { existsSync } from 'fs';
 import { SriWebServiceService } from '../../infrastructure/sri/sri-web-service.service';
+import { RideGeneratorService } from '../../infrastructure/pdf/ride-generator.service';
 
 @Injectable()
 export class InvoicesService {
@@ -17,6 +18,7 @@ export class InvoicesService {
     private xmlGenerator: XmlGeneratorService,
     private xmlStorage: XmlStorageService,
     private digitalSignature: DigitalSignatureService,
+    private rideGenerator: RideGeneratorService,
   ) {}
 
   async create(dto: CreateInvoiceDto, companyId: string, userId: string) {
@@ -380,5 +382,49 @@ export class InvoicesService {
         errors: result.errors,
       };
     }
+  }
+
+   // ==================== GENERACIÓN DE RIDE (PDF) ====================
+
+  async generateRide(invoiceId: string, companyId: string) {
+    // 1. Obtener la factura con todos sus datos
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id: invoiceId, companyId },
+      include: {
+        items: true,
+        customer: true,
+        establishment: true,
+        emissionPoint: true,
+        company: true,
+      },
+    });
+
+    if (!invoice) {
+      throw new NotFoundException('Factura no encontrada');
+    }
+
+    // 2. Verificar que esté autorizada
+    if (invoice.sriStatus !== 'AUTHORIZED') {
+      throw new BadRequestException(
+        'La factura debe estar autorizada por el SRI para generar el RIDE',
+      );
+    }
+
+    // 3. Generar el PDF
+    console.log('📄 Generando RIDE (PDF)...');
+    const ridePath = await this.rideGenerator.generateRide(invoice, invoice.company);
+
+    // 4. Actualizar factura con la ruta del PDF
+    await this.prisma.invoice.update({
+      where: { id: invoiceId },
+      data: { ridePdfPath: ridePath },
+    });
+
+    console.log(`✅ RIDE generado: ${ridePath}`);
+
+    return {
+      message: 'RIDE generado exitosamente',
+      ridePath,
+    };
   }
 }

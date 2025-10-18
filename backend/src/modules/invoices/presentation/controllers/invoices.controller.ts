@@ -114,4 +114,41 @@ export class InvoicesController {
     const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
     return this.invoicesService.sendToSri(id, companyId);
   }
+  @Get(':id/ride')
+@ApiOperation({ summary: 'Generar RIDE (PDF) de la factura' })
+async generateRide(@Param('id') id: string, @Request() req: any) {
+  const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
+  return this.invoicesService.generateRide(id, companyId);
+}
+
+@Get(':id/ride/download')
+@ApiOperation({ summary: 'Descargar RIDE (PDF)' })
+async downloadRide(
+  @Param('id') id: string,
+  @Request() req: any,
+  @Res() res: Response,
+) {
+  const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
+  
+  const invoice = await this.prisma.invoice.findFirst({
+    where: { id, companyId },
+  });
+
+  if (!invoice) {
+    throw new NotFoundException('Factura no encontrada');
+  }
+
+  if (!invoice.ridePdfPath || !existsSync(invoice.ridePdfPath)) {
+    throw new NotFoundException('RIDE no encontrado. Genéralo primero.');
+  }
+
+  const pdfBuffer = await readFile(invoice.ridePdfPath);
+  
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="FACTURA_${invoice.establishmentCode}-${invoice.emissionPointCode}-${invoice.sequential}.pdf"`,
+  );
+  res.send(pdfBuffer);
+}
 }
