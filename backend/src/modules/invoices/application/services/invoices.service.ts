@@ -158,10 +158,19 @@ export class InvoicesService {
           xmlSignedPath = await this.xmlStorage.saveSignedXml(accessKey, signedXml);
           console.log(`✅ XML firmado digitalmente con XAdES-BES: ${xmlSignedPath}`);
           signatureStatus = 'firmado';
+          
         } catch (signError: any) {
-          console.error('❌ Error al firmar XML:', signError);
-          console.error('Detalles:', signError?.message);
+          console.error('❌ Error al firmar XML:', signError.message);
           signatureStatus = 'error_firma';
+          
+          // Mensajes específicos según el tipo de error
+          if (signError.message.includes('no está disponible')) {
+            console.error('⚠️ El microservicio de firma digital no responde');
+          } else if (signError.message.includes('certificado')) {
+            console.error('⚠️ Problema con el certificado digital');
+          } else {
+            console.error('⚠️ Error desconocido en la firma digital');
+          }
         }
       } else {
         console.warn('⚠️ La empresa no tiene certificado digital configurado');
