@@ -21,6 +21,7 @@ import { PrismaService } from '../../../../shared/database/prisma.service';
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { Response } from 'express';
+import { EmailService } from '@/shared/email/email.service';
 
 @ApiTags('companies')
 @Controller('companies')
@@ -30,6 +31,7 @@ export class CompaniesController {
   constructor(
     private readonly companiesService: CompaniesService,
     private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
   ) {}
 
   private async getCompanyId(userId: string): Promise<string> {
@@ -202,4 +204,152 @@ export class CompaniesController {
     const companyId = await this.getCompanyId(req.user.userId);
     return this.companiesService.deleteLogo(companyId);
   }
+  @Put('mailjet-config')
+@ApiOperation({ summary: 'Configurar Mailjet de la empresa' })
+@ApiBody({
+  schema: {
+    type: 'object',
+    properties: {
+      mailjetApiKey: { type: 'string' },
+      mailjetSecretKey: { type: 'string' },
+      mailjetFromEmail: { type: 'string', example: 'ventas@miempresa.com' },
+      mailjetFromName: { type: 'string', example: 'Mi Empresa S.A.' },
+    },
+  },
+})
+async updateMailjetConfig(@Body() dto: any, @Request() req: any) {
+  const companyId = await this.getCompanyId(req.user.userId);
+
+  // Validar que se proporcionen las credenciales
+  if (!dto.mailjetApiKey || !dto.mailjetSecretKey) {
+    throw new BadRequestException('Se requieren mailjetApiKey y mailjetSecretKey');
+  }
+
+  // Verificar conexión antes de guardar
+  const isValid = await this.emailService.verifyConnection({
+    emailProvider: 'MAILJET',
+    mailjetApiKey: dto.mailjetApiKey,
+    mailjetSecretKey: dto.mailjetSecretKey,
+    businessName: '', // No se usa en la verificación
+    email: '',
+  });
+
+  if (!isValid) {
+    throw new BadRequestException('Credenciales de Mailjet inválidas');
+  }
+
+  const updated = await this.prisma.company.update({
+    where: { id: companyId },
+    data: {
+      emailProvider: 'MAILJET',
+      mailjetApiKey: dto.mailjetApiKey,
+      mailjetSecretKey: dto.mailjetSecretKey,
+      mailjetFromEmail: dto.mailjetFromEmail || null,
+      mailjetFromName: dto.mailjetFromName || null,
+      mailjetSenderVerified: false,
+    },
+  });
+
+  return {
+    message: 'Configuración de Mailjet actualizada correctamente',
+    company: {
+      id: updated.id,
+      businessName: updated.businessName,
+      emailProvider: updated.emailProvider,
+      mailjetFromEmail: updated.mailjetFromEmail,
+      mailjetFromName: updated.mailjetFromName,
+    },
+  };
+}
+
+@Delete('mailjet-config')
+@ApiOperation({ summary: 'Volver a usar email del sistema' })
+async resetToSystemEmail(@Request() req: any) {
+  const companyId = await this.getCompanyId(req.user.userId);
+
+  await this.prisma.company.update({
+    where: { id: companyId },
+    data: {
+      emailProvider: 'SYSTEM',
+      mailjetApiKey: null,
+      mailjetSecretKey: null,
+      mailjetFromEmail: null,
+      mailjetFromName: null,
+    },
+  });
+
+  return {
+    message: 'Ahora se usará el email del sistema',
+  };
+}
+@Post('mailjet-config/test')
+@ApiOperation({ summary: 'Probar configuración de Mailjet' })
+async testMailjetConfig(@Request() req: any) {
+  const companyId = await this.getCompanyId(req.user.userId);
+
+  const company = await this.prisma.company.findUnique({
+    where: { id: companyId },
+  });
+
+  if (!company) {
+    throw new BadRequestException('Empresa no encontrada');
+  }
+
+  if (company.emailProvider !== 'MAILJET' || !company.mailjetApiKey) {
+    throw new BadRequestException(
+      'No hay configuración de Mailjet. Configura primero tus credenciales.',
+    );
+  }
+
+  const isValid = await this.emailService.verifyConnection(company);
+
+  if (!isValid) {
+    return {
+      success: false,
+      message: 'Error en la conexión con Mailjet. Verifica tus credenciales.',
+    };
+  }
+
+  return {
+    success: true,
+    message: 'Conexión con Mailjet exitosa',
+  };
+}
+
+@Get('email-config')
+@ApiOperation({ summary: 'Ver configuración de email actual' })
+async getEmailConfig(@Request() req: any) {
+  const companyId = await this.getCompanyId(req.user.userId);
+
+  const company = await this.prisma.company.findUnique({
+    where: { id: companyId },
+    select: {
+      id: true,
+      businessName: true,
+      email: true,
+      replyToEmail: true,
+      emailProvider: true,
+      mailjetFromEmail: true,
+      mailjetFromName: true,
+      mailjetSenderVerified: true,
+    },
+  });
+
+  if (!company) {
+    throw new BadRequestException('Empresa no encontrada');
+  }
+
+  // No mostrar las API keys por seguridad
+  return {
+    message: 'Configuración de email',
+    config: {
+      provider: company.emailProvider,
+      isConfigured: company.emailProvider === 'MAILJET',
+      fromEmail: company.mailjetFromEmail || 'Email del sistema',
+      fromName: company.mailjetFromName || company.businessName,
+      replyToEmail: company.replyToEmail || company.email,
+      verified: company.mailjetSenderVerified,
+    },
+  };
+}
 }

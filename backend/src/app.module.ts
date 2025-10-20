@@ -6,6 +6,7 @@ import { ProductsModule } from './modules/products/products.module';
 import { EstablishmentsModule } from './modules/establishments/establishments.module';
 import { InvoicesModule } from './modules/invoices/invoices.module';
 import { CompaniesModule } from './modules/companies/companies.module';
+import { EmailModule } from './shared/email/email.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { CompaniesModule } from './modules/companies/companies.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    EmailModule,
     AuthModule,
     CustomersModule,
     ProductsModule,

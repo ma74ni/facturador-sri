@@ -11,7 +11,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Response } from 'express';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { InvoicesService } from '../../application/services/invoices.service';
 import { CreateInvoiceDto } from '../../application/dto/create-invoice.dto';
 import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
@@ -150,5 +150,56 @@ async downloadRide(
     `attachment; filename="FACTURA_${invoice.establishmentCode}-${invoice.emissionPointCode}-${invoice.sequential}.pdf"`,
   );
   res.send(pdfBuffer);
+}
+
+@Post(':id/send-email')
+@ApiOperation({ summary: 'Enviar factura por correo electrónico' })
+@ApiResponse({
+  status: 200,
+  description: 'Factura enviada exitosamente',
+})
+@ApiResponse({
+  status: 400,
+  description: 'Error: Factura no autorizada o cliente sin email',
+})
+@ApiResponse({
+  status: 404,
+  description: 'Factura no encontrada',
+})
+@ApiBody({
+  schema: {
+    type: 'object',
+    properties: {
+      email: {
+        type: 'string',
+        description:
+          'Email del destinatario (opcional, usa el del cliente si no se proporciona)',
+        example: 'cliente@example.com',
+      },
+    },
+  },
+})
+async sendByEmail(
+  @Param('id') id: string,
+  @Body('email') email: string,
+  @Request() req: any,
+) {
+  const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
+  return this.invoicesService.sendInvoiceByEmail(id, companyId, email);
+}
+
+@Get(':id/email-logs')
+@ApiOperation({ summary: 'Ver historial de envíos de email de una factura' })
+@ApiResponse({
+  status: 200,
+  description: 'Historial de envíos obtenido exitosamente',
+})
+@ApiResponse({
+  status: 404,
+  description: 'Factura no encontrada',
+})
+async getEmailLogs(@Param('id') id: string, @Request() req: any) {
+  const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
+  return this.invoicesService.getemailLogs(id, companyId);
 }
 }

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../../../../shared/database/prisma.service';
 import { CreateInvoiceDto } from '../dto/create-invoice.dto';
 import { AccessKeyService } from '../../domain/services/access-key.service';
@@ -9,9 +9,12 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { existsSync } from 'fs';
 import { SriWebServiceService } from '../../infrastructure/sri/sri-web-service.service';
 import { RideGeneratorService } from '../../infrastructure/pdf/ride-generator.service';
+import { EmailService } from '../../../../shared/email/email.service';
 
 @Injectable()
 export class InvoicesService {
+  private readonly logger = new Logger(InvoicesService.name);
+
   constructor(
     private prisma: PrismaService,
     private accessKeyService: AccessKeyService,
@@ -19,6 +22,7 @@ export class InvoicesService {
     private xmlStorage: XmlStorageService,
     private digitalSignature: DigitalSignatureService,
     private rideGenerator: RideGeneratorService,
+    private emailService: EmailService,
   ) {}
 
   async create(dto: CreateInvoiceDto, companyId: string, userId: string) {
@@ -313,76 +317,119 @@ export class InvoicesService {
   // ==================== ENVÍO AL SRI ====================
 
   async sendToSri(invoiceId: string, companyId: string) {
-    // 1. Obtener la factura
-    const invoice = await this.prisma.invoice.findFirst({
-      where: { id: invoiceId, companyId },
-      include: { company: true },
-    });
+  // 1. Obtener la factura
+  const invoice = await this.prisma.invoice.findFirst({
+    where: { id: invoiceId, companyId },
+    include: { 
+      company: true,
+      customer: {
+        select: {
+          email: true,
+          firstName: true,
+          lastName: true,
+          businessName: true,
+        },
+      },
+    },
+  });
 
-    if (!invoice) {
-      throw new NotFoundException('Factura no encontrada');
-    }
+  if (!invoice) {
+    throw new NotFoundException('Factura no encontrada');
+  }
 
-    // 2. Verificar que tenga XML firmado
-    if (!invoice.xmlSignedPath) {
-      throw new BadRequestException(
-        'La factura debe estar firmada digitalmente antes de enviarla al SRI',
-      );
-    }
+  // 2. Verificar que tenga XML firmado
+  if (!invoice.xmlSignedPath) {
+    throw new BadRequestException(
+      'La factura debe estar firmada digitalmente antes de enviarla al SRI',
+    );
+  }
 
-    if (!existsSync(invoice.xmlSignedPath)) {
-      throw new NotFoundException('Archivo XML firmado no encontrado');
-    }
+  if (!existsSync(invoice.xmlSignedPath)) {
+    throw new NotFoundException('Archivo XML firmado no encontrado');
+  }
 
-    // 3. Actualizar estado a "enviando"
+  // 3. Actualizar estado a "enviando"
+  await this.prisma.invoice.update({
+    where: { id: invoiceId },
+    data: { sriStatus: 'SENT' },
+  });
+
+  // 4. Enviar al SRI
+  this.logger.log('📤 Enviando factura al SRI...');
+  const sriService = new SriWebServiceService();
+  const result = await sriService.sendAndAuthorize(
+    invoice.xmlSignedPath,
+    invoice.company.environment,
+  );
+
+  // 5. Actualizar estado según resultado
+  if (result.authorized) {
     await this.prisma.invoice.update({
       where: { id: invoiceId },
-      data: { sriStatus: 'SENT' },
-    });
-
-    // 4. Enviar al SRI
-    console.log('📤 Enviando factura al SRI...');
-    const sriService = new SriWebServiceService();
-    const result = await sriService.sendAndAuthorize(
-      invoice.xmlSignedPath,
-      invoice.company.environment,
-    );
-
-    // 5. Actualizar estado según resultado
-    if (result.authorized) {
-      await this.prisma.invoice.update({
-        where: { id: invoiceId },
-        data: {
-          sriStatus: 'AUTHORIZED',
-          authorizationNumber: result.authorizationNumber,
-          authorizationDate: result.authorizationDate,
-        },
-      });
-
-      console.log('✅ Factura autorizada por el SRI');
-      return {
-        message: 'Factura autorizada por el SRI',
-        status: 'AUTHORIZED',
+      data: {
+        sriStatus: 'AUTHORIZED',
         authorizationNumber: result.authorizationNumber,
         authorizationDate: result.authorizationDate,
-      };
-    } else {
-      await this.prisma.invoice.update({
-        where: { id: invoiceId },
-        data: {
-          sriStatus: result.sent ? 'REJECTED' : 'ERROR',
-          sriErrors: { errors: result.errors },
-        },
-      });
+      },
+    });
 
-      console.error('❌ Factura rechazada por el SRI');
-      return {
-        message: 'La factura no fue autorizada',
-        status: result.sent ? 'REJECTED' : 'ERROR',
-        errors: result.errors,
-      };
+    this.logger.log('✅ Factura autorizada por el SRI');
+
+    // ==================== ENVÍO AUTOMÁTICO DE EMAIL ====================
+    let emailSent = false;
+    let emailError: string | null = null;
+
+    try {
+      // Generar RIDE automáticamente
+      this.logger.log('📄 Generando RIDE automáticamente...');
+      await this.generateRide(invoiceId, companyId);
+      this.logger.log('✅ RIDE generado correctamente');
+
+      // Enviar email automáticamente si el cliente tiene email
+      if (invoice.customer?.email) {
+        this.logger.log(`📧 Enviando factura automáticamente a: ${invoice.customer.email}`);
+        
+        await this.sendInvoiceByEmail(invoiceId, companyId);
+        
+        emailSent = true;
+        this.logger.log('✅ Email enviado automáticamente al cliente');
+      } else {
+        this.logger.warn('⚠️ Cliente sin email configurado, no se envió automáticamente');
+        emailError = 'Cliente sin email configurado';
+      }
+    } catch (error: any) {
+      this.logger.error('⚠️ Error en proceso post-autorización:', error.message);
+      emailError = error.message;
+      // No fallar la autorización si el email o RIDE fallan
     }
+
+    return {
+      message: 'Factura autorizada por el SRI',
+      status: 'AUTHORIZED',
+      authorizationNumber: result.authorizationNumber,
+      authorizationDate: result.authorizationDate,
+      emailSent,
+      emailRecipient: invoice.customer?.email || null,
+      emailError,
+    };
+  } else {
+    await this.prisma.invoice.update({
+      where: { id: invoiceId },
+      data: {
+        sriStatus: result.sent ? 'REJECTED' : 'ERROR',
+        sriErrors: { errors: result.errors },
+      },
+    });
+
+    this.logger.error('❌ Factura rechazada por el SRI');
+    return {
+      message: 'La factura no fue autorizada',
+      status: result.sent ? 'REJECTED' : 'ERROR',
+      errors: result.errors,
+      emailSent: false,
+    };
   }
+}
 
    // ==================== GENERACIÓN DE RIDE (PDF) ====================
 
@@ -427,4 +474,196 @@ export class InvoicesService {
       ridePath,
     };
   }
+  // ==================== ENVÍO DE EMAIL ====================
+
+async sendInvoiceByEmail(invoiceId: string, companyId: string, recipientEmail?: string) {
+  // 1. Obtener la factura completa
+  const invoice = await this.prisma.invoice.findFirst({
+    where: { id: invoiceId, companyId },
+    include: {
+      items: true,
+      customer: true,
+      establishment: true,
+      emissionPoint: true,
+      company: {
+        select: {
+          id: true,
+          businessName: true,
+          tradeName: true,
+          email: true,
+          replyToEmail: true,
+          emailProvider: true,
+          mailjetApiKey: true,
+          mailjetSecretKey: true,
+          mailjetFromEmail: true,
+          mailjetFromName: true,
+        },
+      },
+    },
+  });
+
+  if (!invoice) {
+    throw new NotFoundException('Factura no encontrada');
+  }
+
+  // 2. Verificar que esté autorizada
+  if (invoice.sriStatus !== 'AUTHORIZED') {
+    throw new BadRequestException(
+      'Solo se pueden enviar facturas autorizadas por el SRI',
+    );
+  }
+
+  // 3. Verificar que tenga RIDE y XML
+  if (!invoice.ridePdfPath) {
+    // Generar RIDE si no existe
+    await this.generateRide(invoiceId, companyId);
+
+    // Recargar invoice
+    const updatedInvoice = await this.prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: {
+        items: true,
+        customer: true,
+        establishment: true,
+        emissionPoint: true,
+        company: {
+          select: {
+            id: true,
+            businessName: true,
+            tradeName: true,
+            email: true,
+            replyToEmail: true,
+            emailProvider: true,
+            mailjetApiKey: true,
+            mailjetSecretKey: true,
+            mailjetFromEmail: true,
+            mailjetFromName: true,
+          },
+        },
+      },
+    });
+
+    if (!updatedInvoice) {
+      throw new NotFoundException('Error recargando factura');
+    }
+
+    Object.assign(invoice, updatedInvoice);
+  }
+
+  if (!invoice.xmlSignedPath || !existsSync(invoice.xmlSignedPath)) {
+    throw new NotFoundException('XML firmado no encontrado');
+  }
+
+  if (!invoice.ridePdfPath || !existsSync(invoice.ridePdfPath)) {
+    throw new NotFoundException('RIDE (PDF) no encontrado');
+  }
+
+  // 4. Determinar email del destinatario
+  const emailTo = recipientEmail || invoice.customer.email;
+
+  if (!emailTo) {
+    throw new BadRequestException(
+      'El cliente no tiene email registrado. Proporciona un email manualmente.',
+    );
+  }
+
+  // 5. Preparar datos para el template
+  const customerName =
+    invoice.customer.businessName ||
+    `${invoice.customer.firstName || ''} ${invoice.customer.lastName || ''}`.trim() ||
+    'Cliente';
+
+  const invoiceNumber = `${invoice.establishmentCode}-${invoice.emissionPointCode}-${invoice.sequential}`;
+
+  const templateData = {
+    companyName: invoice.company.businessName,
+    customerName,
+    invoiceNumber,
+    issueDate: new Date(invoice.issueDate).toLocaleDateString('es-EC', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }),
+    authorizationDate: invoice.authorizationDate
+      ? new Date(invoice.authorizationDate).toLocaleString('es-EC')
+      : null,
+    authorizationNumber: invoice.authorizationNumber,
+    accessKey: invoice.accessKey,
+    total: invoice.total.toFixed(2),
+    authorized: invoice.sriStatus === 'AUTHORIZED',
+    viewUrl: null, // Puedes agregar URL del frontend aquí
+    year: new Date().getFullYear(),
+  };
+
+  // 6. Enviar email con adjuntos
+  this.logger.log(`📧 Enviando factura ${invoiceNumber} a ${emailTo}...`);
+
+  const result = await this.emailService.sendEmail({
+    to: emailTo,
+    subject: `Factura Electrónica ${invoiceNumber} - ${invoice.company.businessName}`,
+    template: 'invoice',
+    context: templateData,
+    company: invoice.company,
+    attachments: [
+      {
+        filename: `Factura_${invoiceNumber}.pdf`,
+        path: invoice.ridePdfPath,
+        contentType: 'application/pdf',
+      },
+      {
+        filename: `Factura_${invoiceNumber}.xml`,
+        path: invoice.xmlSignedPath,
+        contentType: 'application/xml',
+      },
+    ],
+  });
+
+  // 7. Guardar log del envío
+  await this.prisma.emailLog.create({
+    data: {
+      invoiceId: invoice.id,
+      recipient: emailTo,
+      subject: `Factura Electrónica ${invoiceNumber}`,
+      status: result.success ? 'SENT' : 'FAILED',
+      sentAt: result.success ? new Date() : null,
+      error: result.error || null,
+    },
+  });
+
+  if (!result.success) {
+    this.logger.error(`❌ Error enviando email: ${result.error}`);
+    throw new InternalServerErrorException(
+      `Error al enviar el correo: ${result.error}`,
+    );
+  }
+
+  this.logger.log(`✅ Factura enviada exitosamente a ${emailTo}`);
+
+  return {
+    message: 'Factura enviada exitosamente por correo electrónico',
+    recipient: emailTo,
+    messageId: result.messageId,
+  };
+}
+
+async getemailLogs(invoiceId: string, companyId: string) {
+  const invoice = await this.prisma.invoice.findFirst({
+    where: { id: invoiceId, companyId },
+  });
+
+  if (!invoice) {
+    throw new NotFoundException('Factura no encontrada');
+  }
+
+  const logs = await this.prisma.emailLog.findMany({
+    where: { invoiceId },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  return {
+    message: 'Historial de envíos de email',
+    count: logs.length,
+    logs,
+  };
+}
 }
