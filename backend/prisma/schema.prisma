@@ -46,7 +46,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  invoices Invoice[] @relation("CreatedBy")
+  invoices    Invoice[]    @relation("CreatedBy")
+  creditNotes CreditNote[] @relation("CreditNotesCreatedBy")
 
   @@index([email])
   @@index([companyId])
@@ -100,6 +101,7 @@ model Company {
   customers      Customer[]
   products       Product[]
   invoices       Invoice[]
+  creditNotes    CreditNote[]
 
   @@index([ruc])
   @@map("companies")
@@ -119,6 +121,7 @@ model Establishment {
 
   emissionPoints EmissionPoint[]
   invoices       Invoice[]
+  creditNotes    CreditNote[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -136,9 +139,11 @@ model EmissionPoint {
   establishmentId String
   establishment   Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
 
-  invoiceSequence Int @default(1)
+  invoiceSequence    Int @default(1)
+  creditNoteSequence Int @default(1)
 
-  invoices Invoice[]
+  invoices    Invoice[]
+  creditNotes CreditNote[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -164,7 +169,8 @@ model Customer {
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  invoices Invoice[]
+  invoices    Invoice[]
+  creditNotes CreditNote[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -190,7 +196,8 @@ model Product {
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  invoiceItems InvoiceItem[]
+  invoiceItems    InvoiceItem[]
+  creditNoteItems CreditNoteItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -265,8 +272,9 @@ model Invoice {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items     InvoiceItem[]
-  emailLogs EmailLog[]
+  items       InvoiceItem[]
+  emailLogs   EmailLog[]
+  creditNotes CreditNote[] @relation("InvoiceCreditNotes")
 
   @@index([accessKey])
   @@index([sriStatus])
@@ -294,4 +302,108 @@ model InvoiceItem {
 
   @@index([invoiceId])
   @@map("invoice_items")
+}
+
+// ==================== CREDIT NOTES ====================
+
+model CreditNote {
+  id String @id @default(cuid())
+
+  documentType      String // "04"
+  accessKey         String @unique
+  establishmentCode String
+  emissionPointCode String
+  sequential        String
+
+  issueDate DateTime
+
+  // Referencia a la factura modificada
+  modifiedInvoiceId String
+  modifiedInvoice   Invoice  @relation("InvoiceCreditNotes", fields: [modifiedInvoiceId], references: [id])
+  modifiedDocType   String // "01" = Factura
+  modifiedNumber    String // Número completo: 001-001-000000001
+
+  // Motivo de la nota de crédito
+  reason String // Anulación, Devolución, Descuento, etc.
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  establishmentId String
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+
+  emissionPointId String
+  emissionPoint   EmissionPoint @relation(fields: [emissionPointId], references: [id])
+
+  subtotal      Decimal @db.Decimal(12, 2)
+  totalDiscount Decimal @default(0) @db.Decimal(12, 2)
+  ivaValue      Decimal @db.Decimal(12, 2)
+  total         Decimal @db.Decimal(12, 2)
+
+  sriStatus           SRIStatus @default(PENDING)
+  authorizationNumber String?
+  authorizationDate   DateTime?
+  sriErrors           Json?
+
+  // Rutas de archivos
+  xmlPath       String?
+  xmlSignedPath String?
+  ridePdfPath   String?
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation("CreditNotesCreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items     CreditNoteItem[]
+  emailLogs CreditNoteEmailLog[]
+
+  @@index([accessKey])
+  @@index([sriStatus])
+  @@index([companyId, issueDate])
+  @@index([customerId])
+  @@index([modifiedInvoiceId])
+  @@map("credit_notes")
+}
+
+model CreditNoteItem {
+  id           String     @id @default(cuid())
+  creditNoteId String
+  creditNote   CreditNote @relation(fields: [creditNoteId], references: [id], onDelete: Cascade)
+
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+
+  mainCode    String
+  description String
+  quantity    Decimal @db.Decimal(12, 6)
+  unitPrice   Decimal @db.Decimal(12, 6)
+  discount    Decimal @default(0) @db.Decimal(12, 2)
+  subtotal    Decimal @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+
+  @@index([creditNoteId])
+  @@map("credit_note_items")
+}
+
+model CreditNoteEmailLog {
+  id           String     @id @default(cuid())
+  creditNoteId String
+  recipient    String
+  subject      String
+  status       String // SENT, FAILED, PENDING
+  sentAt       DateTime?
+  error        String?
+  createdAt    DateTime   @default(now())
+
+  creditNote CreditNote @relation(fields: [creditNoteId], references: [id], onDelete: Cascade)
+
+  @@index([creditNoteId])
+  @@index([status])
+  @@map("credit_note_email_logs")
 }
