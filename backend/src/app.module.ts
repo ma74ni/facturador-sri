@@ -7,6 +7,7 @@ import { EstablishmentsModule } from './modules/establishments/establishments.mo
 import { InvoicesModule } from './modules/invoices/invoices.module';
 import { CreditNotesModule } from './modules/credit-notes/credit-notes.module';
 import { CompaniesModule } from './modules/companies/companies.module';
+import { SharedModule } from './shared/shared.module';
 import { EmailModule } from './shared/email/email.module';
 
 @Module({
@@ -15,6 +16,7 @@ import { EmailModule } from './shared/email/email.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    SharedModule,
     EmailModule,
     AuthModule,
     CustomersModule,

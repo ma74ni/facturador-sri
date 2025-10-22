@@ -18,10 +18,9 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody } from '@nes
 import { CompaniesService } from '../../application/services/companies.service';
 import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
 import { PrismaService } from '../../../../shared/database/prisma.service';
-import { existsSync } from 'fs';
-import { readFile } from 'fs/promises';
 import { Response } from 'express';
 import { EmailService } from '@/shared/email/email.service';
+import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
 
 @ApiTags('companies')
 @Controller('companies')
@@ -32,6 +31,7 @@ export class CompaniesController {
     private readonly companiesService: CompaniesService,
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
+    private readonly r2Storage: R2StorageService,
   ) {}
 
   private async getCompanyId(userId: string): Promise<string> {
@@ -178,24 +178,24 @@ export class CompaniesController {
   async getLogo(@Request() req: any,
   @Res({ passthrough: false }) res: Response) {
     const companyId = await this.getCompanyId(req.user.userId);
-    
+
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
       select: { logoPath: true },
     });
 
-    if (!company || !company.logoPath || !existsSync(company.logoPath)) {
+    if (!company || !company.logoPath) {
       throw new BadRequestException('La empresa no tiene logo configurado');
     }
 
-    const logoBuffer = await readFile(company.logoPath);
-    
-    // Detectar tipo MIME según extensión
-    const ext = company.logoPath.split('.').pop()?.toLowerCase();
-    const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg';
-    
+    // Descargar logo desde R2
+    const logoData = await this.r2Storage.downloadLogo(company.logoPath);
+
+    // Detectar tipo MIME desde R2 o desde la extensión
+    const mimeType = logoData.contentType || 'image/png';
+
     res.setHeader('Content-Type', mimeType);
-    res.send(logoBuffer);
+    res.send(logoData.buffer);
   }
 
   @Delete('logo')

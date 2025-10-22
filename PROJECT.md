@@ -15,6 +15,7 @@ Sistema completo de facturación electrónica que cumple con las normativas del 
 #### Backend (NestJS)
 - **Framework:** NestJS 10.3.0 (Node.js + TypeScript)
 - **Base de Datos:** PostgreSQL con Prisma ORM 5.7.1
+- **Almacenamiento:** Cloudflare R2 (S3-compatible) con AWS SDK v3
 - **Autenticación:** JWT (JSON Web Tokens)
 - **Generación XML:** xmlbuilder2, fast-xml-parser
 - **Comunicación SRI:** SOAP (librería 'soap')
@@ -121,19 +122,14 @@ facturador-sri/
 │   │   └── shared/
 │   │       ├── database/
 │   │       │   └── prisma.service.ts
+│   │       ├── storage/
+│   │       │   └── r2-storage.service.ts         # Servicio R2 (S3-compatible)
 │   │       └── email/
 │   │           ├── email.service.ts
 │   │           ├── providers/
 │   │           │   └── mailjet.provider.ts
 │   │           └── templates/
 │   │               └── invoice.hbs              # Plantilla email factura
-│   │
-│   ├── storage/                     # Archivos generados
-│   │   ├── certificates/            # Certificados digitales (.p12)
-│   │   ├── logos/                   # Logos de empresas
-│   │   ├── xml/                     # XMLs sin firmar
-│   │   ├── xml-signed/              # XMLs firmados
-│   │   └── ride/                    # PDFs RIDE
 │   │
 │   └── package.json
 │
@@ -186,10 +182,11 @@ facturador-sri/
 - businessName: String (razón social)
 - tradeName: String (nombre comercial)
 - address, phone, email: String
-- logoPath: String (ruta al logo)
+- logoPath: String (R2 key del logo)
 - environment: Enum (TEST | PRODUCTION)
 - emailProvider: String (SYSTEM | MAILJET | SMTP)
-- certificatePath, certificatePassword: String
+- certificatePath: String (R2 key del certificado)
+- certificatePassword: String
 - certificateExpiry: DateTime
 - hasCertificate: Boolean
 - Configuración Mailjet: mailjetApiKey, mailjetSecretKey, etc.
@@ -250,7 +247,9 @@ facturador-sri/
 - authorizationNumber: String
 - authorizationDate: DateTime
 - sriErrors: Json
-- xmlPath, xmlSignedPath, ridePdfPath: String
+- xmlPath: String (R2 key del XML sin firmar)
+- xmlSignedPath: String (R2 key del XML firmado)
+- ridePdfPath: String (R2 key del PDF RIDE)
 - items: InvoiceItem[]
 - emailLogs: EmailLog[]
 ```
@@ -293,7 +292,9 @@ facturador-sri/
 - authorizationNumber: String
 - authorizationDate: DateTime
 - sriErrors: Json
-- xmlPath, xmlSignedPath, ridePdfPath: String
+- xmlPath: String (R2 key del XML sin firmar)
+- xmlSignedPath: String (R2 key del XML firmado)
+- ridePdfPath: String (R2 key del PDF RIDE)
 - items: CreditNoteItem[]
 - emailLogs: CreditNoteEmailLog[]
 ```
@@ -323,8 +324,9 @@ facturador-sri/
 
 ### 1. Gestión de Empresas
 - Registro de empresas con RUC
-- Carga de certificado digital (.p12)
-- Carga de logo corporativo
+- Carga de certificado digital (.p12) en Cloudflare R2
+- Validación de RUC del certificado vs. RUC de la empresa
+- Carga de logo corporativo en Cloudflare R2
 - Configuración de ambiente (TEST/PRODUCTION)
 - Configuración de email (Mailjet)
 
@@ -358,12 +360,14 @@ facturador-sri/
 - Estructura completa: `<factura>`, `<infoTributaria>`, `<infoFactura>`, `<detalles>`
 - Código documento: 01 (Factura)
 - Validaciones de estructura XML
+- Almacenamiento automático en Cloudflare R2
 
 #### 5.3. Firma Digital
 - **Servicio:** `DigitalSignatureService` (backend) → `SignatureService` (Java)
+- Descarga de certificados desde Cloudflare R2
 - Comunicación con microservicio Java (puerto 8081)
 - Firma XAdES-BES con certificado PKCS#12
-- Almacenamiento de XML firmado
+- Almacenamiento de XML firmado en Cloudflare R2
 - Validación de certificados
 
 #### 5.4. Envío al SRI
@@ -379,17 +383,19 @@ facturador-sri/
 #### 5.5. Generación de RIDE (PDF)
 - **Endpoint:** `GET /api/v1/invoices/:id/ride`
 - **Servicio:** `RideGeneratorService`
-- Generación con PDFKit
+- Generación en memoria con PDFKit (sin escritura a disco)
+- Descarga de logos desde Cloudflare R2
 - Código de barras (bwip-js)
-- Logo de empresa
 - Información completa de factura
 - Diseño profesional con tabla de detalles
+- Almacenamiento automático en Cloudflare R2
 
 #### 5.6. Envío por Email
 - **Endpoint:** `POST /api/v1/invoices/:id/send-email`
 - **Servicio:** `EmailService` + `MailjetProvider`
 - Plantilla HTML (Handlebars)
-- Adjuntos: XML firmado + PDF RIDE
+- Descarga de archivos desde Cloudflare R2 como buffers
+- Adjuntos: XML firmado + PDF RIDE (desde memoria)
 - Log de envíos (EmailLog)
 - Soporte para Mailjet (API Key por empresa o sistema)
 - Reply-To configurable
@@ -464,7 +470,8 @@ facturador-sri/
 - Generación automática de clave de acceso (AccessKeyService)
 - Validación de módulo 11
 - Logs detallados (Winston)
-- Almacenamiento organizado de archivos por compañía
+- Almacenamiento en Cloudflare R2 organizado por compañía
+- Gestión de archivos con AWS SDK v3 (S3-compatible)
 - Secuenciales independientes por tipo de documento
 
 ---
@@ -710,6 +717,12 @@ JWT_EXPIRATION=7d
 # CORS
 CORS_ORIGINS=http://localhost:3000,http://localhost:3001
 
+# CLOUDFLARE R2 STORAGE
+R2_ACCOUNT_ID=your-cloudflare-account-id
+R2_ACCESS_KEY_ID=your-r2-access-key-id
+R2_SECRET_ACCESS_KEY=your-r2-secret-access-key
+R2_BUCKET_NAME=facturador-sri
+
 # SRI URLs
 SRI_RECEPTION_URL_TEST=https://celrio.sri.gob.ec/comprobantes-electronicos-ws/RecepcionComprobantesOffline?wsdl
 SRI_AUTHORIZATION_URL_TEST=https://celrio.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline?wsdl
@@ -774,26 +787,56 @@ docker-compose up -d signing-service
 
 ---
 
-## Estructura de Archivos Generados
+## Almacenamiento en Cloudflare R2
+
+### Estructura de Archivos en R2
+
+Todos los archivos se almacenan en Cloudflare R2 con la siguiente estructura de keys:
 
 ```
-backend/storage/
-├── certificates/
-│   └── {companyId}/
-│       └── certificate.p12
-├── logos/
-│   └── {companyId}/
-│       └── logo.png
-├── xml/
-│   └── {companyId}/
-│       └── {accessKey}.xml
-├── xml-signed/
-│   └── {companyId}/
-│       └── {accessKey}_signed.xml
-└── ride/
-    └── {companyId}/
-        └── {accessKey}.pdf
+R2 Bucket (facturador-sri)/
+├── certificates/{companyId}/
+│   └── {companyId}_{timestamp}.p12        # Certificados digitales
+├── logos/{companyId}/
+│   └── {companyId}.{ext}                  # Logos (png, jpg, jpeg)
+├── xml/{companyId}/
+│   └── {accessKey}.xml                    # XMLs sin firmar
+├── xml-signed/{companyId}/
+│   └── {accessKey}_signed.xml             # XMLs firmados
+└── ride/{companyId}/
+    └── {accessKey}.pdf                    # PDFs RIDE
 ```
+
+### Características del Almacenamiento
+
+- **Proveedor:** Cloudflare R2 (S3-compatible)
+- **SDK:** AWS SDK v3 para JavaScript
+- **Organización:** Por compañía (aislamiento de datos)
+- **Acceso:** Mediante claves de acceso configuradas en variables de entorno
+- **Operaciones:** Upload, download, delete, exists
+- **Descarga temporal:** URLs firmadas con expiración de 1 hora
+- **Ventajas:**
+  - Sin costos de egreso (a diferencia de AWS S3)
+  - Alta disponibilidad y durabilidad
+  - Compatible con herramientas S3
+  - Escalabilidad automática
+
+### Servicio R2StorageService
+
+**Ubicación:** `src/shared/storage/r2-storage.service.ts`
+
+**Métodos principales:**
+- `uploadCertificate(companyId, buffer, filename)` - Sube certificados
+- `downloadCertificate(r2Key)` - Descarga certificados
+- `uploadLogo(companyId, buffer, filename, mimeType)` - Sube logos
+- `downloadLogo(r2Key)` - Descarga logos
+- `uploadXml(companyId, accessKey, content, signed)` - Sube XMLs
+- `downloadXml(r2Key)` - Descarga XMLs
+- `uploadRide(companyId, accessKey, buffer)` - Sube PDFs
+- `downloadRide(r2Key)` - Descarga PDFs
+- `getSignedDownloadUrl(r2Key, expiresIn)` - URLs temporales
+- `deleteFile(r2Key)` - Elimina archivos
+- `fileExists(r2Key)` - Verifica existencia
 
 ---
 
@@ -835,5 +878,19 @@ Para consultas sobre este proyecto:
 
 ---
 
-**Última actualización:** 2025-10-21
-**Versión del proyecto:** 1.0.0
+## Historial de Cambios
+
+### 2025-10-22 - Migración a Cloudflare R2
+- ✅ Migración completa de almacenamiento local a Cloudflare R2
+- ✅ Implementación de R2StorageService con AWS SDK v3
+- ✅ Actualización de todos los servicios para usar R2
+- ✅ Generación de PDFs en memoria (sin escritura a disco)
+- ✅ Descarga de archivos desde R2 como buffers para email
+- ✅ Validación de RUC del certificado vs. RUC de la empresa
+- ✅ Eliminación de dependencias del sistema de archivos local
+- ✅ Flujo completo probado: creación, firma, envío SRI, email
+
+---
+
+**Última actualización:** 2025-10-22
+**Versión del proyecto:** 1.1.0

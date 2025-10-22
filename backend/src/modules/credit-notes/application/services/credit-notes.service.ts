@@ -201,7 +201,7 @@ export class CreditNotesService {
         this.logger.log('🔐 Iniciando proceso de firma digital...');
 
         try {
-          const signedXml = await this.digitalSignature.signXml(xml);
+          const signedXml = await this.digitalSignature.signXml(xml, company);
 
           // Guardar XML firmado
           xmlSignedPath = await this.xmlStorage.saveSignedXml(accessKey, signedXml, companyId);

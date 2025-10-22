@@ -1,7 +1,7 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import * as soap from 'soap';
-import { readFile } from 'fs/promises';
 import { DOMParser } from '@xmldom/xmldom';
+import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
 
 @Injectable()
 export class SriWebServiceService {
@@ -9,6 +9,8 @@ export class SriWebServiceService {
   private readonly authorizationUrlTest = process.env.SRI_AUTHORIZATION_URL_TEST;
   private readonly receptionUrlProd = process.env.SRI_RECEPTION_URL_PROD;
   private readonly authorizationUrlProd = process.env.SRI_AUTHORIZATION_URL_PROD;
+
+  constructor(private r2Storage: R2StorageService) {}
 
   /**
    * Extrae la clave de acceso del XML
@@ -21,13 +23,11 @@ export class SriWebServiceService {
       
       if (claveAccessoNodes && claveAccessoNodes.length > 0) {
         const claveAcceso = claveAccessoNodes[0].textContent || '';
-        console.log(`🔑 Clave de acceso extraída del XML: ${claveAcceso} (longitud: ${claveAcceso.length})`);
         return claveAcceso;
       }
-      
+
       throw new Error('No se encontró la clave de acceso en el XML');
     } catch (error) {
-      console.error('Error extrayendo clave de acceso:', error);
       throw error;
     }
   }
@@ -56,9 +56,6 @@ export class SriWebServiceService {
         );
       }
 
-      console.log(`📤 Enviando factura al SRI (${environment})...`);
-      console.log(`🔗 URL: ${url}`);
-
       // Extraer clave de acceso del XML antes de enviar
       const claveAcceso = this.extractAccessKeyFromXml(xmlContent);
 
@@ -78,8 +75,6 @@ export class SriWebServiceService {
       // Llamar al método validarComprobante
       const [result] = await client.validarComprobanteAsync(args);
 
-      console.log('📥 Respuesta del SRI:', JSON.stringify(result, null, 2));
-
       // Procesar respuesta
       const respuesta = result.RespuestaRecepcionComprobante;
 
@@ -92,7 +87,6 @@ export class SriWebServiceService {
       };
 
     } catch (error) {
-      console.error('❌ Error enviando al SRI:', error);
       throw new InternalServerErrorException(
         `Error al enviar al SRI: ${error.message}`,
       );
@@ -129,10 +123,6 @@ export class SriWebServiceService {
         );
       }
 
-      console.log(`🔍 Consultando autorización en SRI (${environment})...`);
-      console.log(`🔗 URL: ${url}`);
-      console.log(`🔑 Clave de acceso: ${accessKey} (longitud: ${accessKey.length})`);
-
       // Crear cliente SOAP
       const client = await soap.createClientAsync(url, {
         disableCache: true,
@@ -145,8 +135,6 @@ export class SriWebServiceService {
 
       // Llamar al método autorizacionComprobante
       const [result] = await client.autorizacionComprobanteAsync(args);
-
-      console.log('📥 Respuesta autorización:', JSON.stringify(result, null, 2));
 
       // Procesar respuesta
       const autorizaciones = result.RespuestaAutorizacionComprobante?.autorizaciones?.autorizacion;
@@ -174,7 +162,6 @@ export class SriWebServiceService {
       };
 
     } catch (error) {
-      console.error('❌ Error consultando autorización:', error);
       throw new InternalServerErrorException(
         `Error al consultar autorización: ${error.message}`,
       );
@@ -199,12 +186,11 @@ export class SriWebServiceService {
     const errors: string[] = [];
 
     try {
-      // 1. Leer XML
-      const xmlContent = await readFile(xmlPath, 'utf-8');
+      // 1. Descargar XML desde R2
+      const xmlContent = await this.r2Storage.downloadXml(xmlPath);
 
       // 2. Extraer clave de acceso
       const claveAcceso = this.extractAccessKeyFromXml(xmlContent);
-      console.log(`📋 Procesando factura con clave: ${claveAcceso}`);
 
       // 3. Enviar al SRI
       const sendResult = await this.sendInvoice(xmlContent, environment);
@@ -218,11 +204,8 @@ export class SriWebServiceService {
         };
       }
 
-      console.log(`✅ Comprobante RECIBIDO por el SRI`);
-
       // 4. Esperar y consultar autorización (con reintentos)
       for (let i = 0; i < maxRetries; i++) {
-        console.log(`⏳ Intento ${i + 1}/${maxRetries} - Consultando autorización...`);
 
         await this.sleep(retryDelay);
 
@@ -232,10 +215,6 @@ export class SriWebServiceService {
         );
 
         if (authResult.estado === 'AUTORIZADO') {
-          console.log(`✅ Comprobante AUTORIZADO`);
-          console.log(`📄 Número: ${authResult.numeroAutorizacion}`);
-          console.log(`📅 Fecha: ${authResult.fechaAutorizacion}`);
-
           return {
             sent: true,
             authorized: true,
@@ -247,16 +226,13 @@ export class SriWebServiceService {
         if (authResult.estado === 'NO_AUTORIZADO' || authResult.estado === 'RECHAZADA') {
           const mensajes = authResult.mensajes?.map((m: any) => m.mensaje || m.informacionAdicional).join(', ');
           errors.push(`Comprobante rechazado: ${mensajes}`);
-          console.error(`❌ Comprobante NO AUTORIZADO: ${mensajes}`);
-          
+
           return {
             sent: true,
             authorized: false,
             errors,
           };
         }
-
-        console.log(`⏳ Estado: ${authResult.estado}, reintentando...`);
       }
 
       // Si llegamos aquí, se agotaron los reintentos
@@ -268,7 +244,6 @@ export class SriWebServiceService {
       };
 
     } catch (error) {
-      console.error('❌ Error en proceso de envío/autorización:', error);
       errors.push(error.message);
       return {
         sent: false,

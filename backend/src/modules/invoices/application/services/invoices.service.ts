@@ -6,10 +6,10 @@ import { XmlGeneratorService } from '../../infrastructure/xml/xml-generator.serv
 import { XmlStorageService } from '../../infrastructure/xml/xml-storage.service';
 import { DigitalSignatureService } from '../../infrastructure/xml/digital-signature.service';
 import { Decimal } from '@prisma/client/runtime/library';
-import { existsSync } from 'fs';
 import { SriWebServiceService } from '../../infrastructure/sri/sri-web-service.service';
 import { RideGeneratorService } from '../../infrastructure/pdf/ride-generator.service';
 import { EmailService } from '../../../../shared/email/email.service';
+import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
 
 @Injectable()
 export class InvoicesService {
@@ -23,6 +23,8 @@ export class InvoicesService {
     private digitalSignature: DigitalSignatureService,
     private rideGenerator: RideGeneratorService,
     private emailService: EmailService,
+    private sriService: SriWebServiceService,
+    private r2Storage: R2StorageService,
   ) {}
 
   async create(dto: CreateInvoiceDto, companyId: string, userId: string) {
@@ -148,38 +150,22 @@ export class InvoicesService {
 
     try {
       // 8. Generar XML
-      console.log('📄 Generando XML de la factura...');
       const xml = this.xmlGenerator.generateInvoiceXml(invoice, company);
-      xmlPath = await this.xmlStorage.saveXml(accessKey, xml);
-      console.log(`✅ XML generado correctamente: ${xmlPath}`);
+      xmlPath = await this.xmlStorage.saveXml(accessKey, xml, companyId);
 
       // 9. Intentar firmar el XML con certificado de la empresa
       if (company.hasCertificate) {
-        console.log('🔐 Iniciando proceso de firma digital con el microservicio...');
-
         try {
-          const signedXml = await this.digitalSignature.signXml(xml);
+          const signedXml = await this.digitalSignature.signXml(xml, company);
 
           // Guardar XML firmado
-          xmlSignedPath = await this.xmlStorage.saveSignedXml(accessKey, signedXml);
-          console.log(`✅ XML firmado digitalmente con XAdES-BES: ${xmlSignedPath}`);
+          xmlSignedPath = await this.xmlStorage.saveSignedXml(accessKey, signedXml, companyId);
           signatureStatus = 'firmado';
-          
+
         } catch (signError: any) {
-          console.error('❌ Error al firmar XML:', signError.message);
           signatureStatus = 'error_firma';
-          
-          // Mensajes específicos según el tipo de error
-          if (signError.message.includes('no está disponible')) {
-            console.error('⚠️ El microservicio de firma digital no responde');
-          } else if (signError.message.includes('certificado')) {
-            console.error('⚠️ Problema con el certificado digital');
-          } else {
-            console.error('⚠️ Error desconocido en la firma digital');
-          }
         }
       } else {
-        console.warn('⚠️ La empresa no tiene certificado digital configurado');
         signatureStatus = 'sin_certificado';
       }
 
@@ -193,7 +179,6 @@ export class InvoicesService {
       });
 
     } catch (error) {
-      console.error('❌ Error generando/firmando XML:', error);
       signatureStatus = 'error_generacion';
     }
 
@@ -317,10 +302,13 @@ export class InvoicesService {
   // ==================== ENVÍO AL SRI ====================
 
   async sendToSri(invoiceId: string, companyId: string) {
+  this.logger.log(`🚀 [sendToSri] Iniciando proceso para factura ID: ${invoiceId}`);
+
   // 1. Obtener la factura
+  this.logger.log(`📋 [sendToSri] Buscando factura en BD...`);
   const invoice = await this.prisma.invoice.findFirst({
     where: { id: invoiceId, companyId },
-    include: { 
+    include: {
       company: true,
       customer: {
         select: {
@@ -334,30 +322,32 @@ export class InvoicesService {
   });
 
   if (!invoice) {
+    this.logger.error(`❌ [sendToSri] Factura no encontrada: ${invoiceId}`);
     throw new NotFoundException('Factura no encontrada');
   }
 
+  this.logger.log(`✅ [sendToSri] Factura encontrada. Access Key: ${invoice.accessKey}`);
+
   // 2. Verificar que tenga XML firmado
   if (!invoice.xmlSignedPath) {
+    this.logger.error(`❌ [sendToSri] La factura no tiene XML firmado`);
     throw new BadRequestException(
       'La factura debe estar firmada digitalmente antes de enviarla al SRI',
     );
   }
 
-  if (!existsSync(invoice.xmlSignedPath)) {
-    throw new NotFoundException('Archivo XML firmado no encontrado');
-  }
+  this.logger.log(`✅ [sendToSri] XML firmado encontrado en R2: ${invoice.xmlSignedPath}`);
 
   // 3. Actualizar estado a "enviando"
+  this.logger.log(`📝 [sendToSri] Actualizando estado a SENT...`);
   await this.prisma.invoice.update({
     where: { id: invoiceId },
     data: { sriStatus: 'SENT' },
   });
 
   // 4. Enviar al SRI
-  this.logger.log('📤 Enviando factura al SRI...');
-  const sriService = new SriWebServiceService();
-  const result = await sriService.sendAndAuthorize(
+  this.logger.log(`📤 [sendToSri] Enviando factura al SRI (ambiente: ${invoice.company.environment})...`);
+  const result = await this.sriService.sendAndAuthorize(
     invoice.xmlSignedPath,
     invoice.company.environment,
   );
@@ -550,11 +540,11 @@ async sendInvoiceByEmail(invoiceId: string, companyId: string, recipientEmail?: 
     Object.assign(invoice, updatedInvoice);
   }
 
-  if (!invoice.xmlSignedPath || !existsSync(invoice.xmlSignedPath)) {
+  if (!invoice.xmlSignedPath) {
     throw new NotFoundException('XML firmado no encontrado');
   }
 
-  if (!invoice.ridePdfPath || !existsSync(invoice.ridePdfPath)) {
+  if (!invoice.ridePdfPath) {
     throw new NotFoundException('RIDE (PDF) no encontrado');
   }
 
@@ -595,7 +585,14 @@ async sendInvoiceByEmail(invoiceId: string, companyId: string, recipientEmail?: 
     year: new Date().getFullYear(),
   };
 
-  // 6. Enviar email con adjuntos
+  // 6. Descargar archivos desde R2 para adjuntos
+  this.logger.log(`📥 Descargando archivos desde R2 para adjuntos...`);
+  const [pdfBuffer, xmlContent] = await Promise.all([
+    this.r2Storage.downloadRide(invoice.ridePdfPath),
+    this.r2Storage.downloadXml(invoice.xmlSignedPath),
+  ]);
+
+  // 7. Enviar email con adjuntos
   this.logger.log(`📧 Enviando factura ${invoiceNumber} a ${emailTo}...`);
 
   const result = await this.emailService.sendEmail({
@@ -607,12 +604,12 @@ async sendInvoiceByEmail(invoiceId: string, companyId: string, recipientEmail?: 
     attachments: [
       {
         filename: `Factura_${invoiceNumber}.pdf`,
-        path: invoice.ridePdfPath,
+        content: pdfBuffer,
         contentType: 'application/pdf',
       },
       {
         filename: `Factura_${invoiceNumber}.xml`,
-        path: invoice.xmlSignedPath,
+        content: Buffer.from(xmlContent, 'utf-8'),
         contentType: 'application/xml',
       },
     ],

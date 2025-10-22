@@ -1,7 +1,7 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { readFile } from 'fs/promises';
+import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
 
 interface SigningRequest {
   xmlContent: string;
@@ -28,11 +28,14 @@ export class DigitalSignatureService {
   private readonly client: AxiosInstance;
   private readonly endpointPath = '/api/v1/signature/sign'; // ← ENDPOINT CORRECTO
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    private r2Storage: R2StorageService,
+  ) {
     const baseUrl = configService.get<string>('SIGNING_SERVICE_URL') ?? 'http://localhost:8081';
-    
+
     this.logger.log(`🔗 Microservicio de firma configurado en: ${baseUrl}`);
-    
+
     this.client = axios.create({
       baseURL: baseUrl.replace(/\/$/, ''),
       timeout: 30000, // 30 segundos
@@ -42,14 +45,14 @@ export class DigitalSignatureService {
 
   /**
    * Firma un XML usando el microservicio Java
-   * Carga automáticamente el certificado de la empresa desde el sistema de archivos
+   * Carga automáticamente el certificado de la empresa desde R2
    */
-  async signXml(xmlContent: string): Promise<string> {
+  async signXml(xmlContent: string, company: any): Promise<string> {
     try {
       this.logger.log('📤 Enviando XML al microservicio de firma...');
 
-      // 1. Obtener certificado de la empresa
-      const { certificateBase64, password } = await this.loadCompanyCertificate();
+      // 1. Obtener certificado de la empresa desde R2
+      const { certificateBase64, password } = await this.loadCompanyCertificate(company);
 
       // 2. Preparar request
       const request: SigningRequest = {
@@ -109,40 +112,21 @@ export class DigitalSignatureService {
   }
 
   /**
-   * Carga el certificado de la empresa desde el filesystem
-   * En este caso, asumimos que hay una sola empresa configurada
-   * Para multi-empresa, pasarías el companyId como parámetro
+   * Carga el certificado de la empresa desde R2
    */
-  private async loadCompanyCertificate(): Promise<{
+  private async loadCompanyCertificate(company: any): Promise<{
     certificateBase64: string;
     password: string;
   }> {
     try {
-      // Obtener la empresa (asumiendo una sola empresa por ahora)
-      // Si tienes múltiples empresas, deberías pasar el companyId
-      const { PrismaClient } = require('@prisma/client');
-      const prisma = new PrismaClient();
-
-      const company = await prisma.company.findFirst({
-        where: {
-          hasCertificate: true,
-        },
-        select: {
-          certificatePath: true,
-          certificatePassword: true,
-        },
-      });
-
-      await prisma.$disconnect();
-
       if (!company || !company.certificatePath || !company.certificatePassword) {
         throw new InternalServerErrorException(
           'No se encontró certificado digital configurado para la empresa',
         );
       }
 
-      // Leer el archivo .p12 y convertir a Base64
-      const certificateBuffer = await readFile(company.certificatePath);
+      // Descargar el certificado desde R2
+      const certificateBuffer = await this.r2Storage.downloadCertificate(company.certificatePath);
       const certificateBase64 = certificateBuffer.toString('base64');
 
       return {
@@ -151,9 +135,9 @@ export class DigitalSignatureService {
       };
 
     } catch (error) {
-      this.logger.error('❌ Error cargando certificado:', error);
+      this.logger.error('❌ Error cargando certificado desde R2:', error);
       throw new InternalServerErrorException(
-        'Error al cargar el certificado digital de la empresa',
+        'Error al cargar el certificado digital de la empresa desde almacenamiento',
       );
     }
   }

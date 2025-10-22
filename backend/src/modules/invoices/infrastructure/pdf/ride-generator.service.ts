@@ -1,15 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as PDFDocument from 'pdfkit';
 import * as bwipjs from 'bwip-js';
-import { createWriteStream } from 'fs';
-import { join } from 'path';
-import { mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
+import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
 
 @Injectable()
 export class RideGeneratorService {
   private readonly logger = new Logger(RideGeneratorService.name);
-  private readonly ridePath = join(process.cwd(), 'storage', 'ride');
+
+  constructor(private r2Storage: R2StorageService) {}
 
   // ========================= Helpers =========================
   private money(v: any): string {
@@ -35,29 +33,45 @@ export class RideGeneratorService {
     return doc.heightOfString(text, { width });
   }
 
-  // ========================= Infra =========================
-  async ensureRideFolder(): Promise<void> {
-    if (!existsSync(this.ridePath)) {
-      await mkdir(this.ridePath, { recursive: true });
-    }
-  }
-
+  // ========================= Generación de RIDE =========================
   async generateRide(invoice: any, company: any): Promise<string> {
-    await this.ensureRideFolder();
-
-    const filename = `${invoice.accessKey}.pdf`;
-    const filepath = join(this.ridePath, filename);
-
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       try {
         const doc = new PDFDocument({
           size: 'A4',
           margins: { top: 30, bottom: 30, left: 40, right: 40 },
         });
 
-        const stream = createWriteStream(filepath);
-        doc.pipe(stream);
+        // Almacenar los chunks del PDF en memoria
+        const chunks: Buffer[] = [];
+        doc.on('data', (chunk) => chunks.push(chunk));
 
+        doc.on('end', async () => {
+          try {
+            // Combinar chunks en un solo buffer
+            const pdfBuffer = Buffer.concat(chunks);
+
+            // Subir a R2
+            const r2Key = await this.r2Storage.uploadRide(
+              company.id,
+              invoice.accessKey,
+              pdfBuffer,
+            );
+
+            this.logger.log(`✅ RIDE generado y subido a R2: ${r2Key}`);
+            resolve(r2Key);
+          } catch (uploadError) {
+            this.logger.error('❌ Error subiendo RIDE a R2:', uploadError);
+            reject(uploadError);
+          }
+        });
+
+        doc.on('error', (error) => {
+          this.logger.error('❌ Error generando PDF:', error);
+          reject(error);
+        });
+
+        // Construir el contenido del PDF
         this.buildRideContent(doc, invoice, company)
           .then(() => {
             doc.end();
@@ -67,16 +81,6 @@ export class RideGeneratorService {
             doc.end();
             reject(err);
           });
-
-        stream.on('finish', () => {
-          this.logger.log(`✅ RIDE generado: ${filepath}`);
-          resolve(filepath);
-        });
-
-        stream.on('error', (error) => {
-          this.logger.error('❌ Error escribiendo PDF:', error);
-          reject(error);
-        });
       } catch (error) {
         this.logger.error('❌ Error creando PDF:', error);
         reject(error);
@@ -135,16 +139,17 @@ export class RideGeneratorService {
 
     // ========== IZQUIERDA: LOGO Y DATOS EMPRESA ==========
 
-    // Logo primero (centrado o a la izquierda)
-    if (company.logoPath && existsSync(company.logoPath)) {
+    // Logo primero (descargado desde R2)
+    if (company.logoPath) {
       try {
-        doc.image(company.logoPath, leftX, leftY, {
+        const logoData = await this.r2Storage.downloadLogo(company.logoPath);
+        doc.image(logoData.buffer, leftX, leftY, {
           fit: [120, 70],
           align: 'center',
         });
         leftY += 75; // Espacio después del logo
       } catch (error) {
-        this.logger.warn('⚠️ Error al cargar logo:', error);
+        this.logger.warn('⚠️ Error al descargar logo desde R2:', error);
       }
     }
 

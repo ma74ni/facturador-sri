@@ -1,45 +1,25 @@
 import { Injectable } from '@nestjs/common';
-import { writeFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import { join } from 'path';
+import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
 
 @Injectable()
 export class XmlStorageService {
-  private readonly storagePath = join(process.cwd(), 'storage', 'xml');
+  constructor(private r2Storage: R2StorageService) {}
 
-  async ensureStorageExists(): Promise<void> {
-    if (!existsSync(this.storagePath)) {
-      await mkdir(this.storagePath, { recursive: true });
-    }
+  async saveXml(accessKey: string, xml: string, companyId: string): Promise<string> {
+    const r2Key = await this.r2Storage.uploadXml(companyId, accessKey, xml, false);
+    return r2Key;
   }
 
-  async saveXml(accessKey: string, xml: string): Promise<string> {
-    await this.ensureStorageExists();
-    
-    const filename = `${accessKey}.xml`;
-    const filepath = join(this.storagePath, filename);
-    
-    await writeFile(filepath, xml, 'utf-8');
-    
-    return filepath;
+  async saveSignedXml(accessKey: string, signedXml: string, companyId: string): Promise<string> {
+    const r2Key = await this.r2Storage.uploadXml(companyId, accessKey, signedXml, true);
+    return r2Key;
   }
 
-  async saveSignedXml(accessKey: string, signedXml: string): Promise<string> {
-    await this.ensureStorageExists();
-    
-    const filename = `${accessKey}_firmado.xml`;
-    const filepath = join(this.storagePath, filename);
-    
-    await writeFile(filepath, signedXml, 'utf-8');
-    
-    return filepath;
+  getXmlPath(accessKey: string, companyId: string): string {
+    return `xml/${companyId}/${accessKey}.xml`;
   }
 
-  getXmlPath(accessKey: string): string {
-    return join(this.storagePath, `${accessKey}.xml`);
-  }
-
-  getSignedXmlPath(accessKey: string): string {
-    return join(this.storagePath, `${accessKey}_firmado.xml`);
+  getSignedXmlPath(accessKey: string, companyId: string): string {
+    return `xml-signed/${companyId}/${accessKey}_signed.xml`;
   }
 }

@@ -21,7 +21,8 @@ export class EmailService {
     company?: any;
     attachments?: Array<{
       filename: string;
-      path: string;
+      path?: string;
+      content?: Buffer;
       contentType: string;
     }>;
   }): Promise<{ success: boolean; messageId?: string; error?: string }> {
@@ -44,7 +45,8 @@ export class EmailService {
       const mailjetAttachments = [];
       if (options.attachments) {
         for (const att of options.attachments) {
-          const fileBuffer = await readFile(att.path);
+          // Si tiene content (Buffer), usarlo directamente; si no, leer desde path
+          const fileBuffer = att.content || await readFile(att.path!);
           mailjetAttachments.push({
             filename: att.filename,
             contentType: att.contentType,

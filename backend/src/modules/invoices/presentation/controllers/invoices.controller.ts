@@ -16,8 +16,7 @@ import { InvoicesService } from '../../application/services/invoices.service';
 import { CreateInvoiceDto } from '../../application/dto/create-invoice.dto';
 import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
 import { PrismaService } from '../../../../shared/database/prisma.service';
-import { readFile } from 'fs/promises';
-import { existsSync } from 'fs';
+import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
 
 @ApiTags('invoices')
 @Controller('invoices')
@@ -27,6 +26,7 @@ export class InvoicesController {
   constructor(
     private readonly invoicesService: InvoicesService,
     private readonly prisma: PrismaService,
+    private readonly r2Storage: R2StorageService,
   ) {}
 
   private async getCompanyIdAndUserId(userId: string): Promise<{ companyId: string; userId: string }> {
@@ -71,7 +71,7 @@ export class InvoicesController {
     @Res() res: Response,
   ) {
     const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
-    
+
     const invoice = await this.prisma.invoice.findFirst({
       where: { id, companyId },
     });
@@ -80,12 +80,13 @@ export class InvoicesController {
       throw new NotFoundException('Factura no encontrada');
     }
 
-    if (!invoice.xmlPath || !existsSync(invoice.xmlPath)) {
+    if (!invoice.xmlPath) {
       throw new NotFoundException('XML no encontrado');
     }
 
-    const xmlContent = await readFile(invoice.xmlPath, 'utf-8');
-    
+    // Descargar XML desde R2
+    const xmlContent = await this.r2Storage.downloadXml(invoice.xmlPath);
+
     res.setHeader('Content-Type', 'application/xml');
     res.setHeader(
       'Content-Disposition',
@@ -129,7 +130,7 @@ async downloadRide(
   @Res() res: Response,
 ) {
   const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
-  
+
   const invoice = await this.prisma.invoice.findFirst({
     where: { id, companyId },
   });
@@ -138,12 +139,13 @@ async downloadRide(
     throw new NotFoundException('Factura no encontrada');
   }
 
-  if (!invoice.ridePdfPath || !existsSync(invoice.ridePdfPath)) {
+  if (!invoice.ridePdfPath) {
     throw new NotFoundException('RIDE no encontrado. Genéralo primero.');
   }
 
-  const pdfBuffer = await readFile(invoice.ridePdfPath);
-  
+  // Descargar PDF desde R2
+  const pdfBuffer = await this.r2Storage.downloadRide(invoice.ridePdfPath);
+
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader(
     'Content-Disposition',
