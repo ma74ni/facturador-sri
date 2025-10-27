@@ -3,8 +3,10 @@ import { CreditNotesController } from './presentation/controllers/credit-notes.c
 import { CreditNotesService } from './application/services/credit-notes.service';
 import { CreditNoteXmlGeneratorService } from './infrastructure/xml/xml-generator.service';
 import { CreditNoteXmlStorageService } from './infrastructure/xml/xml-storage.service';
+import { CreditNoteRideGeneratorService } from './infrastructure/pdf/ride-generator.service';
 import { PrismaService } from '../../shared/database/prisma.service';
 import { EmailService } from '../../shared/email/email.service';
+import { R2StorageService } from '../../shared/storage/r2-storage.service';
 
 // Servicios compartidos del módulo de facturas
 import { AccessKeyService } from '../invoices/domain/services/access-key.service';
@@ -18,9 +20,11 @@ import { MailjetProvider } from '../../shared/email/providers/mailjet.provider';
     CreditNotesService,
     CreditNoteXmlGeneratorService,
     CreditNoteXmlStorageService,
+    CreditNoteRideGeneratorService,
     PrismaService,
     EmailService,
     MailjetProvider,
+    R2StorageService,
     // Servicios compartidos
     AccessKeyService,
     DigitalSignatureService,

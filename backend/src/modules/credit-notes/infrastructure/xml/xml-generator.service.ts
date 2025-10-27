@@ -58,12 +58,27 @@ export class CreditNoteXmlGeneratorService {
     // ==================== DOCUMENTO MODIFICADO ====================
     infoNotaCredito.ele('codDocModificado').txt(creditNote.modifiedDocType); // "01" = Factura
     infoNotaCredito.ele('numDocModificado').txt(creditNote.modifiedNumber); // 001-001-000000001
+
+    // Fecha de emisión del documento sustento (factura modificada)
+    // Si tenemos la factura completa, usamos su fecha, sino usamos la misma fecha de la nota
+    const fechaSustento = creditNote.modifiedInvoice?.issueDate
+      ? creditNote.modifiedInvoice.issueDate
+      : creditNote.issueDate;
     infoNotaCredito
       .ele('fechaEmisionDocSustento')
-      .txt(dayjs(creditNote.modifiedInvoice.issueDate).format('DD/MM/YYYY'));
+      .txt(dayjs(fechaSustento).format('DD/MM/YYYY'));
 
     // ==================== TOTALES ====================
+    // ORDEN CORRECTO SEGÚN ESQUEMA SRI:
+    // 1. totalSinImpuestos
+    // 2. valorModificacion
+    // 3. moneda
+    // 4. totalConImpuestos
+    // 5. motivo
+
     infoNotaCredito.ele('totalSinImpuestos').txt(creditNote.subtotal.toFixed(2));
+    infoNotaCredito.ele('valorModificacion').txt(creditNote.total.toFixed(2));
+    infoNotaCredito.ele('moneda').txt('DOLAR');
 
     // ==================== TOTAL CON IMPUESTOS ====================
     const totalConImpuestos = infoNotaCredito.ele('totalConImpuestos');
@@ -74,6 +89,7 @@ export class CreditNoteXmlGeneratorService {
     totalImpuesto.ele('codigoPorcentaje').txt('4'); // 4 = 15%
     totalImpuesto.ele('baseImponible').txt(creditNote.subtotal.toFixed(2));
     totalImpuesto.ele('valor').txt(creditNote.ivaValue.toFixed(2));
+    totalImpuesto.ele('valorDevolucionIva').txt('0.00'); // Campo requerido por SRI
 
     // IVA 0% (obligatorio para validación del SRI)
     const totalImpuesto0 = totalConImpuestos.ele('totalImpuesto');
@@ -82,14 +98,8 @@ export class CreditNoteXmlGeneratorService {
     totalImpuesto0.ele('baseImponible').txt('0.00');
     totalImpuesto0.ele('valor').txt('0.00');
 
-    // Motivo de la nota de crédito
+    // Motivo de la nota de crédito (DEBE IR AL FINAL)
     infoNotaCredito.ele('motivo').txt(creditNote.reason);
-
-    // Valor total
-    infoNotaCredito.ele('valorModificacion').txt(creditNote.total.toFixed(2));
-
-    // Moneda
-    infoNotaCredito.ele('moneda').txt('DOLAR');
 
     // ==================== DETALLES ====================
     const detalles = root.ele('detalles');

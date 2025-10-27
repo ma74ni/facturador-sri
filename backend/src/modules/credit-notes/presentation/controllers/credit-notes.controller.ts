@@ -8,7 +8,6 @@ import {
   Request,
   UnauthorizedException,
   Res,
-  NotFoundException,
 } from '@nestjs/common';
 import { Response } from 'express';
 import {
@@ -16,14 +15,11 @@ import {
   ApiOperation,
   ApiBearerAuth,
   ApiResponse,
-  ApiBody,
 } from '@nestjs/swagger';
 import { CreditNotesService } from '../../application/services/credit-notes.service';
 import { CreateCreditNoteDto } from '../../application/dto/create-credit-note.dto';
 import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
 import { PrismaService } from '../../../../shared/database/prisma.service';
-import { readFile } from 'fs/promises';
-import { existsSync } from 'fs';
 
 @ApiTags('credit-notes')
 @Controller('credit-notes')
@@ -83,24 +79,37 @@ export class CreditNotesController {
   @ApiOperation({ summary: 'Descargar XML de la nota de crédito' })
   async downloadXml(@Param('id') id: string, @Request() req: any, @Res() res: Response) {
     const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
+    const xmlData = await this.creditNotesService.getXml(id, companyId);
 
-    const creditNote = await this.prisma.creditNote.findFirst({
-      where: { id, companyId },
-    });
+    res.setHeader('Content-Type', xmlData.contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${xmlData.filename}"`);
+    res.send(xmlData.content);
+  }
 
-    if (!creditNote) {
-      throw new NotFoundException('Nota de crédito no encontrada');
-    }
+  @Get(':id/ride')
+  @ApiOperation({ summary: 'Generar RIDE (PDF) de la nota de crédito' })
+  @ApiResponse({
+    status: 200,
+    description: 'RIDE generado exitosamente',
+  })
+  async generateRide(@Param('id') id: string, @Request() req: any) {
+    const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
+    return this.creditNotesService.generateRide(id, companyId);
+  }
 
-    if (!creditNote.xmlPath || !existsSync(creditNote.xmlPath)) {
-      throw new NotFoundException('XML no encontrado');
-    }
+  @Get(':id/ride/download')
+  @ApiOperation({ summary: 'Descargar RIDE (PDF) de la nota de crédito' })
+  @ApiResponse({
+    status: 200,
+    description: 'RIDE descargado exitosamente',
+  })
+  async downloadRide(@Param('id') id: string, @Request() req: any, @Res() res: Response) {
+    const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
+    const rideData = await this.creditNotesService.downloadRide(id, companyId);
 
-    const xmlContent = await readFile(creditNote.xmlPath, 'utf-8');
-
-    res.setHeader('Content-Type', 'application/xml');
-    res.setHeader('Content-Disposition', `attachment; filename="${creditNote.accessKey}.xml"`);
-    res.send(xmlContent);
+    res.setHeader('Content-Type', rideData.contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${rideData.filename}"`);
+    res.send(rideData.buffer);
   }
 
   @Get('access-key/:accessKey')
@@ -130,5 +139,35 @@ export class CreditNotesController {
   async sendToSri(@Param('id') id: string, @Request() req: any) {
     const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
     return this.creditNotesService.sendToSri(id, companyId);
+  }
+
+  @Post(':id/send-email')
+  @ApiOperation({ summary: 'Enviar nota de crédito por email' })
+  @ApiResponse({
+    status: 200,
+    description: 'Email enviado exitosamente',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Error: Nota de crédito no autorizada o cliente sin email',
+  })
+  async sendEmail(
+    @Param('id') id: string,
+    @Body('recipientEmail') recipientEmail: string,
+    @Request() req: any,
+  ) {
+    const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
+    return this.creditNotesService.sendCreditNoteByEmail(id, companyId, recipientEmail);
+  }
+
+  @Get(':id/email-logs')
+  @ApiOperation({ summary: 'Obtener historial de envíos de email' })
+  @ApiResponse({
+    status: 200,
+    description: 'Historial de emails obtenido exitosamente',
+  })
+  async getEmailLogs(@Param('id') id: string, @Request() req: any) {
+    const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
+    return this.creditNotesService.getEmailLogs(id, companyId);
   }
 }

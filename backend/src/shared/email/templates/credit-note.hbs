@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nota de Crédito Electrónica</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: 20px auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .header {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+    .content {
+      padding: 30px;
+    }
+    .credit-note-number {
+      background-color: #f8f9fa;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 20px 0;
+      text-align: center;
+    }
+    .credit-note-number strong {
+      font-size: 20px;
+      color: #f5576c;
+    }
+    .details {
+      margin: 20px 0;
+    }
+    .details table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .details td {
+      padding: 8px 0;
+      border-bottom: 1px solid #eee;
+    }
+    .details td:first-child {
+      font-weight: bold;
+      width: 40%;
+    }
+    .reason-box {
+      background-color: #fff3cd;
+      border-left: 4px solid #ffc107;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 20px 0;
+    }
+    .reason-box strong {
+      color: #856404;
+    }
+    .total {
+      background-color: #f5576c;
+      color: white;
+      padding: 15px;
+      border-radius: 6px;
+      text-align: center;
+      margin: 20px 0;
+      font-size: 20px;
+    }
+    .button {
+      display: inline-block;
+      padding: 12px 30px;
+      background-color: #f5576c;
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      margin: 10px 5px;
+      font-weight: bold;
+    }
+    .button:hover {
+      background-color: #e04560;
+    }
+    .footer {
+      background-color: #f8f9fa;
+      padding: 20px;
+      text-align: center;
+      font-size: 12px;
+      color: #666;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 5px 15px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .status-authorized {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .attachments {
+      background-color: #e7f3ff;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 20px 0;
+      border-left: 4px solid #2196f3;
+    }
+    .modified-invoice {
+      background-color: #f0f0f0;
+      padding: 12px;
+      border-radius: 4px;
+      margin: 15px 0;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>🔄 Nota de Crédito Electrónica</h1>
+      <p>{{companyName}}</p>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <p>Estimado(a) <strong>{{customerName}}</strong>,</p>
+
+      <p>Se ha generado una nota de crédito electrónica con los siguientes detalles:</p>
+
+      <!-- Credit Note Number -->
+      <div class="credit-note-number">
+        <strong>{{creditNoteNumber}}</strong>
+        <br>
+        {{#if authorized}}
+          <span class="status-badge status-authorized">✓ AUTORIZADO POR EL SRI</span>
+        {{/if}}
+      </div>
+
+      <!-- Modified Invoice -->
+      <div class="modified-invoice">
+        <strong>Documento que modifica:</strong><br>
+        <span style="font-size: 16px; color: #667eea;">Factura {{modifiedInvoiceNumber}}</span>
+      </div>
+
+      <!-- Reason -->
+      <div class="reason-box">
+        <strong>📋 Motivo de la nota de crédito:</strong><br>
+        <p style="margin: 10px 0 0 0;">{{reason}}</p>
+      </div>
+
+      <!-- Details -->
+      <div class="details">
+        <table>
+          <tr>
+            <td>Fecha de emisión:</td>
+            <td>{{issueDate}}</td>
+          </tr>
+          {{#if authorizationDate}}
+          <tr>
+            <td>Fecha de autorización:</td>
+            <td>{{authorizationDate}}</td>
+          </tr>
+          {{/if}}
+          {{#if authorizationNumber}}
+          <tr>
+            <td>No. de autorización:</td>
+            <td style="font-size: 11px;">{{authorizationNumber}}</td>
+          </tr>
+          {{/if}}
+          <tr>
+            <td>Clave de acceso:</td>
+            <td style="font-size: 11px;">{{accessKey}}</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Total -->
+      <div class="total">
+        <strong>Total de la nota: ${{total}}</strong>
+      </div>
+
+      <!-- Attachments Notice -->
+      <div class="attachments">
+        <strong>📎 Archivos adjuntos:</strong>
+        <ul style="margin: 10px 0;">
+          <li>RIDE (PDF) - Representación impresa de la nota de crédito</li>
+          <li>XML firmado - Comprobante electrónico</li>
+        </ul>
+      </div>
+
+      <!-- Actions -->
+      <div style="text-align: center; margin: 30px 0;">
+        {{#if viewUrl}}
+          <a href="{{viewUrl}}" class="button">Ver Nota de Crédito Online</a>
+        {{/if}}
+      </div>
+
+      <p style="color: #666; font-size: 14px;">
+        Esta nota de crédito modifica la factura originalmente emitida. Si tiene alguna pregunta, no dude en contactarnos.
+      </p>
+
+      <p style="margin-top: 30px;">
+        Saludos cordiales,<br>
+        <strong>{{companyName}}</strong>
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>Este es un mensaje automático, por favor no responder a este correo.</p>
+      <p>© {{year}} {{companyName}}. Todos los derechos reservados.</p>
+    </div>
+  </div>
+</body>
+</html>

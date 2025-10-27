@@ -111,7 +111,7 @@ facturador-sri/
 │   │   │       │   ├── xml/
 │   │   │       │   │   ├── xml-generator.service.ts      # Genera XML nota crédito
 │   │   │       │   │   └── xml-storage.service.ts        # Almacena XMLs
-│   │   │       │   ├── pdf/                              # (PENDIENTE)
+│   │   │       │   ├── pdf/
 │   │   │       │   │   └── ride-generator.service.ts     # Genera PDF RIDE
 │   │   │       │   └── sri/                              # (Usa servicios compartidos)
 │   │   │       ├── presentation/
@@ -409,7 +409,7 @@ facturador-sri/
 - `GET /api/v1/invoices/:id/ride/download` - Descargar PDF
 - `GET /api/v1/invoices/:id/email-logs` - Historial de emails
 
-### 6. Notas de Crédito (COMPLETO)
+### 6. Notas de Crédito (✅ COMPLETO)
 
 #### 6.1. Creación de Notas de Crédito
 - **Endpoint:** `POST /api/v1/credit-notes`
@@ -445,14 +445,42 @@ facturador-sri/
 - Actualización de estado (AUTHORIZED/REJECTED)
 - Almacenamiento de número de autorización
 
-#### 6.5. Consultas
+#### 6.5. Generación de RIDE (PDF)
+- **Endpoint:** `GET /api/v1/credit-notes/:id/ride`
+- **Servicio:** `CreditNoteRideGeneratorService`
+- Generación en memoria con PDFKit (sin escritura a disco)
+- Descarga de logos desde Cloudflare R2
+- Código de barras (bwip-js)
+- Información completa de nota de crédito
+- Muestra información de factura modificada
+- Incluye motivo de la nota de crédito
+- Diseño profesional con tabla de detalles
+- Almacenamiento automático en Cloudflare R2
+
+#### 6.6. Envío por Email
+- **Endpoint:** `POST /api/v1/credit-notes/:id/send-email`
+- **Servicio:** `EmailService` + `MailjetProvider`
+- Plantilla HTML específica para notas de crédito (Handlebars)
+- Descarga de archivos desde Cloudflare R2 como buffers
+- Adjuntos: XML firmado + PDF RIDE (desde memoria)
+- Muestra información de factura modificada y motivo
+- Log de envíos (CreditNoteEmailLog)
+- Soporte para Mailjet (API Key por empresa o sistema)
+- Reply-To configurable
+- Generación automática de RIDE si no existe
+
+#### 6.7. Consultas
 - `GET /api/v1/credit-notes` - Listar notas de crédito
 - `GET /api/v1/credit-notes/:id` - Obtener nota por ID
 - `GET /api/v1/credit-notes/access-key/:accessKey` - Buscar por clave de acceso
 - `GET /api/v1/credit-notes/stats` - Estadísticas
 - `GET /api/v1/credit-notes/:id/xml` - Descargar XML
+- `GET /api/v1/credit-notes/:id/ride` - Generar RIDE (PDF)
+- `GET /api/v1/credit-notes/:id/ride/download` - Descargar PDF
+- `POST /api/v1/credit-notes/:id/send-email` - Enviar por email
+- `GET /api/v1/credit-notes/:id/email-logs` - Historial de emails
 
-#### 6.6. Validaciones Especiales
+#### 6.8. Validaciones Especiales
 - Solo se pueden crear notas de crédito para facturas AUTORIZADAS
 - El cliente debe ser el mismo de la factura original
 - El total no puede exceder el total de la factura
@@ -478,13 +506,13 @@ facturador-sri/
 
 ## Documentos SRI Soportados
 
-| Código | Tipo de Documento | Estado | Módulo |
-|--------|-------------------|--------|--------|
-| 01 | Factura | ✅ IMPLEMENTADO | `invoices` |
-| 04 | Nota de Crédito | ✅ IMPLEMENTADO | `credit-notes` |
-| 05 | Nota de Débito | ❌ PENDIENTE | - |
-| 06 | Guía de Remisión | ❌ PENDIENTE | - |
-| 07 | Comprobante de Retención | ❌ PENDIENTE | - |
+| Código | Tipo de Documento | Estado | Módulo | RIDE |
+|--------|-------------------|--------|--------|------|
+| 01 | Factura | ✅ IMPLEMENTADO | `invoices` | ✅ |
+| 04 | Nota de Crédito | ✅ IMPLEMENTADO | `credit-notes` | ✅ |
+| 05 | Nota de Débito | ❌ PENDIENTE | - | ❌ |
+| 06 | Guía de Remisión | ❌ PENDIENTE | - | ❌ |
+| 07 | Comprobante de Retención | ❌ PENDIENTE | - | ❌ |
 
 ---
 
@@ -546,26 +574,7 @@ facturador-sri/
 - Entrega a clientes
 - Transferencias entre establecimientos
 
-### 4. Generación de RIDE para Notas de Crédito
-**Pendiente:** Implementar generación de PDF (RIDE) para notas de crédito
-
-**Requisitos:**
-- Servicio `CreditNoteRideGeneratorService` similar al de facturas
-- Diseño específico para notas de crédito
-- Mostrar información de factura modificada
-- Incluir motivo de la nota
-- Código de barras con clave de acceso
-
-### 5. Envío de Notas de Crédito por Email
-**Pendiente:** Implementar envío por correo electrónico
-
-**Requisitos:**
-- Endpoint `POST /api/v1/credit-notes/:id/send-email`
-- Plantilla HTML específica para notas de crédito
-- Adjuntar XML firmado y PDF RIDE
-- Log de envíos (CreditNoteEmailLog)
-
-### 6. Anulación de Documentos
+### 4. Anulación de Documentos
 **Actualización:** Resolución NAC-DGERCGC25-00000014 (vigente desde agosto 2025)
 
 **Requisitos:**
@@ -581,32 +590,32 @@ facturador-sri/
 - Anulación de comprobante de retención
 - Anulación de documentos complementarios
 
-### 7. Reportes y Estadísticas
+### 5. Reportes y Estadísticas
 - Dashboard con métricas de facturación
 - Reportes de ventas por período
 - Reportes de impuestos (IVA, Retenciones)
 - Exportación a Excel/PDF
 - Gráficas de tendencias
 
-### 8. Multi-tenancy y Permisos
+### 6. Multi-tenancy y Permisos
 - Roles granulares (ADMIN, MANAGER, USER, VIEWER)
 - Permisos por módulo
 - Auditoría de acciones
 - Logs de usuario
 
-### 9. Integraciones Adicionales
+### 7. Integraciones Adicionales
 - Webhook para notificaciones de eventos
 - API pública para integraciones externas
 - Sincronización con sistemas contables
 - Integración con pasarelas de pago
 
-### 10. Mejoras de Email
+### 8. Mejoras de Email
 - Soporte completo SMTP personalizado
 - Plantillas personalizables por empresa
 - Envío masivo de facturas
 - Programación de envíos
 
-### 11. Validaciones SRI Adicionales
+### 9. Validaciones SRI Adicionales
 - Validación contra listas negras SRI
 - Consulta de estado de RUC en tiempo real
 - Validación de certificados contra SRI
@@ -843,20 +852,19 @@ R2 Bucket (facturador-sri)/
 ## Próximos Pasos Recomendados
 
 ### Prioridad Alta
-1. **RIDE para Notas de Crédito** - Generar representación impresa
-2. **Email para Notas de Crédito** - Envío automático por correo
-3. **Comprobante de Retención** - Obligatorio para agentes de retención
-4. **Anulación de Documentos** - Nueva normativa SRI 2025
+1. **Comprobante de Retención** - Obligatorio para agentes de retención
+2. **Anulación de Documentos** - Nueva normativa SRI 2025
+3. **Nota de Débito** - Para cobros adicionales
 
 ### Prioridad Media
-5. **Nota de Débito** - Para cobros adicionales
-6. **Guía de Remisión** - Traslado de mercancía
-7. **Dashboard y Reportes** - Visualización de datos
+4. **Guía de Remisión** - Traslado de mercancía
+5. **Dashboard y Reportes** - Visualización de datos
+6. **Mejoras de Email** - SMTP personalizado y plantillas
 
 ### Prioridad Baja
-8. **Integraciones adicionales**
-9. **Mejoras de UX**
-10. **Optimizaciones de rendimiento**
+7. **Integraciones adicionales**
+8. **Mejoras de UX**
+9. **Optimizaciones de rendimiento**
 
 ---
 
@@ -880,6 +888,28 @@ Para consultas sobre este proyecto:
 
 ## Historial de Cambios
 
+### 2025-10-27 - Implementación Completa de Notas de Crédito
+- ✅ **RIDE para Notas de Crédito:**
+  - Implementación completa de generación de RIDE (PDF)
+  - Servicio `CreditNoteRideGeneratorService` con generación en memoria
+  - Diseño profesional adaptado a notas de crédito
+  - Muestra información de factura modificada y motivo
+  - Código de barras con clave de acceso
+  - Descarga de logos desde Cloudflare R2
+  - Almacenamiento automático en Cloudflare R2
+  - Endpoints `/ride` y `/ride/download` implementados
+
+- ✅ **Email para Notas de Crédito:**
+  - Implementación completa de envío por correo electrónico
+  - Plantilla HTML específica (`credit-note.hbs`)
+  - Método `sendCreditNoteByEmail` en el servicio
+  - Adjuntos: XML firmado + PDF RIDE desde R2
+  - Log de envíos con `CreditNoteEmailLog`
+  - Generación automática de RIDE si no existe
+  - Endpoint `POST /send-email` implementado
+  - Endpoint `GET /email-logs` para historial
+  - Muestra información de factura modificada y motivo en el email
+
 ### 2025-10-22 - Migración a Cloudflare R2
 - ✅ Migración completa de almacenamiento local a Cloudflare R2
 - ✅ Implementación de R2StorageService con AWS SDK v3
@@ -892,5 +922,5 @@ Para consultas sobre este proyecto:
 
 ---
 
-**Última actualización:** 2025-10-22
-**Versión del proyecto:** 1.1.0
+**Última actualización:** 2025-10-27
+**Versión del proyecto:** 1.3.0
