@@ -14,6 +14,7 @@ import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { InvoicesService } from '../../application/services/invoices.service';
 import { CreateInvoiceDto } from '../../application/dto/create-invoice.dto';
+import { BatchProcessDto } from '../../application/dto/batch-process.dto';
 import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
 import { PrismaService } from '../../../../shared/database/prisma.service';
 import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
@@ -114,6 +115,47 @@ export class InvoicesController {
   async sendToSri(@Param('id') id: string, @Request() req: any) {
     const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
     return this.invoicesService.sendToSri(id, companyId);
+  }
+
+  @Post('batch/send-to-sri')
+  @ApiOperation({ summary: 'Procesar múltiples facturas pendientes y enviar al SRI' })
+  @ApiResponse({
+    status: 200,
+    description: 'Procesamiento masivo completado',
+    schema: {
+      type: 'object',
+      properties: {
+        total: { type: 'number', example: 10 },
+        successful: { type: 'number', example: 8 },
+        failed: { type: 'number', example: 2 },
+        results: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              invoiceId: { type: 'string' },
+              sequential: { type: 'string' },
+              status: { type: 'string', enum: ['success', 'error'] },
+              message: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiBody({
+    type: BatchProcessDto,
+    description: 'Parámetros para el procesamiento masivo de facturas',
+  })
+  async processBatch(@Body() dto: BatchProcessDto, @Request() req: any) {
+    const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
+    return this.invoicesService.processBatchInvoices(
+      companyId,
+      dto.dateFrom,
+      dto.dateTo,
+      dto.limit,
+      dto.concurrency,
+    );
   }
   @Get(':id/ride')
 @ApiOperation({ summary: 'Generar RIDE (PDF) de la factura' })

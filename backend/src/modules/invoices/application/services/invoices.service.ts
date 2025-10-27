@@ -663,4 +663,122 @@ async getemailLogs(invoiceId: string, companyId: string) {
     logs,
   };
 }
+
+  // ==================== PROCESAMIENTO MASIVO ====================
+  async processBatchInvoices(
+    companyId: string,
+    dateFrom?: string,
+    dateTo?: string,
+    limit: number = 100,
+    concurrency: number = 5,
+  ) {
+    this.logger.log('📦 Iniciando procesamiento masivo de facturas...');
+
+    // 1. Construir filtro de fechas
+    const dateFilter: any = {};
+    if (dateFrom) {
+      dateFilter.gte = new Date(dateFrom);
+    }
+    if (dateTo) {
+      const endDate = new Date(dateTo);
+      endDate.setHours(23, 59, 59, 999); // Incluir todo el día
+      dateFilter.lte = endDate;
+    }
+
+    // 2. Obtener facturas pendientes
+    const invoices = await this.prisma.invoice.findMany({
+      where: {
+        companyId,
+        sriStatus: 'PENDING',
+        ...(Object.keys(dateFilter).length > 0 && { issueDate: dateFilter }),
+      },
+      take: limit,
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        accessKey: true,
+        establishmentCode: true,
+        emissionPointCode: true,
+        sequential: true,
+        issueDate: true,
+      },
+    });
+
+    if (invoices.length === 0) {
+      return {
+        message: 'No hay facturas pendientes para procesar',
+        total: 0,
+        successful: 0,
+        failed: 0,
+        results: [],
+      };
+    }
+
+    this.logger.log(`📋 Se encontraron ${invoices.length} facturas pendientes`);
+
+    // 3. Procesar en lotes con concurrencia controlada
+    const results = [];
+    let successful = 0;
+    let failed = 0;
+
+    // Procesar en grupos de tamaño 'concurrency'
+    for (let i = 0; i < invoices.length; i += concurrency) {
+      const batch = invoices.slice(i, i + concurrency);
+
+      this.logger.log(`⚙️ Procesando lote ${Math.floor(i / concurrency) + 1} (${batch.length} facturas)...`);
+
+      const batchResults = await Promise.allSettled(
+        batch.map(async (invoice) => {
+          try {
+            const result = await this.sendToSri(invoice.id, companyId);
+            return {
+              invoiceId: invoice.id,
+              invoiceNumber: `${invoice.establishmentCode}-${invoice.emissionPointCode}-${invoice.sequential}`,
+              status: result.status,
+              authorizationNumber: result.authorizationNumber,
+              emailSent: result.emailSent || false,
+              success: true,
+            };
+          } catch (error: any) {
+            throw {
+              invoiceId: invoice.id,
+              invoiceNumber: `${invoice.establishmentCode}-${invoice.emissionPointCode}-${invoice.sequential}`,
+              error: error.message,
+            };
+          }
+        }),
+      );
+
+      // Procesar resultados del lote
+      for (const result of batchResults) {
+        if (result.status === 'fulfilled') {
+          results.push(result.value);
+          successful++;
+          this.logger.log(`✅ Factura ${result.value.invoiceNumber}: ${result.value.status}`);
+        } else {
+          results.push({
+            ...result.reason,
+            success: false,
+          });
+          failed++;
+          this.logger.error(`❌ Factura ${result.reason.invoiceNumber}: ${result.reason.error}`);
+        }
+      }
+
+      // Pequeña pausa entre lotes para no saturar el SRI
+      if (i + concurrency < invoices.length) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
+
+    this.logger.log(`🎉 Procesamiento completado: ${successful} exitosas, ${failed} fallidas`);
+
+    return {
+      message: 'Procesamiento masivo completado',
+      total: invoices.length,
+      successful,
+      failed,
+      results,
+    };
+  }
 }

@@ -833,4 +833,162 @@ export class CreditNotesService {
       logs,
     };
   }
+
+  /**
+   * Procesa múltiples notas de crédito pendientes de forma masiva
+   * @param companyId ID de la empresa
+   * @param dateFrom Fecha desde (opcional)
+   * @param dateTo Fecha hasta (opcional)
+   * @param limit Número máximo de notas a procesar (default: 100)
+   * @param concurrency Número de notas a procesar en paralelo (default: 5)
+   */
+  async processBatchCreditNotes(
+    companyId: string,
+    dateFrom?: string,
+    dateTo?: string,
+    limit: number = 100,
+    concurrency: number = 5,
+  ) {
+    this.logger.log(`🔄 Iniciando procesamiento masivo de notas de crédito...`);
+    this.logger.log(
+      `Parámetros: dateFrom=${dateFrom}, dateTo=${dateTo}, limit=${limit}, concurrency=${concurrency}`,
+    );
+
+    // Construir filtros para la consulta
+    const whereClause: any = {
+      companyId,
+      sriStatus: 'PENDING',
+    };
+
+    // Agregar filtro de fechas si se proporcionan
+    if (dateFrom || dateTo) {
+      whereClause.issueDate = {};
+      if (dateFrom) {
+        whereClause.issueDate.gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        whereClause.issueDate.lte = new Date(dateTo);
+      }
+    }
+
+    // Obtener notas de crédito pendientes
+    const pendingCreditNotes = await this.prisma.creditNote.findMany({
+      where: whereClause,
+      take: limit,
+      orderBy: {
+        issueDate: 'asc', // Procesar las más antiguas primero
+      },
+      select: {
+        id: true,
+        sequential: true,
+        establishmentCode: true,
+        emissionPointCode: true,
+        issueDate: true,
+      },
+    });
+
+    if (pendingCreditNotes.length === 0) {
+      this.logger.warn('⚠️  No hay notas de crédito pendientes para procesar');
+      return {
+        message: 'No hay notas de crédito pendientes para procesar',
+        total: 0,
+        successful: 0,
+        failed: 0,
+        results: [],
+      };
+    }
+
+    this.logger.log(`📋 Se encontraron ${pendingCreditNotes.length} notas de crédito pendientes`);
+
+    // Arrays para rastrear resultados
+    const results: Array<{
+      creditNoteId: string;
+      sequential: string;
+      status: 'success' | 'error';
+      message: string;
+    }> = [];
+
+    let successful = 0;
+    let failed = 0;
+
+    // Procesar en lotes con concurrencia controlada
+    for (let i = 0; i < pendingCreditNotes.length; i += concurrency) {
+      const batch = pendingCreditNotes.slice(i, i + concurrency);
+      const batchNumber = Math.floor(i / concurrency) + 1;
+      const totalBatches = Math.ceil(pendingCreditNotes.length / concurrency);
+
+      this.logger.log(
+        `🔄 Procesando lote ${batchNumber}/${totalBatches} (${batch.length} notas de crédito)...`,
+      );
+
+      // Procesar el lote en paralelo usando Promise.allSettled
+      const batchResults = await Promise.allSettled(
+        batch.map(async (creditNote) => {
+          try {
+            this.logger.log(
+              `   → Procesando nota de crédito ${creditNote.establishmentCode}-${creditNote.emissionPointCode}-${creditNote.sequential}...`,
+            );
+
+            // Llamar al método sendToSri para procesar la nota de crédito
+            const result = await this.sendToSri(creditNote.id, companyId);
+
+            return {
+              creditNoteId: creditNote.id,
+              sequential: `${creditNote.establishmentCode}-${creditNote.emissionPointCode}-${creditNote.sequential}`,
+              status: 'success' as const,
+              message: result.message || 'Nota de crédito procesada exitosamente',
+            };
+          } catch (error) {
+            this.logger.error(
+              `   ✗ Error procesando nota de crédito ${creditNote.sequential}: ${error.message}`,
+            );
+
+            return {
+              creditNoteId: creditNote.id,
+              sequential: `${creditNote.establishmentCode}-${creditNote.emissionPointCode}-${creditNote.sequential}`,
+              status: 'error' as const,
+              message: error.message || 'Error desconocido',
+            };
+          }
+        }),
+      );
+
+      // Procesar resultados del lote
+      batchResults.forEach((result) => {
+        if (result.status === 'fulfilled') {
+          results.push(result.value);
+          if (result.value.status === 'success') {
+            successful++;
+            this.logger.log(`   ✓ ${result.value.sequential}: ${result.value.message}`);
+          } else {
+            failed++;
+            this.logger.error(`   ✗ ${result.value.sequential}: ${result.value.message}`);
+          }
+        } else {
+          failed++;
+          this.logger.error(`   ✗ Error inesperado: ${result.reason}`);
+        }
+      });
+
+      // Pausa entre lotes para no saturar el servicio del SRI
+      if (i + concurrency < pendingCreditNotes.length) {
+        this.logger.log(`⏸️  Esperando 1 segundo antes del siguiente lote...`);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
+
+    // Resumen final
+    this.logger.log(`\n📊 Resumen del procesamiento masivo:`);
+    this.logger.log(`   Total procesadas: ${pendingCreditNotes.length}`);
+    this.logger.log(`   Exitosas: ${successful}`);
+    this.logger.log(`   Fallidas: ${failed}`);
+
+    return {
+      message: 'Procesamiento masivo completado',
+      total: pendingCreditNotes.length,
+      successful,
+      failed,
+      results,
+    };
+  }
 }

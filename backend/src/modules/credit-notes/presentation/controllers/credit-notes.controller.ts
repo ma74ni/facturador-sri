@@ -18,6 +18,7 @@ import {
 } from '@nestjs/swagger';
 import { CreditNotesService } from '../../application/services/credit-notes.service';
 import { CreateCreditNoteDto } from '../../application/dto/create-credit-note.dto';
+import { BatchProcessDto } from '../../application/dto/batch-process.dto';
 import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
 import { PrismaService } from '../../../../shared/database/prisma.service';
 
@@ -139,6 +140,43 @@ export class CreditNotesController {
   async sendToSri(@Param('id') id: string, @Request() req: any) {
     const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
     return this.creditNotesService.sendToSri(id, companyId);
+  }
+
+  @Post('batch/send-to-sri')
+  @ApiOperation({ summary: 'Procesar múltiples notas de crédito pendientes y enviar al SRI' })
+  @ApiResponse({
+    status: 200,
+    description: 'Procesamiento masivo completado',
+    schema: {
+      type: 'object',
+      properties: {
+        total: { type: 'number', example: 10 },
+        successful: { type: 'number', example: 8 },
+        failed: { type: 'number', example: 2 },
+        results: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              creditNoteId: { type: 'string' },
+              sequential: { type: 'string' },
+              status: { type: 'string', enum: ['success', 'error'] },
+              message: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+  })
+  async processBatch(@Body() dto: BatchProcessDto, @Request() req: any) {
+    const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
+    return this.creditNotesService.processBatchCreditNotes(
+      companyId,
+      dto.dateFrom,
+      dto.dateTo,
+      dto.limit,
+      dto.concurrency,
+    );
   }
 
   @Post(':id/send-email')

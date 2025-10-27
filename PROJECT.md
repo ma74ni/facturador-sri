@@ -400,7 +400,19 @@ facturador-sri/
 - Soporte para Mailjet (API Key por empresa o sistema)
 - Reply-To configurable
 
-#### 5.7. Consultas
+#### 5.7. Procesamiento Masivo (Batch)
+- **Endpoint:** `POST /api/v1/invoices/batch/send-to-sri`
+- **Servicio:** `processBatchInvoices()` en `InvoicesService`
+- Procesa múltiples facturas pendientes de forma masiva
+- Filtrado por rango de fechas (opcional)
+- Control de límite (máximo 100 facturas)
+- Concurrencia configurable (default 5, máximo 10)
+- Usa `Promise.allSettled` para manejo de errores individuales
+- Pausa de 1 segundo entre lotes para no saturar SRI
+- Retorna resultados detallados (total, exitosas, fallidas)
+- Logging detallado con progreso en tiempo real
+
+#### 5.8. Consultas
 - `GET /api/v1/invoices` - Listar facturas
 - `GET /api/v1/invoices/:id` - Obtener factura por ID
 - `GET /api/v1/invoices/access-key/:accessKey` - Buscar por clave de acceso
@@ -469,7 +481,19 @@ facturador-sri/
 - Reply-To configurable
 - Generación automática de RIDE si no existe
 
-#### 6.7. Consultas
+#### 6.7. Procesamiento Masivo (Batch)
+- **Endpoint:** `POST /api/v1/credit-notes/batch/send-to-sri`
+- **Servicio:** `processBatchCreditNotes()` en `CreditNotesService`
+- Procesa múltiples notas de crédito pendientes de forma masiva
+- Filtrado por rango de fechas (opcional)
+- Control de límite (máximo 100 notas)
+- Concurrencia configurable (default 5, máximo 10)
+- Usa `Promise.allSettled` para manejo de errores individuales
+- Pausa de 1 segundo entre lotes para no saturar SRI
+- Retorna resultados detallados (total, exitosas, fallidas)
+- Logging detallado con progreso en tiempo real
+
+#### 6.8. Consultas
 - `GET /api/v1/credit-notes` - Listar notas de crédito
 - `GET /api/v1/credit-notes/:id` - Obtener nota por ID
 - `GET /api/v1/credit-notes/access-key/:accessKey` - Buscar por clave de acceso
@@ -480,7 +504,7 @@ facturador-sri/
 - `POST /api/v1/credit-notes/:id/send-email` - Enviar por email
 - `GET /api/v1/credit-notes/:id/email-logs` - Historial de emails
 
-#### 6.8. Validaciones Especiales
+#### 6.9. Validaciones Especiales
 - Solo se pueden crear notas de crédito para facturas AUTORIZADAS
 - El cliente debe ser el mismo de la factura original
 - El total no puede exceder el total de la factura
@@ -612,7 +636,6 @@ facturador-sri/
 ### 8. Mejoras de Email
 - Soporte completo SMTP personalizado
 - Plantillas personalizables por empresa
-- Envío masivo de facturas
 - Programación de envíos
 
 ### 9. Validaciones SRI Adicionales
@@ -689,6 +712,7 @@ graph TD
 - `GET /api/v1/invoices/access-key/:accessKey` - Buscar por clave de acceso
 - `GET /api/v1/invoices/stats` - Estadísticas
 - `POST /api/v1/invoices/:id/send-to-sri` - Enviar al SRI
+- `POST /api/v1/invoices/batch/send-to-sri` - Envío masivo al SRI
 - `GET /api/v1/invoices/:id/ride` - Generar RIDE (PDF)
 - `GET /api/v1/invoices/:id/ride/download` - Descargar PDF
 - `GET /api/v1/invoices/:id/xml` - Descargar XML
@@ -702,7 +726,12 @@ graph TD
 - `GET /api/v1/credit-notes/access-key/:accessKey` - Buscar por clave de acceso
 - `GET /api/v1/credit-notes/stats` - Estadísticas
 - `POST /api/v1/credit-notes/:id/send-to-sri` - Enviar al SRI
+- `POST /api/v1/credit-notes/batch/send-to-sri` - Envío masivo al SRI
 - `GET /api/v1/credit-notes/:id/xml` - Descargar XML
+- `GET /api/v1/credit-notes/:id/ride` - Generar RIDE (PDF)
+- `GET /api/v1/credit-notes/:id/ride/download` - Descargar PDF
+- `POST /api/v1/credit-notes/:id/send-email` - Enviar por email
+- `GET /api/v1/credit-notes/:id/email-logs` - Historial de emails
 
 ---
 
@@ -888,6 +917,26 @@ Para consultas sobre este proyecto:
 
 ## Historial de Cambios
 
+### 2025-10-27 - Procesamiento Masivo (Batch Processing)
+- ✅ **Procesamiento Masivo de Facturas:**
+  - DTO `BatchProcessDto` con validaciones (dateFrom, dateTo, limit, concurrency)
+  - Método `processBatchInvoices()` en `InvoicesService`
+  - Endpoint `POST /api/v1/invoices/batch/send-to-sri`
+  - Filtrado por rango de fechas (opcional)
+  - Límite configurable (máximo 100 facturas)
+  - Concurrencia configurable (default 5, máximo 10)
+  - Manejo de errores individuales con `Promise.allSettled`
+  - Pausa de 1 segundo entre lotes para no saturar SRI
+  - Resultados detallados (total, exitosas, fallidas)
+  - Logging detallado con progreso en tiempo real
+
+- ✅ **Procesamiento Masivo de Notas de Crédito:**
+  - DTO `BatchProcessDto` adaptado para notas de crédito
+  - Método `processBatchCreditNotes()` en `CreditNotesService`
+  - Endpoint `POST /api/v1/credit-notes/batch/send-to-sri`
+  - Mismas características que procesamiento de facturas
+  - Procesa las más antiguas primero
+
 ### 2025-10-27 - Implementación Completa de Notas de Crédito
 - ✅ **RIDE para Notas de Crédito:**
   - Implementación completa de generación de RIDE (PDF)
@@ -910,6 +959,13 @@ Para consultas sobre este proyecto:
   - Endpoint `GET /email-logs` para historial
   - Muestra información de factura modificada y motivo en el email
 
+- ✅ **Correcciones XML Notas de Crédito:**
+  - Corrección de orden de elementos en XML (cumplimiento esquema SRI)
+  - Agregado campo `valorDevolucionIva` (requerido)
+  - Corrección de `fechaEmisionDocSustento` con fallback
+  - Integración con R2Storage en `sendToSri`
+  - Envío automático de email después de autorización SRI
+
 ### 2025-10-22 - Migración a Cloudflare R2
 - ✅ Migración completa de almacenamiento local a Cloudflare R2
 - ✅ Implementación de R2StorageService con AWS SDK v3
@@ -923,4 +979,4 @@ Para consultas sobre este proyecto:
 ---
 
 **Última actualización:** 2025-10-27
-**Versión del proyecto:** 1.3.0
+**Versión del proyecto:** 1.4.0
