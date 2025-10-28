@@ -1,0 +1,32 @@
+{
+  "name": "facturador-sri-monorepo",
+  "version": "1.4.0",
+  "description": "Sistema de Facturación Electrónica SRI Ecuador - Monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:core": "pnpm --filter facturacion-core dev",
+    "dev:pos": "pnpm --filter pos-heladeria dev",
+    "build:all": "pnpm -r build",
+    "test:all": "pnpm -r test",
+    "lint:all": "pnpm -r lint"
+  },
+  "keywords": [
+    "facturacion",
+    "sri",
+    "ecuador",
+    "monorepo",
+    "pos"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}

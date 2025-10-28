@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<notaCredito id="comprobante" version="1.1.0">
+  <infoTributaria>
+    <ambiente>1</ambiente>
+    <tipoEmision>1</tipoEmision>
+    <razonSocial>Alicia Carrillo e Hijos Heladería Lattia C. L.</razonSocial>
+    <nombreComercial>Heladería Lattia</nombreComercial>
+    <ruc>1793082815001</ruc>
+    <claveAcceso>1501202404179308281500110010200000000048143311117</claveAcceso>
+    <codDoc>04</codDoc>
+    <estab>001</estab>
+    <ptoEmi>020</ptoEmi>
+    <secuencial>000000004</secuencial>
+    <dirMatriz>Rother e4-23 y Hoppe Norton</dirMatriz>
+  </infoTributaria>
+  <infoNotaCredito>
+    <fechaEmision>15/01/2024</fechaEmision>
+    <dirEstablecimiento>Rother e4-23 y Hoppe Norton</dirEstablecimiento>
+    <tipoIdentificacionComprador>05</tipoIdentificacionComprador>
+    <razonSocialComprador>Juan Pérez</razonSocialComprador>
+    <identificacionComprador>1234567890</identificacionComprador>
+    <obligadoContabilidad>SI</obligadoContabilidad>
+    <codDocModificado>01</codDocModificado>
+    <numDocModificado>001-020-000000004</numDocModificado>
+    <fechaEmisionDocSustento>16/10/2025</fechaEmisionDocSustento>
+    <totalSinImpuestos>600.00</totalSinImpuestos>
+    <totalConImpuestos>
+      <totalImpuesto>
+        <codigo>2</codigo>
+        <codigoPorcentaje>4</codigoPorcentaje>
+        <baseImponible>600.00</baseImponible>
+        <valor>90.00</valor>
+      </totalImpuesto>
+      <totalImpuesto>
+        <codigo>2</codigo>
+        <codigoPorcentaje>0</codigoPorcentaje>
+        <baseImponible>0.00</baseImponible>
+        <valor>0.00</valor>
+      </totalImpuesto>
+    </totalConImpuestos>
+    <motivo>Devolución de mercancía defectuosa</motivo>
+    <valorModificacion>690.00</valorModificacion>
+    <moneda>DOLAR</moneda>
+  </infoNotaCredito>
+  <detalles>
+    <detalle>
+      <codigoInterno>PROD-001</codigoInterno>
+      <codigoAdicional>PROD-001</codigoAdicional>
+      <descripcion>Laptop Dell Inspiron 15</descripcion>
+      <cantidad>1</cantidad>
+      <precioUnitario>600.000000</precioUnitario>
+      <descuento>0.00</descuento>
+      <precioTotalSinImpuesto>600.00</precioTotalSinImpuesto>
+      <impuestos>
+        <impuesto>
+          <codigo>2</codigo>
+          <codigoPorcentaje>4</codigoPorcentaje>
+          <tarifa>15</tarifa>
+          <baseImponible>600.00</baseImponible>
+          <valor>90.00</valor>
+        </impuesto>
+      </impuestos>
+    </detalle>
+  </detalles>
+  <infoAdicional>
+    <campoAdicional nombre="Email">ma74ny@gmail.com</campoAdicional>
+    <campoAdicional nombre="Telefono">0987654321</campoAdicional>
+    <campoAdicional nombre="Factura Modificada">001-020-000000004</campoAdicional>
+  </infoAdicional>
+</notaCredito>

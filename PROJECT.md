@@ -6,6 +6,15 @@ Sistema completo de facturación electrónica que cumple con las normativas del 
 
 **Versión del esquema SRI:** Compatible con versión 2.26+ (actualizado marzo 2024)
 
+### 🏗️ Arquitectura: Monorepo (desde v1.4.0)
+
+Este proyecto utiliza arquitectura de **Monorepo** con múltiples paquetes:
+- `facturacion-core`: Backend genérico de facturación electrónica (NestJS)
+- `shared-types`: Tipos compartidos entre aplicaciones
+- `pos-heladeria`: POS específico para heladería (en desarrollo)
+
+**Ver [ARQUITECTURA-MONOREPO.md](./ARQUITECTURA-MONOREPO.md) para documentación completa de la arquitectura.**
+
 ---
 
 ## Arquitectura del Sistema
@@ -37,9 +46,27 @@ Sistema completo de facturación electrónica que cumple con las normativas del 
 
 ## Estructura del Proyecto
 
+**Nota:** Desde v1.4.0, el proyecto migró a arquitectura de **Monorepo**. Ver [ARQUITECTURA-MONOREPO.md](./ARQUITECTURA-MONOREPO.md) para detalles completos.
+
 ```
-facturador-sri/
-├── backend/                          # Backend principal (NestJS)
+facturador-sri/                       # Raíz del Monorepo
+├── packages/
+│   ├── facturacion-core/             # Backend principal (NestJS) - GENÉRICO
+│   │   ├── (estructura detallada abajo)
+│   │
+│   ├── shared-types/                 # Tipos compartidos (DTOs, interfaces, enums)
+│   │   └── (en desarrollo - FASE 1)
+│   │
+│   └── pos-heladeria/                # POS Heladería (futuro)
+│       └── (pendiente - FASE 3+)
+│
+├── package.json                      # Workspace raíz
+├── pnpm-workspace.yaml               # Configuración de workspaces
+├── PROJECT.md                        # Este archivo
+├── ARQUITECTURA-MONOREPO.md          # Documentación de migración
+└── HELADERIA-REQUIREMENTS.md         # Requerimientos POS Heladería
+
+packages/facturacion-core/            # Backend principal (NestJS)
 │   ├── prisma/
 │   │   ├── schema.prisma            # Esquema de base de datos
 │   │   └── seed.ts                  # Datos iniciales
@@ -161,6 +188,10 @@ facturador-sri/
 ---
 
 ## Modelos de Datos (Prisma Schema)
+
+**Schema de Base de Datos:** `facturacion_core` (PostgreSQL multi-schema desde v1.4.0)
+
+Todas las tablas del core de facturación residen en el schema `facturacion_core`. Esto permite separación lógica de otros módulos del monorepo (ej: `pos_heladeria` para el POS de heladería).
 
 ### Principales Entidades
 
@@ -916,6 +947,21 @@ Para consultas sobre este proyecto:
 ---
 
 ## Historial de Cambios
+
+### 2025-10-27 - Migración a Arquitectura Monorepo
+- ✅ **Migración a Monorepo (FASE 0 completada):**
+  - Instalación de pnpm v10.19.0 como gestor de workspaces
+  - Creación de estructura de packages (`facturacion-core`, `shared-types`, `pos-heladeria`)
+  - Migración de `backend/` a `packages/facturacion-core/`
+  - Actualización de Prisma schema con multiSchema preview feature
+  - Todos los modelos y enums con `@@schema("facturacion_core")`
+  - Migración de base de datos: 3 ENUMs + 13 tablas de `public` → `facturacion_core`
+  - Script SQL de migración creado y ejecutado
+  - Prisma Client regenerado (v5.22.0)
+  - **Verificación exitosa:** Server funciona correctamente con nueva estructura
+  - **Datos preservados:** Todas las empresas, usuarios, productos e invoices intactos
+  - **Transparencia total:** Endpoints, funcionalidad y APIs sin cambios
+  - Ver [ARQUITECTURA-MONOREPO.md](./ARQUITECTURA-MONOREPO.md) para detalles completos
 
 ### 2025-10-27 - Procesamiento Masivo (Batch Processing)
 - ✅ **Procesamiento Masivo de Facturas:**

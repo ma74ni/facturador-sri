@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<factura id="comprobante" version="2.1.0">
+  <infoTributaria>
+    <ambiente>1</ambiente>
+    <tipoEmision>1</tipoEmision>
+    <razonSocial>Alicia Carrillo e Hijos HeladeriaLattia C. L.</razonSocial>
+    <nombreComercial>Heladería Lattia</nombreComercial>
+    <ruc>1793082815001</ruc>
+    <claveAcceso>1310202501179308281500110010200000000031927068214</claveAcceso>
+    <codDoc>01</codDoc>
+    <estab>001</estab>
+    <ptoEmi>020</ptoEmi>
+    <secuencial>000000003</secuencial>
+    <dirMatriz>Rother e4-23 y Hoppe Norton</dirMatriz>
+  </infoTributaria>
+  <infoFactura>
+    <fechaEmision>13/10/2025</fechaEmision>
+    <dirEstablecimiento>Rother e4-23 y Hoppe Norton</dirEstablecimiento>
+    <obligadoContabilidad>SI</obligadoContabilidad>
+    <tipoIdentificacionComprador>05</tipoIdentificacionComprador>
+    <razonSocialComprador>Juan Pérez</razonSocialComprador>
+    <identificacionComprador>1234567890</identificacionComprador>
+    <direccionComprador>Av. Amazonas N23-45, Quito</direccionComprador>
+    <totalSinImpuestos>2541.00</totalSinImpuestos>
+    <totalDescuento>10.50</totalDescuento>
+    <totalConImpuestos>
+      <totalImpuesto>
+        <codigo>2</codigo>
+        <codigoPorcentaje>4</codigoPorcentaje>
+        <baseImponible>2541.00</baseImponible>
+        <valor>381.15</valor>
+      </totalImpuesto>
+    </totalConImpuestos>
+    <propina>0.00</propina>
+    <importeTotal>2922.15</importeTotal>
+    <moneda>DOLAR</moneda>
+    <pagos>
+      <pago>
+        <formaPago>01</formaPago>
+        <total>2922.15</total>
+      </pago>
+    </pagos>
+  </infoFactura>
+  <detalles>
+    <detalle>
+      <codigoPrincipal>PROD-003</codigoPrincipal>
+      <descripcion>Teclado</descripcion>
+      <cantidad>3</cantidad>
+      <precioUnitario>850.500000</precioUnitario>
+      <descuento>10.50</descuento>
+      <precioTotalSinImpuesto>2541.00</precioTotalSinImpuesto>
+      <impuestos>
+        <impuesto>
+          <codigo>2</codigo>
+          <codigoPorcentaje>4</codigoPorcentaje>
+          <tarifa>15</tarifa>
+          <baseImponible>2541.00</baseImponible>
+          <valor>381.15</valor>
+        </impuesto>
+      </impuestos>
+    </detalle>
+  </detalles>
+  <infoAdicional>
+    <campoAdicional nombre="Email">juan@example.com</campoAdicional>
+    <campoAdicional nombre="Teléfono">0987654321</campoAdicional>
+  </infoAdicional>
+</factura>
