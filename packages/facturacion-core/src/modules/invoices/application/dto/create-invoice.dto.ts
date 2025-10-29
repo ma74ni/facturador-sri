@@ -1,5 +1,5 @@
-import { IsString, IsNotEmpty, IsArray, ValidateNested, IsDateString } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsArray, ValidateNested, IsDateString, IsOptional, IsObject } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { InvoiceItemDto } from './invoice-item.dto';
 
@@ -24,7 +24,7 @@ export class CreateInvoiceDto {
   @IsNotEmpty()
   emissionPointId: string;
 
-  @ApiProperty({ 
+  @ApiProperty({
     type: [InvoiceItemDto],
     description: 'Items de la factura',
     example: [
@@ -41,4 +41,22 @@ export class CreateInvoiceDto {
   @ValidateNested({ each: true })
   @Type(() => InvoiceItemDto)
   items: InvoiceItemDto[];
+
+  @ApiPropertyOptional({
+    description: 'Metadata adicional para integraciones (POS, etc)',
+    example: {
+      source: 'POS_HELADERIA',
+      accountId: 'account-123',
+      paymentId: 'payment-456'
+    }
+  })
+  @IsOptional()
+  @IsObject()
+  metadata?: {
+    source?: string;
+    externalId?: string;
+    accountId?: string;
+    paymentId?: string;
+    [key: string]: any;
+  };
 }

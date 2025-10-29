@@ -278,6 +278,9 @@ model Invoice {
   xmlSignedPath String?
   ridePdfPath   String?
 
+  // Metadata para integraciones (POS, etc)
+  metadata Json?
+
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
@@ -366,6 +369,9 @@ model CreditNote {
   xmlPath       String?
   xmlSignedPath String?
   ridePdfPath   String?
+
+  // Metadata para integraciones (POS, etc)
+  metadata Json?
 
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)

@@ -123,6 +123,7 @@ export class InvoicesService {
         companyId,
         createdById: userId,
         sriStatus: 'PENDING',
+        metadata: dto.metadata,
         items: {
           create: calculatedItems.map((item) => ({
             productId: item.productId,
