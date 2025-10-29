@@ -12,6 +12,7 @@ interface User {
   lastName: string;
   role: string;
   companyId: string;
+  emailVerified?: boolean;
 }
 
 interface Company {
@@ -21,6 +22,8 @@ interface Company {
   tradeName?: string;
   email: string;
   environment: 'TEST' | 'PRODUCTION';
+  status?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  rejectionReason?: string;
 }
 
 interface AuthContextType {

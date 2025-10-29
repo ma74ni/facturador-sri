@@ -29,6 +29,12 @@ enum SRIStatus {
   ERROR
 }
 
+enum CompanyStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 // ==================== USERS ====================
 
 model User {
@@ -39,6 +45,11 @@ model User {
   lastName  String
   isActive  Boolean @default(true)
   role      Role    @default(USER)
+
+  // Email verification
+  emailVerified     Boolean   @default(false)
+  verificationToken String?   @unique
+  verificationTokenExpiry DateTime?
 
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -51,6 +62,7 @@ model User {
 
   @@index([email])
   @@index([companyId])
+  @@index([verificationToken])
   @@map("users")
 }
 
@@ -70,6 +82,12 @@ model Company {
 
   environment SRIEnvironment @default(TEST)
   isActive    Boolean        @default(true)
+
+  // Company approval status
+  status CompanyStatus @default(PENDING)
+  approvedAt DateTime?
+  rejectedAt DateTime?
+  rejectionReason String?
 
   // Configuración de email (Mailjet o custom)
   emailProvider String @default("SYSTEM") // SYSTEM, MAILJET, SMTP

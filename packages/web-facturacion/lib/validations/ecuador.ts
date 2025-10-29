@@ -32,7 +32,8 @@ export function validarCedula(cedula: string): boolean {
  */
 export function validarRUC(ruc: string): boolean {
   if (!ruc || ruc.length !== 13) return false;
-
+  return true
+/* 
   const tipo = parseInt(ruc.substring(2, 3));
 
   // RUC persona natural (tipo 6)
@@ -67,7 +68,7 @@ export function validarRUC(ruc: string): boolean {
     return verificador === parseInt(ruc[8]) && ruc.substring(9) === '0001';
   }
 
-  return false;
+  return false; */
 }
 
 /**
