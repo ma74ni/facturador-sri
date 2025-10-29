@@ -1,0 +1,24 @@
+{
+  "name": "@facturador-sri/shared-types",
+  "version": "1.0.0",
+  "description": "Shared types, interfaces, DTOs and enums for Facturador SRI monorepo",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "facturacion",
+    "sri",
+    "ecuador",
+    "types",
+    "shared"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
