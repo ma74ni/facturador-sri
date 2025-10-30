@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { NumberInput } from '@/components/ui/number-input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -211,18 +212,19 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="unitPrice">Precio Unitario * ($)</Label>
-              <Input
+              <NumberInput
                 id="unitPrice"
-                type="number"
-                step="0.01"
-                min="0"
                 value={formData.unitPrice}
-                onChange={(e) => {
-                  setFormData({ ...formData, unitPrice: parseFloat(e.target.value) || 0 });
+                onChange={(value) => {
+                  setFormData({ ...formData, unitPrice: value });
                   if (errors.unitPrice) {
                     setErrors({ ...errors, unitPrice: '' });
                   }
                 }}
+                allowDecimals={true}
+                decimalPlaces={2}
+                min={0}
+                placeholder="Ej: 15.99"
                 className={errors.unitPrice ? 'border-red-500' : ''}
               />
               {errors.unitPrice && (
@@ -235,18 +237,19 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
 
             <div className="space-y-2">
               <Label htmlFor="cost">Costo ($)</Label>
-              <Input
+              <NumberInput
                 id="cost"
-                type="number"
-                step="0.01"
-                min="0"
                 value={formData.cost || 0}
-                onChange={(e) => {
-                  setFormData({ ...formData, cost: parseFloat(e.target.value) || 0 });
+                onChange={(value) => {
+                  setFormData({ ...formData, cost: value });
                   if (errors.cost) {
                     setErrors({ ...errors, cost: '' });
                   }
                 }}
+                allowDecimals={true}
+                decimalPlaces={2}
+                min={0}
+                placeholder="Ej: 8.50"
                 className={errors.cost ? 'border-red-500' : ''}
               />
               {errors.cost && (

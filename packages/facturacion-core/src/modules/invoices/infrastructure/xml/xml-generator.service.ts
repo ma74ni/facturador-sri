@@ -84,7 +84,8 @@ export class XmlGeneratorService {
     // ==================== FORMA DE PAGO ====================
     const pagos = infoFactura.ele('pagos');
     const pago = pagos.ele('pago');
-    pago.ele('formaPago').txt('01'); // 01 = Sin utilización del sistema financiero
+    const paymentMethod = invoice.metadata?.paymentMethod || '01';
+    pago.ele('formaPago').txt(paymentMethod);
     pago.ele('total').txt(invoice.total.toFixed(2));
     pago.ele('plazo').txt('0');
     pago.ele('unidadTiempo').txt('dias');
@@ -120,6 +121,13 @@ export class XmlGeneratorService {
     infoAdicional.ele('campoAdicional', { nombre: 'Email' }).txt(invoice.customer.email || 'N/A');
     if (invoice.customer.phone) {
       infoAdicional.ele('campoAdicional', { nombre: 'Telefono' }).txt(invoice.customer.phone);
+    }
+
+    // Agregar leyenda RIMPE si aplica
+    if (invoice.metadata?.isRimpe) {
+      infoAdicional.ele('campoAdicional', { nombre: 'REGIMEN' }).txt(
+        'CONTRIBUYENTE NEGOCIO POPULAR - RÉGIMEN RIMPE'
+      );
     }
 
     // Generar XML como string

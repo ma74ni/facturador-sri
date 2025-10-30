@@ -329,15 +329,26 @@ export class InvoicesService {
 
   this.logger.log(`✅ [sendToSri] Factura encontrada. Access Key: ${invoice.accessKey}`);
 
-  // 2. Verificar que tenga XML firmado
-  if (!invoice.xmlSignedPath) {
-    this.logger.error(`❌ [sendToSri] La factura no tiene XML firmado`);
+  // 2. Verificar que tenga XML firmado (o sin firma en TEST)
+  const isTestEnvironment = invoice.company.environment === 'TEST';
+
+  if (!invoice.xmlSignedPath && !invoice.xmlPath) {
+    this.logger.error(`❌ [sendToSri] La factura no tiene XML generado`);
+    throw new BadRequestException('La factura no tiene XML generado');
+  }
+
+  if (!invoice.xmlSignedPath && !isTestEnvironment) {
+    this.logger.error(`❌ [sendToSri] La factura no tiene XML firmado y está en PRODUCCIÓN`);
     throw new BadRequestException(
-      'La factura debe estar firmada digitalmente antes de enviarla al SRI',
+      'En ambiente de PRODUCCIÓN, la factura debe estar firmada digitalmente antes de enviarla al SRI. Por favor, sube un certificado digital en la configuración de tu empresa.',
     );
   }
 
-  this.logger.log(`✅ [sendToSri] XML firmado encontrado en R2: ${invoice.xmlSignedPath}`);
+  if (!invoice.xmlSignedPath && isTestEnvironment) {
+    this.logger.warn(`⚠️ [sendToSri] Enviando factura SIN FIRMA DIGITAL (ambiente TEST)`);
+  } else {
+    this.logger.log(`✅ [sendToSri] XML firmado encontrado en R2: ${invoice.xmlSignedPath}`);
+  }
 
   // 3. Actualizar estado a "enviando"
   this.logger.log(`📝 [sendToSri] Actualizando estado a SENT...`);
@@ -348,8 +359,16 @@ export class InvoicesService {
 
   // 4. Enviar al SRI
   this.logger.log(`📤 [sendToSri] Enviando factura al SRI (ambiente: ${invoice.company.environment})...`);
+
+  // Usar XML firmado si existe, sino usar XML sin firmar (solo en TEST)
+  const xmlToSend = invoice.xmlSignedPath || invoice.xmlPath;
+
+  if (!xmlToSend) {
+    throw new BadRequestException('No se encontró XML para enviar');
+  }
+
   const result = await this.sriService.sendAndAuthorize(
-    invoice.xmlSignedPath,
+    xmlToSend,
     invoice.company.environment,
   );
 

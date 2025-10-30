@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/context/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,16 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Settings,
   Building,
@@ -25,20 +35,19 @@ import {
   Mail,
   User
 } from 'lucide-react';
-
-interface Establishment {
-  id: string;
-  code: string;
-  name: string;
-  address: string;
-  emissionPoints: EmissionPoint[];
-}
-
-interface EmissionPoint {
-  id: string;
-  code: string;
-  establishmentId: string;
-}
+import {
+  establishmentsApi,
+  emissionPointsApi,
+  Establishment,
+  EmissionPoint,
+  CreateEstablishmentDto,
+  UpdateEstablishmentDto,
+  CreateEmissionPointDto
+} from '@/lib/api/establishments';
+import { EstablishmentDialog } from '@/components/establishments/establishment-dialog';
+import { EmissionPointDialog } from '@/components/establishments/emission-point-dialog';
+import { CertificateManager } from '@/components/certificates/certificate-manager';
+import { useToast } from '@/hooks/use-toast';
 
 interface UserData {
   id: string;
@@ -50,19 +59,156 @@ interface UserData {
 
 export default function ConfiguracionPage() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'establishments' | 'users' | 'security'>('establishments');
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<'establishments' | 'users' | 'security' | 'certificate'>('establishments');
 
-  // Datos de ejemplo (en producción vendrían del backend)
-  const establishments: Establishment[] = [
-    // Lista vacía por ahora
-  ];
+  // Establishments state
+  const [establishments, setEstablishments] = useState<Establishment[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [establishmentDialogOpen, setEstablishmentDialogOpen] = useState(false);
+  const [emissionPointDialogOpen, setEmissionPointDialogOpen] = useState(false);
+  const [selectedEstablishment, setSelectedEstablishment] = useState<Establishment | undefined>();
+  const [deleteEstablishmentId, setDeleteEstablishmentId] = useState<string | null>(null);
+  const [deleteEmissionPoint, setDeleteEmissionPoint] = useState<{
+    establishmentId: string;
+    emissionPointId: string;
+  } | null>(null);
+  const [emissionPointEstablishment, setEmissionPointEstablishment] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   const users: UserData[] = [
-    // Lista vacía por ahora
+    // Lista vacía por ahora - pendiente implementar
   ];
+
+  // Load establishments
+  const loadEstablishments = async () => {
+    try {
+      setLoading(true);
+      const data = await establishmentsApi.getAll();
+      setEstablishments(Array.isArray(data) ? data : []);
+    } catch (error: any) {
+      console.error('Error loading establishments:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.message || 'Error al cargar establecimientos',
+      });
+      setEstablishments([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadEstablishments();
+  }, []);
+
+  // Establishment handlers
+  const handleCreateEstablishment = () => {
+    setSelectedEstablishment(undefined);
+    setEstablishmentDialogOpen(true);
+  };
+
+  const handleEditEstablishment = (establishment: Establishment) => {
+    setSelectedEstablishment(establishment);
+    setEstablishmentDialogOpen(true);
+  };
+
+  const handleSaveEstablishment = async (data: CreateEstablishmentDto | UpdateEstablishmentDto) => {
+    try {
+      if (selectedEstablishment) {
+        await establishmentsApi.update(selectedEstablishment.id, data as UpdateEstablishmentDto);
+        toast({
+          title: 'Establecimiento actualizado',
+          description: 'Los cambios han sido guardados correctamente',
+        });
+      } else {
+        await establishmentsApi.create(data as CreateEstablishmentDto);
+        toast({
+          title: 'Establecimiento creado',
+          description: 'El establecimiento ha sido creado correctamente',
+        });
+      }
+      await loadEstablishments();
+    } catch (error: any) {
+      console.error('Error saving establishment:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.message || 'Error al guardar el establecimiento',
+      });
+      throw error;
+    }
+  };
+
+  const handleDeleteEstablishment = async (id: string) => {
+    try {
+      await establishmentsApi.delete(id);
+      toast({
+        title: 'Establecimiento eliminado',
+        description: 'El establecimiento ha sido eliminado correctamente',
+      });
+      await loadEstablishments();
+    } catch (error: any) {
+      console.error('Error deleting establishment:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.message || 'Error al eliminar el establecimiento',
+      });
+    }
+  };
+
+  // Emission point handlers
+  const handleCreateEmissionPoint = (establishmentId: string, establishmentName: string) => {
+    setEmissionPointEstablishment({ id: establishmentId, name: establishmentName });
+    setEmissionPointDialogOpen(true);
+  };
+
+  const handleSaveEmissionPoint = async (data: CreateEmissionPointDto) => {
+    if (!emissionPointEstablishment) return;
+
+    try {
+      await emissionPointsApi.create(emissionPointEstablishment.id, data);
+      toast({
+        title: 'Punto de emisión creado',
+        description: 'El punto de emisión ha sido creado correctamente',
+      });
+      await loadEstablishments();
+    } catch (error: any) {
+      console.error('Error creating emission point:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.message || 'Error al crear el punto de emisión',
+      });
+      throw error;
+    }
+  };
+
+  const handleDeleteEmissionPoint = async (establishmentId: string, emissionPointId: string) => {
+    try {
+      await emissionPointsApi.delete(establishmentId, emissionPointId);
+      toast({
+        title: 'Punto de emisión eliminado',
+        description: 'El punto de emisión ha sido eliminado correctamente',
+      });
+      await loadEstablishments();
+    } catch (error: any) {
+      console.error('Error deleting emission point:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.message || 'Error al eliminar el punto de emisión',
+      });
+    }
+  };
 
   const tabs = [
     { id: 'establishments' as const, label: 'Establecimientos', icon: Building },
+    { id: 'certificate' as const, label: 'Certificado Digital', icon: Key },
     { id: 'users' as const, label: 'Usuarios', icon: Users },
     { id: 'security' as const, label: 'Seguridad', icon: Shield },
   ];
@@ -119,7 +265,7 @@ export default function ConfiguracionPage() {
                     Administra las ubicaciones de tu empresa
                   </CardDescription>
                 </div>
-                <Button>
+                <Button onClick={handleCreateEstablishment}>
                   <Plus className="mr-2 h-4 w-4" />
                   Nuevo Establecimiento
                 </Button>
@@ -137,7 +283,7 @@ export default function ConfiguracionPage() {
                   <p className="text-sm text-muted-foreground mb-4 max-w-sm">
                     Agrega al menos un establecimiento para poder emitir documentos electrónicos.
                   </p>
-                  <Button>
+                  <Button onClick={handleCreateEstablishment}>
                     <Plus className="mr-2 h-4 w-4" />
                     Agregar Primer Establecimiento
                   </Button>
@@ -160,10 +306,18 @@ export default function ConfiguracionPage() {
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          <Button variant="ghost" size="sm">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditEstablishment(establishment)}
+                          >
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeleteEstablishmentId(establishment.id)}
+                          >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </div>
@@ -173,7 +327,11 @@ export default function ConfiguracionPage() {
                       <div className="mt-4 pt-4 border-t">
                         <div className="flex items-center justify-between mb-3">
                           <h4 className="text-sm font-medium">Puntos de Emisión</h4>
-                          <Button variant="outline" size="sm">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCreateEmissionPoint(establishment.id, establishment.name)}
+                          >
                             <Plus className="mr-1 h-3 w-3" />
                             Agregar Punto
                           </Button>
@@ -196,10 +354,14 @@ export default function ConfiguracionPage() {
                                   <span className="text-sm">Punto de Emisión {point.code}</span>
                                 </div>
                                 <div className="flex gap-1">
-                                  <Button variant="ghost" size="sm">
-                                    <Edit className="h-3 w-3" />
-                                  </Button>
-                                  <Button variant="ghost" size="sm">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setDeleteEmissionPoint({
+                                      establishmentId: establishment.id,
+                                      emissionPointId: point.id,
+                                    })}
+                                  >
                                     <Trash2 className="h-3 w-3 text-destructive" />
                                   </Button>
                                 </div>
@@ -237,6 +399,13 @@ export default function ConfiguracionPage() {
               </div>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* Certificate Tab */}
+      {activeTab === 'certificate' && (
+        <div className="space-y-6">
+          <CertificateManager />
         </div>
       )}
 
@@ -466,6 +635,82 @@ export default function ConfiguracionPage() {
           </Card>
         </div>
       )}
+
+      {/* Dialogs */}
+      <EstablishmentDialog
+        open={establishmentDialogOpen}
+        onOpenChange={setEstablishmentDialogOpen}
+        onSave={handleSaveEstablishment}
+        establishment={selectedEstablishment}
+      />
+
+      <EmissionPointDialog
+        open={emissionPointDialogOpen}
+        onOpenChange={setEmissionPointDialogOpen}
+        onSave={handleSaveEmissionPoint}
+        establishmentName={emissionPointEstablishment?.name || ''}
+      />
+
+      {/* Delete Establishment Confirmation */}
+      <AlertDialog
+        open={!!deleteEstablishmentId}
+        onOpenChange={(open) => !open && setDeleteEstablishmentId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar establecimiento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará el establecimiento y todos sus puntos de emisión.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteEstablishmentId) {
+                  handleDeleteEstablishment(deleteEstablishmentId);
+                  setDeleteEstablishmentId(null);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Emission Point Confirmation */}
+      <AlertDialog
+        open={!!deleteEmissionPoint}
+        onOpenChange={(open) => !open && setDeleteEmissionPoint(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar punto de emisión?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará el punto de emisión.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteEmissionPoint) {
+                  handleDeleteEmissionPoint(
+                    deleteEmissionPoint.establishmentId,
+                    deleteEmissionPoint.emissionPointId
+                  );
+                  setDeleteEmissionPoint(null);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,11 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Plus,
   Search,
@@ -19,46 +29,244 @@ import {
   XCircle,
   AlertCircle,
   DollarSign,
-  Calendar
+  Calendar,
+  FileDown
 } from 'lucide-react';
-
-interface Factura {
-  id: string;
-  sequential: string;
-  establishmentCode: string;
-  emissionPointCode: string;
-  customerName: string;
-  customerId: string;
-  issueDate: string;
-  totalAmount: number;
-  status: 'PENDING' | 'SENT' | 'AUTHORIZED' | 'REJECTED' | 'ERROR';
-  sriStatus?: 'AUTHORIZED' | 'REJECTED' | 'ERROR';
-  authorizationNumber?: string;
-  authorizationDate?: string;
-}
+import { invoicesApi, Invoice, CreateInvoiceDto, InvoiceStats } from '@/lib/api/invoices';
+import { customersApi, Customer } from '@/lib/api/customers';
+import { productsApi, Product } from '@/lib/api/products';
+import { establishmentsApi, Establishment } from '@/lib/api/establishments';
+import { InvoiceDialog } from '@/components/invoices/invoice-dialog';
+import { useToast } from '@/hooks/use-toast';
 
 export default function FacturasPage() {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [loading, setLoading] = useState(false);
 
-  // Datos de ejemplo (en producción vendrían del backend)
-  const facturas: Factura[] = [
-    // Lista vacía por ahora
-  ];
+  // Data
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [establishments, setEstablishments] = useState<Establishment[]>([]);
+  const [stats, setStats] = useState<InvoiceStats>({
+    total: 0,
+    authorized: 0,
+    pending: 0,
+    rejected: 0,
+    totalAmount: 0,
+  });
+
+  // Dialog states
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+
+  // Load all data
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [invoicesData, customersData, productsData, establishmentsData, statsData] = await Promise.all([
+        invoicesApi.getAll(),
+        customersApi.getAll(),
+        productsApi.getAll(),
+        establishmentsApi.getAll(),
+        invoicesApi.getStats(),
+      ]);
+
+      setInvoices(Array.isArray(invoicesData) ? invoicesData : []);
+      setCustomers(Array.isArray(customersData) ? customersData : []);
+      setProducts(Array.isArray(productsData) ? productsData : []);
+      setEstablishments(Array.isArray(establishmentsData) ? establishmentsData : []);
+      setStats({
+        total: statsData?.total ?? 0,
+        authorized: statsData?.authorized ?? 0,
+        pending: statsData?.pending ?? 0,
+        rejected: statsData?.rejected ?? 0,
+        totalAmount: statsData?.totalAmount ?? 0,
+      });
+    } catch (error: any) {
+      console.error('Error loading data:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.message || 'Error al cargar datos',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const facturas = invoices;
+
+  // Load individual resources
+  const loadCustomers = async () => {
+    try {
+      const customersData = await customersApi.getAll();
+      setCustomers(Array.isArray(customersData) ? customersData : []);
+    } catch (error) {
+      console.error('Error loading customers:', error);
+    }
+  };
+
+  const loadProducts = async () => {
+    try {
+      const productsData = await productsApi.getAll();
+      setProducts(Array.isArray(productsData) ? productsData : []);
+    } catch (error) {
+      console.error('Error loading products:', error);
+    }
+  };
+
+  // Handlers
+  const handleCreateInvoice = async (data: CreateInvoiceDto) => {
+    try {
+      const invoice = await invoicesApi.create(data);
+
+      // Si se solicitó enviar al SRI, hacerlo automáticamente
+      const sendToSri = (data as any).metadata?.sendToSri;
+      if (sendToSri) {
+        try {
+          const result = await invoicesApi.sendToSri(invoice.id);
+          toast({
+            title: 'Factura creada y enviada',
+            description: 'La factura ha sido creada y enviada al SRI para su autorización',
+          });
+        } catch (sriError: any) {
+          console.error('Error sending to SRI:', sriError);
+          const errorMessage = sriError.response?.data?.message || 'La factura se creó pero hubo un error al enviar al SRI';
+
+          // Si el error es por falta de certificado, mostrar mensaje específico
+          if (errorMessage.includes('certificado') || errorMessage.includes('firmada')) {
+            toast({
+              variant: 'destructive',
+              title: 'Certificado requerido',
+              description: 'Debes subir un certificado digital en la configuración de tu empresa para firmar facturas. La factura fue creada pero no enviada.',
+            });
+          } else {
+            toast({
+              variant: 'destructive',
+              title: 'Factura creada pero no enviada',
+              description: errorMessage,
+            });
+          }
+        }
+      } else {
+        toast({
+          title: 'Factura creada',
+          description: 'La factura ha sido creada correctamente',
+        });
+      }
+
+      await loadData();
+    } catch (error: any) {
+      console.error('Error creating invoice:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.message || 'Error al crear la factura',
+      });
+      throw error;
+    }
+  };
+
+  const handleSendToSri = async (id: string) => {
+    try {
+      await invoicesApi.sendToSri(id);
+      toast({
+        title: 'Factura enviada',
+        description: 'La factura ha sido enviada al SRI para autorización',
+      });
+      await loadData();
+    } catch (error: any) {
+      console.error('Error sending to SRI:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.message || 'Error al enviar la factura al SRI',
+      });
+    }
+  };
+
+  const handleDownloadXml = async (id: string, sequential: string) => {
+    try {
+      const blob = await invoicesApi.downloadXml(id);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `FACTURA_${sequential}.xml`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error: any) {
+      console.error('Error downloading XML:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Error al descargar el XML',
+      });
+    }
+  };
+
+  const handleDownloadPdf = async (id: string, sequential: string) => {
+    try {
+      // Generate RIDE if not exists
+      await invoicesApi.generateRide(id);
+
+      const blob = await invoicesApi.downloadRide(id);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `FACTURA_${sequential}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error: any) {
+      console.error('Error downloading PDF:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Error al descargar el PDF',
+      });
+    }
+  };
+
+  const handleSendEmail = async (id: string) => {
+    try {
+      await invoicesApi.sendByEmail(id);
+      toast({
+        title: 'Email enviado',
+        description: 'La factura ha sido enviada por correo electrónico',
+      });
+    } catch (error: any) {
+      console.error('Error sending email:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.message || 'Error al enviar el email',
+      });
+    }
+  };
 
   const filteredFacturas = facturas.filter(factura => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch =
       factura.sequential.toLowerCase().includes(searchLower) ||
       factura.customerName.toLowerCase().includes(searchLower) ||
-      factura.customerId.includes(searchLower);
+      factura.customerIdentification.includes(searchLower);
 
     const matchesStatus = statusFilter === 'all' || factura.status === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
 
-  const getStatusBadge = (status: Factura['status']) => {
+  const getStatusBadge = (status: Invoice['status']) => {
     const statusConfig = {
       PENDING: { variant: 'warning' as const, icon: Clock, label: 'Pendiente' },
       SENT: { variant: 'info' as const, icon: Send, label: 'Enviada' },
@@ -67,7 +275,7 @@ export default function FacturasPage() {
       ERROR: { variant: 'destructive' as const, icon: AlertCircle, label: 'Error' },
     };
 
-    const config = statusConfig[status];
+    const config = statusConfig[status] || { variant: 'secondary' as const, icon: AlertCircle, label: status || 'Desconocido' };
     const Icon = config.icon;
 
     return (
@@ -76,13 +284,6 @@ export default function FacturasPage() {
         {config.label}
       </Badge>
     );
-  };
-
-  const stats = {
-    total: facturas.length,
-    authorized: facturas.filter(f => f.status === 'AUTHORIZED').length,
-    pending: facturas.filter(f => f.status === 'PENDING').length,
-    totalAmount: facturas.reduce((sum, f) => sum + f.totalAmount, 0),
   };
 
   return (
@@ -95,7 +296,7 @@ export default function FacturasPage() {
             Gestiona y emite facturas electrónicas
           </p>
         </div>
-        <Button>
+        <Button onClick={() => setInvoiceDialogOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Nueva Factura
         </Button>
@@ -223,7 +424,7 @@ export default function FacturasPage() {
               <p className="text-sm text-muted-foreground mb-4 max-w-sm">
                 Comienza emitiendo tu primera factura electrónica para tus clientes.
               </p>
-              <Button>
+              <Button onClick={() => setInvoiceDialogOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 Emitir Primera Factura
               </Button>
@@ -255,30 +456,56 @@ export default function FacturasPage() {
                     </TableCell>
                     <TableCell>{factura.customerName}</TableCell>
                     <TableCell className="font-mono text-muted-foreground">
-                      {factura.customerId}
+                      {factura.customerIdentification}
                     </TableCell>
                     <TableCell>
                       {getStatusBadge(factura.status)}
                     </TableCell>
                     <TableCell className="text-right font-medium">
-                      ${factura.totalAmount.toFixed(2)}
+                      ${Number(factura.totalAmount).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button variant="ghost" size="sm" title="Ver detalles">
-                          <Eye className="h-4 w-4" />
-                        </Button>
                         {factura.status === 'PENDING' && (
-                          <Button variant="ghost" size="sm" title="Enviar al SRI">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Enviar al SRI"
+                            onClick={() => handleSendToSri(factura.id)}
+                          >
                             <Send className="h-4 w-4 text-blue-600" />
                           </Button>
                         )}
                         {factura.status === 'AUTHORIZED' && (
                           <>
-                            <Button variant="ghost" size="sm" title="Descargar PDF/XML">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Descargar XML"
+                              onClick={() => handleDownloadXml(
+                                factura.id,
+                                `${factura.establishmentCode}-${factura.emissionPointCode}-${factura.sequential}`
+                              )}
+                            >
+                              <FileDown className="h-4 w-4 text-green-600" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Descargar PDF"
+                              onClick={() => handleDownloadPdf(
+                                factura.id,
+                                `${factura.establishmentCode}-${factura.emissionPointCode}-${factura.sequential}`
+                              )}
+                            >
                               <Download className="h-4 w-4 text-green-600" />
                             </Button>
-                            <Button variant="ghost" size="sm" title="Enviar por email">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Enviar por email"
+                              onClick={() => handleSendEmail(factura.id)}
+                            >
                               <Mail className="h-4 w-4 text-purple-600" />
                             </Button>
                           </>
@@ -317,14 +544,14 @@ export default function FacturasPage() {
                         {factura.establishmentCode}-{factura.emissionPointCode}-{factura.sequential}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {factura.customerName} • {factura.customerId}
+                        {factura.customerName} • {factura.customerIdentification}
                       </p>
                       <p className="text-xs font-mono text-green-700">
                         {factura.authorizationNumber}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-medium">${factura.totalAmount.toFixed(2)}</p>
+                      <p className="text-sm font-medium">${Number(factura.totalAmount).toFixed(2)}</p>
                       <p className="text-xs text-muted-foreground">
                         {factura.authorizationDate &&
                           new Date(factura.authorizationDate).toLocaleDateString('es-EC')}
@@ -336,6 +563,18 @@ export default function FacturasPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Invoice Dialog */}
+      <InvoiceDialog
+        open={invoiceDialogOpen}
+        onOpenChange={setInvoiceDialogOpen}
+        onSave={handleCreateInvoice}
+        customers={customers}
+        products={products}
+        establishments={establishments}
+        onCustomerCreated={loadCustomers}
+        onProductCreated={loadProducts}
+      />
     </div>
   );
 }
