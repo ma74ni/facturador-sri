@@ -21,9 +21,13 @@ interface Company {
   businessName: string;
   tradeName?: string;
   email: string;
+  phone?: string;
+  address?: string;
   environment: 'TEST' | 'PRODUCTION';
   status?: 'PENDING' | 'APPROVED' | 'REJECTED';
   rejectionReason?: string;
+  approvedAt?: string;
+  rejectedAt?: string;
 }
 
 interface AuthContextType {

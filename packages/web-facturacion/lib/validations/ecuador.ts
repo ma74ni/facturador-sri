@@ -32,12 +32,17 @@ export function validarCedula(cedula: string): boolean {
  */
 export function validarRUC(ruc: string): boolean {
   if (!ruc || ruc.length !== 13) return false;
-  return true
-/* 
+
+  // Verificar que sean solo números
+  if (!/^\d+$/.test(ruc)) return false;
+
+  const provincia = parseInt(ruc.substring(0, 2));
+  if (provincia < 1 || provincia > 24) return false;
+
   const tipo = parseInt(ruc.substring(2, 3));
 
-  // RUC persona natural (tipo 6)
-  if (tipo === 6) {
+  // RUC persona natural (tercer dígito < 6)
+  if (tipo < 6) {
     const cedula = ruc.substring(0, 10);
     return validarCedula(cedula) && ruc.substring(10) === '001';
   }
@@ -55,8 +60,8 @@ export function validarRUC(ruc: string): boolean {
     return verificador === parseInt(ruc[9]) && ruc.substring(10) === '001';
   }
 
-  // RUC pública (tipo < 6)
-  if (tipo < 6) {
+  // RUC institución pública (tipo 6)
+  if (tipo === 6) {
     const coeficientes = [3, 2, 7, 6, 5, 4, 3, 2];
     let suma = 0;
 
@@ -68,7 +73,30 @@ export function validarRUC(ruc: string): boolean {
     return verificador === parseInt(ruc[8]) && ruc.substring(9) === '0001';
   }
 
-  return false; */
+  return false;
+}
+
+/**
+ * Validar email
+ * @param email - Dirección de email
+ * @returns true si el email es válido o está vacío
+ */
+export function validarEmail(email: string): boolean {
+  if (!email) return true; // Email es opcional
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+/**
+ * Validar teléfono ecuatoriano
+ * @param phone - Número de teléfono
+ * @returns true si el teléfono es válido o está vacío
+ */
+export function validarTelefono(phone: string): boolean {
+  if (!phone) return true; // Teléfono es opcional
+  // Acepta números de 7 a 10 dígitos (fijos y móviles)
+  const phoneRegex = /^\d{7,10}$/;
+  return phoneRegex.test(phone.replace(/[\s\-()]/g, ''));
 }
 
 /**

@@ -1878,7 +1878,85 @@ Ver documento FASE-A-WEB-FACTURACION.md para detalles completos.
 - ✅ Sección de Mailjet documentada
 - ✅ Flujo de onboarding documentado
 
+#### 15:00-17:00 UTC - FASE A (Sprint 3) - Integración Backend - Módulo Clientes ✅ COMPLETADA
+- ✅ shadcn/ui components instalados: dialog, select, textarea, toast, alert-dialog
+- ✅ /lib/api/customers.ts creado con CRUD completo (getAll, create, update, delete, search)
+- ✅ /components/customers/customer-dialog.tsx creado con validaciones en tiempo real
+- ✅ /components/ui/alert-dialog.tsx creado para confirmación de eliminación
+- ✅ /hooks/use-toast.ts creado (shadcn hook)
+- ✅ /components/ui/toaster.tsx creado
+- ✅ /app/layout.tsx actualizado con Toaster component
+- ✅ /app/dashboard/clientes/page.tsx actualizado con integración completa
+- ✅ customersApi.getAll() corregido para extraer array de respuesta envuelta
+- ✅ Validaciones funcionando: cédula, RUC (3 tipos), email, teléfono
+- ✅ /lib/validations/ecuador.ts completado con validarRUC() para todos los tipos
+- ✅ validarEmail() y validarTelefono() agregados a validations/ecuador.ts
+- ✅ Formulario con campos condicionales (RUC muestra Razón Social, Cédula muestra Nombres/Apellidos)
+- ✅ Toast notifications para feedback de usuario
+- ✅ Loading states y error handling implementados
+- ✅ No hay código duplicado - se usa código existente
+
+**Archivos Creados (Sprint 3 - Clientes):**
+```
+packages/web-facturacion/
+├── lib/
+│   ├── api/
+│   │   └── customers.ts                    # CRUD API service
+│   └── validations/
+│       └── ecuador.ts                      # Fixed validarRUC, added validarEmail, validarTelefono
+├── components/
+│   ├── customers/
+│   │   └── customer-dialog.tsx             # Customer form with validation
+│   └── ui/
+│       ├── alert-dialog.tsx                # Delete confirmation
+│       └── toaster.tsx                     # Toast container
+├── hooks/
+│   └── use-toast.ts                        # Toast hook
+└── app/
+    ├── layout.tsx                          # Added Toaster
+    └── dashboard/
+        └── clientes/page.tsx               # Full CRUD integration
+```
+
+**Lecciones Aprendidas:**
+- ⚠️ Siempre verificar estructura de respuesta del backend antes de usar (puede estar envuelta en {message, data})
+- ⚠️ Validar que arrays son realmente arrays antes de usar .filter(), .map()
+- ⚠️ Buscar código existente (lib/validations/) antes de crear archivos nuevos
+- ⚠️ **CRÍTICO**: Actualizar ARQUITECTURA-MONOREPO.md después de cada sprint
+
+**Patrón de Integración Establecido:**
+```typescript
+// 1. API Service Layer (lib/api/customers.ts)
+export const customersApi = {
+  getAll: async (): Promise<Customer[]> => {
+    const response = await apiClient.get('/customers');
+    return response.data.customers || response.data; // Handle wrapped responses
+  },
+  create: async (data: CreateCustomerDto): Promise<Customer> => {
+    const response = await apiClient.post('/customers', data);
+    return response.data;
+  },
+  // ... update, delete
+};
+
+// 2. Dialog Component (components/customers/customer-dialog.tsx)
+- Formulario con validación en tiempo real
+- Campos condicionales según tipo de identificación
+- useEffect para resetear form al abrir/cerrar
+- validateForm() antes de submit
+- Errores visuales con AlertCircle icon
+
+// 3. Page Integration (app/dashboard/clientes/page.tsx)
+- useState para customers, loading, dialogs
+- useEffect para cargar datos al montar
+- handleCreate, handleEdit, handleSave, handleDelete
+- Toast notifications para feedback
+- Validar arrays antes de usar: Array.isArray(data) ? data : []
+```
+
+**Sprint 3 - Tiempo Real:** ~2 horas (incluyendo debugging y fixes)
+
 ---
 
-**Última actualización:** 2025-10-29 11:00 UTC
-**Próxima revisión:** Al completar FASE A Sprint 2
+**Última actualización:** 2025-10-29 17:00 UTC
+**Próxima revisión:** Al completar Sprint 3 - Productos
