@@ -237,7 +237,12 @@ export function InvoiceDialog({
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const totals = items.reduce(
+  const normalized = items.map(i => ({
+  ...i,
+  discount: i.discount ?? 0,
+}));
+
+  const totals = normalized.reduce(
     (acc, item) => ({
       subtotal: acc.subtotal + item.subtotal,
       discount: acc.discount + item.discount,
@@ -607,7 +612,7 @@ export function InvoiceDialog({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((item, index) => (
+                  {normalized.map((item, index) => (
                     <TableRow key={index}>
                       <TableCell>{item.description}</TableCell>
                       <TableCell className="text-right">{item.quantity}</TableCell>

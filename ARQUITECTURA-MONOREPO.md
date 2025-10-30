@@ -44,6 +44,96 @@ El sistema actual mezcla **facturación electrónica genérica** con **POS espec
 
 ---
 
+## 🔍 ¿Por qué hay "dos backends"?
+
+### Situación Actual (Transición):
+
+```
+facturador-sri/
+├── backend/                          ← Backend ACTIVO (en uso)
+│   └── src/                            Código que se ejecuta ahora
+│       └── modules/
+│           ├── invoices/
+│           ├── customers/
+│           └── ...
+│
+└── packages/
+    └── facturacion-core/             ← Backend OBJETIVO (migración futura)
+        └── src/                        Preparado para reutilizar
+            └── modules/
+                ├── invoices/
+                ├── customers/
+                └── ...
+```
+
+### Explicación:
+
+**NO son dos backends "activos"**, es una **migración en progreso**:
+
+1. **`/backend/`** (Actual - En Uso)
+   - Es el código que **está corriendo** cuando haces `npm run start:dev`
+   - Es donde debes hacer cambios **ahora** para que funcionen
+   - Se ejecuta en `localhost:3000` (o el puerto configurado)
+   - Este es el que responde a tus llamadas API desde el frontend
+
+2. **`/packages/facturacion-core/`** (Futuro - Preparación)
+   - Es una **copia preparada** para cuando migremos completamente al monorepo
+   - **NO se está ejecutando** actualmente
+   - Es donde **eventualmente** vivirá el código cuando la migración esté completa
+   - Permitirá reutilizar el código en múltiples aplicaciones (POS, Web, Mobile)
+
+### Estado de Migración:
+
+| Componente | /backend | /packages/facturacion-core | Estado |
+|------------|----------|---------------------------|--------|
+| **Módulos Core** | ✅ Activo | 🟡 Preparado | En uso `/backend` |
+| **Frontend Web** | ✅ Conectado | ❌ No conectado | Usando `/backend` |
+| **POS Heladería** | ❌ N/A | 🔵 Planeado | No iniciado |
+| **Deploy** | ✅ Producción | ❌ No desplegado | Solo `/backend` |
+
+### Plan de Transición (Pendiente):
+
+**Paso 1 (Actual):** Desarrollo activo en `/backend/`
+- Todos los cambios se hacen aquí ✅
+- Frontend Web conectado aquí ✅
+- Deploy desde aquí ✅
+
+**Paso 2 (Futuro):** Migración completa a monorepo
+- Deprecar `/backend/` como carpeta raíz
+- Mover todo a `/packages/facturacion-core/`
+- Actualizar referencias y configuraciones
+- Deploy desde monorepo
+
+**Paso 3 (Visión):** Múltiples aplicaciones
+```
+packages/
+├── facturacion-core/    → API genérica de facturación
+├── web-facturacion/     → Frontend web (actual)
+├── pos-heladeria/       → POS para heladería
+├── pos-restaurante/     → POS para restaurante (futuro)
+└── mobile-facturacion/  → App móvil (futuro)
+```
+
+### ⚠️ Importante para Desarrollo:
+
+**Mientras trabajas HOY:**
+- ✅ Haz cambios en `/backend/src/`
+- ✅ Reinicia servidor desde `/backend/`
+- ❌ NO uses `/packages/facturacion-core/` (aún no está activo)
+
+**Cuando se complete la migración:**
+- El directorio `/backend/` se eliminará o marcará como deprecated
+- Todo el código vivirá en `/packages/facturacion-core/`
+- El monorepo será la única fuente de verdad
+
+### Beneficio del Enfoque:
+
+1. **Ahora:** Desarrollamos rápido sin interrupciones
+2. **Futuro:** Tenemos el código preparado para escalar
+3. **Gradual:** No hay "big bang" que rompa todo
+
+---
+
 ## 🏗️ Estructura del Monorepo
 
 ### Estructura FINAL (Objetivo):
@@ -2533,5 +2623,105 @@ packages/web-facturacion/
 
 ---
 
-**Última actualización:** 2025-10-30 09:00 UTC
+#### 09:00-09:30 UTC - FASE B (Sprint 4) - Eliminar Facturas ✅ COMPLETADA
+
+**Contexto:** Usuario necesitaba eliminar facturas creadas antes de subir el certificado digital.
+
+**Implementación:**
+
+##### Backend:
+- ✅ Endpoint `DELETE /api/v1/invoices/:id` creado en `InvoicesController`
+- ✅ Método `deleteInvoice()` implementado en `InvoicesService`:
+  - Valida que la factura existe y pertenece a la empresa
+  - **REGLA DE NEGOCIO:** Impide eliminar facturas AUTORIZADAS
+  - Elimina archivos de R2 (xmlPath, xmlSignedPath, ridePdfPath)
+  - Elimina items de la factura (cascade)
+  - Elimina el registro de la factura en BD
+  - Logs detallados de todo el proceso
+
+##### Frontend:
+- ✅ Método `delete()` agregado en `invoicesApi`
+- ✅ Botón "Eliminar" agregado en columna de acciones:
+  - Visible para facturas en estado PENDING
+  - Visible para facturas en estados de ERROR o REJECTED
+  - **NO visible** para facturas AUTORIZADAS (protección UI)
+- ✅ Diálogo de confirmación con:
+  - Mensaje claro mostrando número de factura
+  - Advertencia de que la acción es irreversible
+  - Nota sobre archivos que se eliminarán
+  - Botones con estados de loading
+
+**Reglas de Negocio:**
+1. ❌ **NO se pueden eliminar facturas AUTORIZADAS**
+   - Son documentos legales que deben mantenerse
+   - Backend valida y rechaza con error 400
+   - Frontend no muestra botón para facturas autorizadas
+
+2. ✅ **SE pueden eliminar:**
+   - Facturas PENDING (antes de enviar al SRI)
+   - Facturas REJECTED (rechazadas por el SRI)
+   - Facturas con ERROR (problemas al firmar o enviar)
+
+**Flujo de Eliminación:**
+```
+1. Usuario hace clic en botón "Eliminar"
+2. Se muestra diálogo de confirmación
+3. Usuario confirma
+4. Frontend llama a DELETE /api/v1/invoices/:id
+5. Backend valida:
+   - Factura existe
+   - Pertenece a la empresa
+   - NO está autorizada ✓
+6. Backend elimina:
+   - Archivos de R2 (XML, RIDE, etc.)
+   - Items de la factura
+   - Registro de la factura
+7. Frontend actualiza lista
+8. Toast de confirmación
+```
+
+**Archivos Modificados:**
+```
+Backend:
+packages/facturacion-core/src/
+├── modules/invoices/
+│   ├── presentation/controllers/
+│   │   └── invoices.controller.ts      # Endpoint DELETE
+│   └── application/services/
+│       └── invoices.service.ts         # Método deleteInvoice()
+
+Frontend:
+packages/web-facturacion/
+├── lib/api/
+│   └── invoices.ts                     # Método delete()
+└── app/dashboard/facturas/
+    └── page.tsx                        # Botón y diálogo
+```
+
+**Validaciones de Seguridad:**
+- ✅ Verificación de pertenencia a la empresa (companyId)
+- ✅ Protección contra eliminación de documentos legales (AUTHORIZED)
+- ✅ Eliminación segura de archivos en R2
+- ✅ Transacciones en BD (elimina items primero, luego factura)
+- ✅ Manejo de errores si archivos R2 no existen
+
+**UX:**
+- ✅ Botón de eliminar solo visible cuando aplica
+- ✅ Ícono rojo (Trash2) para acción destructiva
+- ✅ Confirmación obligatoria antes de eliminar
+- ✅ Mensaje claro con número de factura
+- ✅ Loading state durante eliminación
+- ✅ Toast de éxito con detalles
+
+**Resultado:**
+- ✅ Usuarios pueden eliminar facturas no autorizadas
+- ✅ Facturas autorizadas protegidas (no eliminables)
+- ✅ Limpieza completa de archivos en R2
+- ✅ Sistema mantiene integridad de documentos legales
+
+**Sprint 4B - Eliminar Facturas - Tiempo Real:** ~30 minutos
+
+---
+
+**Última actualización:** 2025-10-30 09:30 UTC
 **Próxima revisión:** Al completar Sprint 5 (Testing Final y Deploy)

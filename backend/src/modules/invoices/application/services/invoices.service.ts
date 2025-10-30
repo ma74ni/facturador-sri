@@ -781,4 +781,81 @@ async getemailLogs(invoiceId: string, companyId: string) {
       results,
     };
   }
+
+  // ==================== ELIMINAR FACTURA ====================
+
+  async deleteInvoice(invoiceId: string, companyId: string) {
+    this.logger.log(`🗑️ [deleteInvoice] Iniciando eliminación de factura ID: ${invoiceId}`);
+
+    // 1. Verificar que la factura existe y pertenece a la empresa
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id: invoiceId, companyId },
+      include: {
+        items: true,
+      },
+    });
+
+    if (!invoice) {
+      this.logger.error(`❌ [deleteInvoice] Factura no encontrada: ${invoiceId}`);
+      throw new NotFoundException('Factura no encontrada');
+    }
+
+    // 2. REGLA DE NEGOCIO: No permitir eliminar facturas autorizadas
+    if (invoice.sriStatus === 'AUTHORIZED') {
+      this.logger.error(`❌ [deleteInvoice] Intento de eliminar factura autorizada: ${invoiceId}`);
+      throw new BadRequestException(
+        'No se puede eliminar una factura autorizada por el SRI. Las facturas autorizadas son documentos legales que deben mantenerse en el sistema.',
+      );
+    }
+
+    this.logger.log(`📋 [deleteInvoice] Factura encontrada. Estado: ${invoice.sriStatus}`);
+
+    try {
+      // 3. Eliminar archivos de R2 si existen
+      const filesToDelete = [
+        invoice.xmlPath,
+        invoice.xmlSignedPath,
+        invoice.ridePdfPath,
+      ].filter((path): path is string => path !== null && path !== undefined);
+
+      if (filesToDelete.length > 0) {
+        this.logger.log(`🗂️ [deleteInvoice] Eliminando ${filesToDelete.length} archivos de R2...`);
+
+        for (const filePath of filesToDelete) {
+          try {
+            await this.r2Storage.deleteFile(filePath);
+            this.logger.log(`✅ Archivo eliminado: ${filePath}`);
+          } catch (error) {
+            this.logger.warn(`⚠️ Error eliminando archivo de R2: ${filePath}`, error);
+            // No fallar si hay error eliminando archivos, continuar con la eliminación de BD
+          }
+        }
+      }
+
+      // 4. Eliminar items de la factura (cascade delete debería manejarlo, pero lo hacemos explícito)
+      await this.prisma.invoiceItem.deleteMany({
+        where: { invoiceId: invoice.id },
+      });
+      this.logger.log(`✅ Items de factura eliminados: ${invoice.items.length}`);
+
+      // 5. Eliminar la factura
+      await this.prisma.invoice.delete({
+        where: { id: invoiceId },
+      });
+
+      this.logger.log(`✅ [deleteInvoice] Factura eliminada exitosamente: ${invoiceId}`);
+
+      return {
+        message: 'Factura eliminada exitosamente',
+        invoice: {
+          id: invoice.id,
+          sequential: invoice.sequential,
+          formattedNumber: `${invoice.establishmentCode}-${invoice.emissionPointCode}-${invoice.sequential}`,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`❌ [deleteInvoice] Error eliminando factura: ${invoiceId}`, error);
+      throw new InternalServerErrorException('Error al eliminar la factura');
+    }
+  }
 }

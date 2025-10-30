@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Param,
   UseGuards,
@@ -245,5 +246,24 @@ async sendByEmail(
 async getEmailLogs(@Param('id') id: string, @Request() req: any) {
   const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
   return this.invoicesService.getemailLogs(id, companyId);
+}
+
+@Delete(':id')
+@ApiOperation({ summary: 'Eliminar factura' })
+@ApiResponse({
+  status: 200,
+  description: 'Factura eliminada exitosamente',
+})
+@ApiResponse({
+  status: 404,
+  description: 'Factura no encontrada',
+})
+@ApiResponse({
+  status: 400,
+  description: 'No se puede eliminar una factura autorizada',
+})
+async delete(@Param('id') id: string, @Request() req: any) {
+  const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
+  return this.invoicesService.deleteInvoice(id, companyId);
 }
 }

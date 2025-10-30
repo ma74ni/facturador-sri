@@ -154,4 +154,9 @@ export const invoicesApi = {
   sendByEmail: async (id: string, email?: string): Promise<void> => {
     await apiClient.post(`/invoices/${id}/send-email`, { email });
   },
+
+  // Eliminar factura
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/invoices/${id}`);
+  },
 };

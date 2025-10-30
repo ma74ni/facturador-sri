@@ -30,7 +30,8 @@ import {
   AlertCircle,
   DollarSign,
   Calendar,
-  FileDown
+  FileDown,
+  Trash2
 } from 'lucide-react';
 import { invoicesApi, Invoice, CreateInvoiceDto, InvoiceStats } from '@/lib/api/invoices';
 import { customersApi, Customer } from '@/lib/api/customers';
@@ -61,6 +62,8 @@ export default function FacturasPage() {
   // Dialog states
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
 
   // Load all data
   const loadData = async () => {
@@ -251,6 +254,36 @@ export default function FacturasPage() {
         title: 'Error',
         description: error.response?.data?.message || 'Error al enviar el email',
       });
+    }
+  };
+
+  const handleDeleteClick = (invoice: Invoice) => {
+    setInvoiceToDelete(invoice);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!invoiceToDelete) return;
+
+    try {
+      setLoading(true);
+      await invoicesApi.delete(invoiceToDelete.id);
+      toast({
+        title: 'Factura eliminada',
+        description: `La factura ${invoiceToDelete.establishmentCode}-${invoiceToDelete.emissionPointCode}-${invoiceToDelete.sequential} ha sido eliminada`,
+      });
+      setDeleteDialogOpen(false);
+      setInvoiceToDelete(null);
+      await loadData();
+    } catch (error: any) {
+      console.error('Error deleting invoice:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error al eliminar',
+        description: error.response?.data?.message || 'No se pudo eliminar la factura',
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -467,14 +500,24 @@ export default function FacturasPage() {
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         {factura.status === 'PENDING' && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            title="Enviar al SRI"
-                            onClick={() => handleSendToSri(factura.id)}
-                          >
-                            <Send className="h-4 w-4 text-blue-600" />
-                          </Button>
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Enviar al SRI"
+                              onClick={() => handleSendToSri(factura.id)}
+                            >
+                              <Send className="h-4 w-4 text-blue-600" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Eliminar factura"
+                              onClick={() => handleDeleteClick(factura)}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </>
                         )}
                         {factura.status === 'AUTHORIZED' && (
                           <>
@@ -509,6 +552,17 @@ export default function FacturasPage() {
                               <Mail className="h-4 w-4 text-purple-600" />
                             </Button>
                           </>
+                        )}
+                        {/* Botón eliminar para estados diferentes a AUTHORIZED */}
+                        {factura.status !== 'AUTHORIZED' && factura.status !== 'PENDING' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Eliminar factura"
+                            onClick={() => handleDeleteClick(factura)}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </Button>
                         )}
                       </div>
                     </TableCell>
@@ -575,6 +629,42 @@ export default function FacturasPage() {
         onCustomerCreated={loadCustomers}
         onProductCreated={loadProducts}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar factura?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {invoiceToDelete && (
+                <>
+                  ¿Estás seguro de eliminar la factura{' '}
+                  <strong className="font-mono">
+                    {invoiceToDelete.establishmentCode}-{invoiceToDelete.emissionPointCode}-{invoiceToDelete.sequential}
+                  </strong>
+                  ?
+                  <br /><br />
+                  Esta acción no se puede deshacer. Se eliminarán todos los archivos asociados (XML, RIDE, etc.).
+                  <br /><br />
+                  <span className="text-xs text-muted-foreground">
+                    Nota: Solo se pueden eliminar facturas que no estén autorizadas por el SRI.
+                  </span>
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={loading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {loading ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
