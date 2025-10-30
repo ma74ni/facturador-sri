@@ -22,10 +22,14 @@ import {
   Shield,
   Info
 } from 'lucide-react';
+import { companyApi, UpdateCompanyDto } from '@/lib/api/company';
+import { useToast } from '@/hooks/use-toast';
 
 export default function EmpresaPage() {
-  const { company } = useAuth();
+  const { company, checkAuth } = useAuth();
+  const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     businessName: company?.businessName || '',
     tradeName: company?.tradeName || '',
@@ -35,10 +39,39 @@ export default function EmpresaPage() {
     phone: company?.phone || '',
   });
 
-  const handleSave = () => {
-    // TODO: Implementar guardado en backend
-    console.log('Guardando datos:', formData);
-    setIsEditing(false);
+  const handleSave = async () => {
+    try {
+      setLoading(true);
+
+      const updateData: UpdateCompanyDto = {
+        businessName: formData.businessName,
+        tradeName: formData.tradeName || undefined,
+        address: formData.address,
+        email: formData.email,
+        phone: formData.phone || undefined,
+      };
+
+      await companyApi.update(updateData);
+
+      // Actualizar el contexto de auth
+      await checkAuth();
+
+      toast({
+        title: 'Cambios guardados',
+        description: 'La información de tu empresa ha sido actualizada correctamente',
+      });
+
+      setIsEditing(false);
+    } catch (error: any) {
+      console.error('Error al guardar:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.message || 'Error al actualizar la información',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancel = () => {
@@ -101,13 +134,13 @@ export default function EmpresaPage() {
           </Button>
         ) : (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={handleCancel}>
+            <Button variant="outline" onClick={handleCancel} disabled={loading}>
               <X className="mr-2 h-4 w-4" />
               Cancelar
             </Button>
-            <Button onClick={handleSave}>
+            <Button onClick={handleSave} disabled={loading}>
               <Save className="mr-2 h-4 w-4" />
-              Guardar Cambios
+              {loading ? 'Guardando...' : 'Guardar Cambios'}
             </Button>
           </div>
         )}

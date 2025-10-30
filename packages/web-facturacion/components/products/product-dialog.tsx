@@ -22,6 +22,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Product, CreateProductDto } from '@/lib/api/products';
 import { AlertCircle } from 'lucide-react';
+import { getTaxLabel, getAllTaxCodes, COMMON_TAX_CODES } from '@/lib/constants/tax-codes';
 
 interface ProductDialogProps {
   open: boolean;
@@ -114,17 +115,6 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
     } finally {
       setLoading(false);
     }
-  };
-
-  const getTaxLabel = (code: string) => {
-    const taxMap: Record<string, string> = {
-      '0': 'IVA 0%',
-      '2': 'IVA 15%',
-      '3': 'IVA 15%',
-      '6': 'No objeto de impuesto',
-      '7': 'Exento de IVA',
-    };
-    return taxMap[code] || code;
   };
 
   return (
@@ -281,10 +271,11 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="2">{getTaxLabel('2')}</SelectItem>
-                <SelectItem value="0">{getTaxLabel('0')}</SelectItem>
-                <SelectItem value="6">{getTaxLabel('6')}</SelectItem>
-                <SelectItem value="7">{getTaxLabel('7')}</SelectItem>
+                {COMMON_TAX_CODES.map((code) => (
+                  <SelectItem key={code} value={code}>
+                    {getTaxLabel(code)}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">

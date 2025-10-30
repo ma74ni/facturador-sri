@@ -20,6 +20,7 @@ import { Plus, Search, Edit, Trash2, DollarSign, Package, Loader2 } from 'lucide
 import { productsApi, Product, CreateProductDto } from '@/lib/api/products';
 import { ProductDialog } from '@/components/products/product-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { getTaxLabel } from '@/lib/constants/tax-codes';
 
 export default function ProductosPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,6 +37,8 @@ export default function ProductosPage() {
       setLoading(true);
       const data = await productsApi.getAll();
       console.log('Datos recibidos del backend:', data);
+      console.log('Es un array?', Array.isArray(data));
+      console.log('Cantidad de productos:', data?.length);
       setProducts(Array.isArray(data) ? data : []);
     } catch (error: any) {
       console.error('Error al cargar productos:', error);
@@ -50,6 +53,7 @@ export default function ProductosPage() {
     }
   };
 
+  // Mover función antes de useEffect para evitar warning de setState durante render
   useEffect(() => {
     loadProducts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -127,17 +131,6 @@ export default function ProductosPage() {
       product.description?.toLowerCase().includes(searchLower)
     );
   });
-
-  const getTaxLabel = (taxPercentageCode: string) => {
-    const taxMap: Record<string, string> = {
-      '0': 'IVA 0%',
-      '2': 'IVA 15%',
-      '3': 'IVA 15%',
-      '6': 'No objeto',
-      '7': 'Exento',
-    };
-    return taxMap[taxPercentageCode] || 'IVA';
-  };
 
   return (
     <div className="space-y-6">
@@ -231,8 +224,10 @@ export default function ProductosPage() {
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product) => {
-                  const margen = product.cost
-                    ? ((product.unitPrice - product.cost) / product.cost * 100).toFixed(1)
+                  const unitPrice = Number(product.unitPrice);
+                  const cost = product.cost ? Number(product.cost) : null;
+                  const margen = cost
+                    ? ((unitPrice - cost) / cost * 100).toFixed(1)
                     : null;
 
                   return (
@@ -252,10 +247,10 @@ export default function ProductosPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right text-muted-foreground">
-                        {product.cost ? `$${product.cost.toFixed(2)}` : '-'}
+                        {cost ? `$${cost.toFixed(2)}` : '-'}
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        ${product.unitPrice.toFixed(2)}
+                        ${unitPrice.toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right">
                         {margen !== null ? (
@@ -320,7 +315,7 @@ export default function ProductosPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ${products.length > 0 ? (products.reduce((sum, p) => sum + p.unitPrice, 0) / products.length).toFixed(2) : '0.00'}
+                ${products.length > 0 ? (products.reduce((sum, p) => sum + Number(p.unitPrice), 0) / products.length).toFixed(2) : '0.00'}
               </div>
               <p className="text-xs text-muted-foreground">
                 precio venta
@@ -338,7 +333,7 @@ export default function ProductosPage() {
             <CardContent>
               <div className="text-2xl font-bold">
                 ${products.filter(p => p.cost).length > 0
-                  ? (products.reduce((sum, p) => sum + (p.cost || 0), 0) / products.filter(p => p.cost).length).toFixed(2)
+                  ? (products.reduce((sum, p) => sum + Number(p.cost || 0), 0) / products.filter(p => p.cost).length).toFixed(2)
                   : '0.00'}
               </div>
               <p className="text-xs text-muted-foreground">
