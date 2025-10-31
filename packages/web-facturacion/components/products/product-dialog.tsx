@@ -287,7 +287,7 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
           </div>
 
           {/* Margen de Ganancia (Informativo) */}
-          {formData.cost > 0 && formData.unitPrice > 0 && (
+          {formData.cost && formData.cost > 0 && formData.unitPrice > 0 && (
             <div className="rounded-lg bg-slate-100 p-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Margen de Ganancia:</span>

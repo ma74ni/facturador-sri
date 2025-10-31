@@ -1,10 +1,11 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import * as soap from 'soap';
 import { DOMParser } from '@xmldom/xmldom';
 import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
 
 @Injectable()
 export class SriWebServiceService {
+  private readonly logger = new Logger(SriWebServiceService.name);
   private readonly receptionUrlTest = process.env.SRI_RECEPTION_URL_TEST;
   private readonly authorizationUrlTest = process.env.SRI_AUTHORIZATION_URL_TEST;
   private readonly receptionUrlProd = process.env.SRI_RECEPTION_URL_PROD;
@@ -193,9 +194,17 @@ export class SriWebServiceService {
       const claveAcceso = this.extractAccessKeyFromXml(xmlContent);
 
       // 3. Enviar al SRI
+      this.logger.log(`📤 Enviando comprobante al SRI (clave: ${claveAcceso})`);
       const sendResult = await this.sendInvoice(xmlContent, environment);
 
+      this.logger.log(`📋 Respuesta de recepción SRI: ${JSON.stringify({
+        success: sendResult.success,
+        estado: sendResult.estado,
+        mensaje: sendResult.mensaje
+      })}`);
+
       if (!sendResult.success) {
+        this.logger.error(`❌ Error en recepción SRI: ${sendResult.mensaje || 'Desconocido'}`);
         errors.push(`Error en recepción: ${sendResult.mensaje || 'Desconocido'}`);
         return {
           sent: false,
@@ -205,16 +214,21 @@ export class SriWebServiceService {
       }
 
       // 4. Esperar y consultar autorización (con reintentos)
+      this.logger.log(`⏳ Consultando autorización (máximo ${maxRetries} intentos)...`);
       for (let i = 0; i < maxRetries; i++) {
 
         await this.sleep(retryDelay);
 
+        this.logger.log(`🔄 Intento ${i + 1}/${maxRetries} de consulta de autorización...`);
         const authResult = await this.checkAuthorization(
           claveAcceso, // Usar la clave extraída del XML
           environment,
         );
 
+        this.logger.log(`📋 Estado de autorización: ${authResult.estado}`);
+
         if (authResult.estado === 'AUTORIZADO') {
+          this.logger.log(`✅ Comprobante AUTORIZADO: ${authResult.numeroAutorizacion}`);
           return {
             sent: true,
             authorized: true,
@@ -225,6 +239,8 @@ export class SriWebServiceService {
 
         if (authResult.estado === 'NO_AUTORIZADO' || authResult.estado === 'RECHAZADA') {
           const mensajes = authResult.mensajes?.map((m: any) => m.mensaje || m.informacionAdicional).join(', ');
+          this.logger.error(`❌ Comprobante RECHAZADO: ${mensajes}`);
+          this.logger.error(`📋 Mensajes completos del SRI:`, JSON.stringify(authResult.mensajes, null, 2));
           errors.push(`Comprobante rechazado: ${mensajes}`);
 
           return {

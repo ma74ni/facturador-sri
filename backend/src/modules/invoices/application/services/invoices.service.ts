@@ -59,19 +59,16 @@ export class InvoicesService {
       throw new NotFoundException('Compañía no encontrada');
     }
 
-    // 4. Obtener secuencial y actualizar
+    // 4. Obtener secuencial (NO incrementar aún)
     const sequential = emissionPoint.invoiceSequence.toString().padStart(9, '0');
-    await this.prisma.emissionPoint.update({
-      where: { id: emissionPoint.id },
-      data: { invoiceSequence: emissionPoint.invoiceSequence + 1 },
-    });
+    this.logger.log(`📋 Usando secuencial: ${sequential} (no incrementado aún)`);
 
     // 5. Calcular totales
     let subtotal = new Decimal(0);
     let totalDiscount = new Decimal(0);
     let ivaValue = new Decimal(0);
 
-    const calculatedItems = [];
+    const calculatedItems: any[] = [];
 
     for (const item of dto.items) {
       const itemSubtotal = new Decimal(item.quantity).mul(item.unitPrice);
@@ -104,43 +101,49 @@ export class InvoicesService {
       sequential,
     );
 
-    // 7. Crear factura con items
-    const invoice = await this.prisma.invoice.create({
-      data: {
-        documentType: '01',
-        accessKey,
-        establishmentCode: establishment.code,
-        emissionPointCode: emissionPoint.code,
-        sequential,
-        issueDate,
-        customerId: customer.id,
-        establishmentId: establishment.id,
-        emissionPointId: emissionPoint.id,
-        subtotal: subtotal.toNumber(),
-        totalDiscount: totalDiscount.toNumber(),
-        ivaValue: ivaValue.toNumber(),
-        total: total.toNumber(),
-        companyId,
-        createdById: userId,
-        sriStatus: 'PENDING',
-        items: {
-          create: calculatedItems.map((item) => ({
-            productId: item.productId,
-            mainCode: item.mainCode,
-            description: item.description,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            discount: item.discount || 0,
-            subtotal: item.subtotal,
-          })),
+    // 7. Crear factura en estado DRAFT (dentro de transacción)
+    const invoice = await this.prisma.$transaction(async (prisma) => {
+      // Crear factura con items
+      const newInvoice = await prisma.invoice.create({
+        data: {
+          documentType: '01',
+          accessKey,
+          establishmentCode: establishment.code,
+          emissionPointCode: emissionPoint.code,
+          sequential,
+          issueDate,
+          customerId: customer.id,
+          establishmentId: establishment.id,
+          emissionPointId: emissionPoint.id,
+          subtotal: subtotal.toNumber(),
+          totalDiscount: totalDiscount.toNumber(),
+          ivaValue: ivaValue.toNumber(),
+          total: total.toNumber(),
+          companyId,
+          createdById: userId,
+          sriStatus: 'DRAFT', // 👈 Estado DRAFT hasta que se firme exitosamente
+          items: {
+            create: calculatedItems.map((item) => ({
+              productId: item.productId,
+              mainCode: item.mainCode,
+              description: item.description,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              discount: item.discount || 0,
+              subtotal: item.subtotal,
+            })),
+          },
         },
-      },
-      include: {
-        items: true,
-        customer: true,
-        establishment: true,
-        emissionPoint: true,
-      },
+        include: {
+          items: true,
+          customer: true,
+          establishment: true,
+          emissionPoint: true,
+        },
+      });
+
+      this.logger.log(`✅ Factura creada en estado DRAFT (ID: ${newInvoice.id})`);
+      return newInvoice;
     });
 
     // ==================== GENERAR Y FIRMAR XML ====================
@@ -150,6 +153,7 @@ export class InvoicesService {
 
     try {
       // 8. Generar XML
+      this.logger.log(`📋 Cliente info - Tipo ID: ${invoice.customer.identificationType}, ID: ${invoice.customer.identification}`);
       const xml = this.xmlGenerator.generateInvoiceXml(invoice, company);
       xmlPath = await this.xmlStorage.saveXml(accessKey, xml, companyId);
 
@@ -169,23 +173,41 @@ export class InvoicesService {
         signatureStatus = 'sin_certificado';
       }
 
-      // 10. Actualizar factura con rutas de archivos
-      await this.prisma.invoice.update({
-        where: { id: invoice.id },
-        data: {
-          xmlPath,
-          xmlSignedPath,
-        },
+      // 10. SI TODO ES EXITOSO, incrementar secuencial y cambiar a PENDING
+      await this.prisma.$transaction(async (prisma) => {
+        // Incrementar secuencial
+        await prisma.emissionPoint.update({
+          where: { id: emissionPoint.id },
+          data: { invoiceSequence: emissionPoint.invoiceSequence + 1 },
+        });
+
+        this.logger.log(`✅ Secuencial incrementado: ${emissionPoint.invoiceSequence} → ${emissionPoint.invoiceSequence + 1}`);
+
+        // Actualizar factura a PENDING con archivos
+        await prisma.invoice.update({
+          where: { id: invoice.id },
+          data: {
+            xmlPath,
+            xmlSignedPath,
+            sriStatus: xmlSignedPath ? 'PENDING' : 'DRAFT', // PENDING solo si está firmada
+          },
+        });
+
+        this.logger.log(`✅ Factura actualizada a estado: ${xmlSignedPath ? 'PENDING' : 'DRAFT'}`);
       });
 
     } catch (error) {
+      this.logger.error(`❌ Error en generación/firma: ${error.message}`);
       signatureStatus = 'error_generacion';
+
+      // La factura queda en DRAFT, el secuencial NO se incrementó
+      this.logger.warn(`⚠️ Factura ${invoice.id} quedó en estado DRAFT. Secuencial NO incrementado.`);
     }
 
     return {
       message: 'Factura creada exitosamente',
       signatureStatus,
-      warnings: signatureStatus !== 'firmado' 
+      warnings: signatureStatus !== 'firmado'
         ? ['La factura no está firmada digitalmente. Sube un certificado para firmar facturas.']
         : [],
       invoice: {
@@ -197,9 +219,13 @@ export class InvoicesService {
     };
   }
 
-  async findAll(companyId: string) {
+  async findAll(companyId: string, includeCancelled: boolean = false) {
     const invoices = await this.prisma.invoice.findMany({
-      where: { companyId },
+      where: {
+        companyId,
+        // Por defecto, excluir facturas canceladas
+        ...(includeCancelled ? {} : { sriStatus: { not: 'CANCELLED' } }),
+      },
       include: {
         customer: {
           select: {
@@ -412,6 +438,9 @@ export class InvoicesService {
     });
 
     this.logger.error('❌ Factura rechazada por el SRI');
+    this.logger.error('📋 Errores del SRI:', JSON.stringify(result.errors, null, 2));
+    this.logger.error('📋 Estado de envío (sent):', result.sent);
+
     return {
       message: 'La factura no fue autorizada',
       status: result.sent ? 'REJECTED' : 'ERROR',
@@ -784,8 +813,17 @@ async getemailLogs(invoiceId: string, companyId: string) {
 
   // ==================== ELIMINAR FACTURA ====================
 
-  async deleteInvoice(invoiceId: string, companyId: string) {
-    this.logger.log(`🗑️ [deleteInvoice] Iniciando eliminación de factura ID: ${invoiceId}`);
+  /**
+   * Cancela una factura (soft delete)
+   * Solo se pueden cancelar facturas en estado DRAFT, PENDING, ERROR o REJECTED
+   * Las facturas AUTORIZADAS requieren una Nota de Crédito
+   */
+  async cancelInvoice(
+    invoiceId: string,
+    companyId: string,
+    reason?: string
+  ) {
+    this.logger.log(`❌ [cancelInvoice] Iniciando cancelación de factura ID: ${invoiceId}`);
 
     // 1. Verificar que la factura existe y pertenece a la empresa
     const invoice = await this.prisma.invoice.findFirst({
@@ -796,66 +834,71 @@ async getemailLogs(invoiceId: string, companyId: string) {
     });
 
     if (!invoice) {
-      this.logger.error(`❌ [deleteInvoice] Factura no encontrada: ${invoiceId}`);
+      this.logger.error(`❌ [cancelInvoice] Factura no encontrada: ${invoiceId}`);
       throw new NotFoundException('Factura no encontrada');
     }
 
-    // 2. REGLA DE NEGOCIO: No permitir eliminar facturas autorizadas
+    // 2. REGLA DE NEGOCIO: No permitir cancelar facturas autorizadas
     if (invoice.sriStatus === 'AUTHORIZED') {
-      this.logger.error(`❌ [deleteInvoice] Intento de eliminar factura autorizada: ${invoiceId}`);
+      this.logger.error(`❌ [cancelInvoice] Intento de cancelar factura autorizada: ${invoiceId}`);
       throw new BadRequestException(
-        'No se puede eliminar una factura autorizada por el SRI. Las facturas autorizadas son documentos legales que deben mantenerse en el sistema.',
+        'No se puede cancelar una factura autorizada por el SRI. Para anular una factura autorizada debe emitir una Nota de Crédito.',
       );
     }
 
-    this.logger.log(`📋 [deleteInvoice] Factura encontrada. Estado: ${invoice.sriStatus}`);
+    // 3. REGLA DE NEGOCIO: No permitir cancelar facturas ya canceladas
+    if (invoice.sriStatus === 'CANCELLED') {
+      this.logger.warn(`⚠️ [cancelInvoice] Factura ya está cancelada: ${invoiceId}`);
+      throw new BadRequestException('La factura ya está cancelada');
+    }
+
+    // 4. REGLA DE NEGOCIO: Solo se pueden cancelar DRAFT, PENDING, ERROR, REJECTED
+    const allowedStatuses = ['DRAFT', 'PENDING', 'ERROR', 'REJECTED'];
+    if (!allowedStatuses.includes(invoice.sriStatus)) {
+      throw new BadRequestException(
+        `No se puede cancelar una factura en estado ${invoice.sriStatus}`,
+      );
+    }
+
+    this.logger.log(`📋 [cancelInvoice] Factura encontrada. Estado actual: ${invoice.sriStatus}`);
 
     try {
-      // 3. Eliminar archivos de R2 si existen
-      const filesToDelete = [
-        invoice.xmlPath,
-        invoice.xmlSignedPath,
-        invoice.ridePdfPath,
-      ].filter((path): path is string => path !== null && path !== undefined);
-
-      if (filesToDelete.length > 0) {
-        this.logger.log(`🗂️ [deleteInvoice] Eliminando ${filesToDelete.length} archivos de R2...`);
-
-        for (const filePath of filesToDelete) {
-          try {
-            await this.r2Storage.deleteFile(filePath);
-            this.logger.log(`✅ Archivo eliminado: ${filePath}`);
-          } catch (error) {
-            this.logger.warn(`⚠️ Error eliminando archivo de R2: ${filePath}`, error);
-            // No fallar si hay error eliminando archivos, continuar con la eliminación de BD
-          }
-        }
-      }
-
-      // 4. Eliminar items de la factura (cascade delete debería manejarlo, pero lo hacemos explícito)
-      await this.prisma.invoiceItem.deleteMany({
-        where: { invoiceId: invoice.id },
-      });
-      this.logger.log(`✅ Items de factura eliminados: ${invoice.items.length}`);
-
-      // 5. Eliminar la factura
-      await this.prisma.invoice.delete({
+      // 5. Actualizar factura a estado CANCELLED (soft delete)
+      const cancelledInvoice = await this.prisma.invoice.update({
         where: { id: invoiceId },
+        data: {
+          sriStatus: 'CANCELLED',
+          cancelledAt: new Date(),
+          cancelReason: reason || 'Cancelada por usuario',
+        },
       });
 
-      this.logger.log(`✅ [deleteInvoice] Factura eliminada exitosamente: ${invoiceId}`);
+      this.logger.log(`✅ [cancelInvoice] Factura cancelada exitosamente: ${invoiceId}`);
 
       return {
-        message: 'Factura eliminada exitosamente',
+        message: 'Factura cancelada exitosamente',
         invoice: {
-          id: invoice.id,
-          sequential: invoice.sequential,
-          formattedNumber: `${invoice.establishmentCode}-${invoice.emissionPointCode}-${invoice.sequential}`,
+          id: cancelledInvoice.id,
+          sequential: cancelledInvoice.sequential,
+          formattedNumber: `${cancelledInvoice.establishmentCode}-${cancelledInvoice.emissionPointCode}-${cancelledInvoice.sequential}`,
+          cancelledAt: cancelledInvoice.cancelledAt,
+          cancelReason: cancelledInvoice.cancelReason,
         },
       };
     } catch (error) {
-      this.logger.error(`❌ [deleteInvoice] Error eliminando factura: ${invoiceId}`, error);
-      throw new InternalServerErrorException('Error al eliminar la factura');
+      this.logger.error(`❌ [cancelInvoice] Error cancelando factura: ${invoiceId}`, error);
+      throw new InternalServerErrorException('Error al cancelar la factura');
     }
+  }
+
+  /**
+   * @deprecated Use cancelInvoice instead. This method will be removed in future versions.
+   * Hard delete - Solo para desarrollo/testing
+   */
+  async deleteInvoice(invoiceId: string, companyId: string) {
+    this.logger.warn(`⚠️ [deleteInvoice] DEPRECATED: Usando hard delete para factura ${invoiceId}`);
+
+    // Redirigir a cancelInvoice para operación normal
+    return this.cancelInvoice(invoiceId, companyId, 'Eliminada (método deprecado)');
   }
 }

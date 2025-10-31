@@ -5,6 +5,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   Request,
   UnauthorizedException,
@@ -52,10 +53,17 @@ export class InvoicesController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar todas las facturas' })
-  async findAll(@Request() req: any) {
+  @ApiOperation({
+    summary: 'Listar todas las facturas',
+    description: 'Por defecto excluye facturas canceladas. Use ?includeCancelled=true para incluirlas.'
+  })
+  async findAll(
+    @Request() req: any,
+    @Query('includeCancelled') includeCancelled?: string,
+  ) {
     const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
-    return this.invoicesService.findAll(companyId);
+    const include = includeCancelled === 'true';
+    return this.invoicesService.findAll(companyId, include);
   }
 
   @Get('stats')
@@ -248,11 +256,41 @@ async getEmailLogs(@Param('id') id: string, @Request() req: any) {
   return this.invoicesService.getemailLogs(id, companyId);
 }
 
-@Delete(':id')
-@ApiOperation({ summary: 'Eliminar factura' })
+@Post(':id/cancel')
+@ApiOperation({
+  summary: 'Cancelar factura',
+  description: 'Cancela una factura en estado DRAFT, PENDING, ERROR o REJECTED. Las facturas AUTORIZADAS requieren una Nota de Crédito.'
+})
 @ApiResponse({
   status: 200,
-  description: 'Factura eliminada exitosamente',
+  description: 'Factura cancelada exitosamente',
+})
+@ApiResponse({
+  status: 404,
+  description: 'Factura no encontrada',
+})
+@ApiResponse({
+  status: 400,
+  description: 'No se puede cancelar una factura autorizada o ya cancelada',
+})
+async cancel(
+  @Param('id') id: string,
+  @Body() body: { reason?: string },
+  @Request() req: any
+) {
+  const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
+  return this.invoicesService.cancelInvoice(id, companyId, body.reason);
+}
+
+@Delete(':id')
+@ApiOperation({
+  summary: 'Eliminar factura (DEPRECADO)',
+  description: 'Este endpoint está deprecado. Use POST /:id/cancel en su lugar. Ahora redirige a cancelInvoice.',
+  deprecated: true,
+})
+@ApiResponse({
+  status: 200,
+  description: 'Factura cancelada exitosamente',
 })
 @ApiResponse({
   status: 404,

@@ -22,11 +22,13 @@ enum SRIEnvironment {
 }
 
 enum SRIStatus {
-  PENDING
-  SENT
-  AUTHORIZED
-  REJECTED
-  ERROR
+  DRAFT      // Factura creada pero aún no firmada/lista para enviar
+  PENDING    // Lista para enviar al SRI
+  SENT       // Enviada al SRI, esperando autorización
+  AUTHORIZED // Autorizada por el SRI
+  REJECTED   // Rechazada por el SRI
+  ERROR      // Error en el proceso
+  CANCELLED  // Cancelada antes de enviar al SRI
 }
 
 enum CompanyStatus {
@@ -271,7 +273,7 @@ model Invoice {
   ivaValue      Decimal @db.Decimal(12, 2)
   total         Decimal @db.Decimal(12, 2)
 
-  sriStatus           SRIStatus @default(PENDING)
+  sriStatus           SRIStatus @default(DRAFT)
   authorizationNumber String?
   authorizationDate   DateTime?
   sriErrors           Json?
@@ -280,6 +282,10 @@ model Invoice {
   xmlPath       String?
   xmlSignedPath String?
   ridePdfPath   String?
+
+  // Auditoría y control
+  cancelledAt DateTime?
+  cancelReason String?
 
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)

@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   Clock,
   Mail,
+  BarChart3,
 } from 'lucide-react';
 
 export default function DashboardLayout({
@@ -54,6 +55,7 @@ export default function DashboardLayout({
     { name: 'Facturas', href: '/dashboard/facturas', icon: FileText },
     { name: 'Clientes', href: '/dashboard/clientes', icon: Users },
     { name: 'Productos', href: '/dashboard/productos', icon: Package },
+    { name: 'Reportes', href: '/dashboard/reportes', icon: BarChart3 },
     { name: 'Empresa', href: '/dashboard/empresa', icon: Building2 },
     { name: 'Configuración', href: '/dashboard/configuracion', icon: Settings },
   ];
