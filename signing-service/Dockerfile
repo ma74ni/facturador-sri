@@ -13,14 +13,14 @@ COPY src ./src
 RUN mvn clean package -DskipTests
 
 # Etapa 2: Runtime
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:17-jre
 WORKDIR /app
 
 # Instalar dependencias necesarias
-RUN apk add --no-cache curl
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 # Crear usuario no privilegiado
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 
 # Copiar JAR desde la etapa de build
 COPY --from=build /app/target/*.jar app.jar
@@ -36,4 +36,4 @@ EXPOSE 8081
 
 
 # Ejecutar aplicación
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+ENTRYPOINT ["bash", "-c", "java $JAVA_OPTS -jar app.jar"]
