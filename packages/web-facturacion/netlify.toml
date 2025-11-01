@@ -1,0 +1,22 @@
+[build]
+  # Directorio base del frontend
+  base = "packages/web-facturacion"
+
+  # Comando de build - primero instalamos shared-types, luego el frontend
+  command = "cd ../.. && pnpm install && pnpm --filter web-facturacion build"
+
+  # Directorio de publicación (relativo al base)
+  publish = ".next"
+
+[build.environment]
+  # Usar Node 18+
+  NODE_VERSION = "18"
+
+  # Habilitar pnpm
+  NPM_FLAGS = "--version"
+
+# Configuración de redirecciones para Next.js App Router
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
