@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: facturador-api-staging
+    runtime: node
+    region: oregon
+    plan: free
+    branch: dev
+    rootDir: packages/facturacion-core
+    buildCommand: cd ../.. && corepack enable && corepack prepare pnpm@latest --activate && pnpm install && pnpm --filter facturacion-core prisma:generate && pnpm --filter facturacion-core build
+    startCommand: npx prisma migrate deploy && npm run start:prod
