@@ -836,7 +836,7 @@ async getemailLogs(invoiceId: string, companyId: string) {
         invoice.xmlPath,
         invoice.xmlSignedPath,
         invoice.ridePdfPath,
-      ].filter(Boolean);
+      ].filter((path): path is string => path !== null && path !== undefined);
 
       if (filesToDelete.length > 0) {
         this.logger.log(`🗂️ [deleteInvoice] Eliminando ${filesToDelete.length} archivos de R2...`);
