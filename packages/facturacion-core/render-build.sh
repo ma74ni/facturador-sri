@@ -19,6 +19,10 @@ pnpm install --frozen-lockfile
 # Volver al directorio del backend
 cd packages/facturacion-core
 
+# Rebuild bcrypt para la arquitectura del servidor
+echo "🔧 Rebuilding native modules (bcrypt)..."
+pnpm rebuild bcrypt --build-from-source
+
 # Generar Prisma Client
 echo "🔨 Generating Prisma Client..."
 pnpm prisma:generate
