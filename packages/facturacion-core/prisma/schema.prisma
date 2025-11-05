@@ -28,11 +28,21 @@ enum SRIEnvironment {
 }
 
 enum SRIStatus {
+  DRAFT      // Factura creada pero aún no firmada/lista para enviar
+  PENDING    // Lista para enviar al SRI
+  SENT       // Enviada al SRI, esperando autorización
+  AUTHORIZED // Autorizada por el SRI
+  REJECTED   // Rechazada por el SRI
+  ERROR      // Error en el proceso
+  CANCELLED  // Cancelada antes de enviar al SRI
+
+  @@schema("facturacion_core")
+}
+
+enum CompanyStatus {
   PENDING
-  SENT
-  AUTHORIZED
+  APPROVED
   REJECTED
-  ERROR
 
   @@schema("facturacion_core")
 }
@@ -48,6 +58,11 @@ model User {
   isActive  Boolean @default(true)
   role      Role    @default(USER)
 
+  // Email verification
+  emailVerified     Boolean   @default(false)
+  verificationToken String?   @unique
+  verificationTokenExpiry DateTime?
+
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
@@ -59,6 +74,7 @@ model User {
 
   @@index([email])
   @@index([companyId])
+  @@index([verificationToken])
   @@schema("facturacion_core")
   @@map("users")
 }
@@ -79,6 +95,12 @@ model Company {
 
   environment SRIEnvironment @default(TEST)
   isActive    Boolean        @default(true)
+
+  // Company approval status
+  status CompanyStatus @default(PENDING)
+  approvedAt DateTime?
+  rejectedAt DateTime?
+  rejectionReason String?
 
   // Configuración de email (Mailjet o custom)
   emailProvider String @default("SYSTEM") // SYSTEM, MAILJET, SMTP
@@ -268,7 +290,7 @@ model Invoice {
   ivaValue      Decimal @db.Decimal(12, 2)
   total         Decimal @db.Decimal(12, 2)
 
-  sriStatus           SRIStatus @default(PENDING)
+  sriStatus           SRIStatus @default(DRAFT)
   authorizationNumber String?
   authorizationDate   DateTime?
   sriErrors           Json?
@@ -277,6 +299,10 @@ model Invoice {
   xmlPath       String?
   xmlSignedPath String?
   ridePdfPath   String?
+
+  // Auditoría y control
+  cancelledAt DateTime?
+  cancelReason String?
 
   // Metadata para integraciones (POS, etc)
   metadata Json?
@@ -360,7 +386,7 @@ model CreditNote {
   ivaValue      Decimal @db.Decimal(12, 2)
   total         Decimal @db.Decimal(12, 2)
 
-  sriStatus           SRIStatus @default(PENDING)
+  sriStatus           SRIStatus @default(DRAFT)
   authorizationNumber String?
   authorizationDate   DateTime?
   sriErrors           Json?
@@ -369,6 +395,10 @@ model CreditNote {
   xmlPath       String?
   xmlSignedPath String?
   ridePdfPath   String?
+
+  // Auditoría y control
+  cancelledAt DateTime?
+  cancelReason String?
 
   // Metadata para integraciones (POS, etc)
   metadata Json?

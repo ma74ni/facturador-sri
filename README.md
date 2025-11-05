@@ -2,6 +2,369 @@
 
 Sistema completo de facturación electrónica compatible con las regulaciones del SRI (Servicio de Rentas Internas) de Ecuador. Incluye generación de XML, firma digital XAdES-BES, envío al SRI, y generación de RIDE (Representación Impresa del Documento Electrónico).
 
+## Guía de Instalación Rápida para Desarrollo Local
+
+### ⚠️ IMPORTANTE: Estructura Actual del Proyecto
+
+Este proyecto tiene **DOS backends** en diferentes estados:
+
+1. **`/backend/`** → ✅ **BACKEND ACTIVO** (úsalo para desarrollo)
+2. **`/packages/facturacion-core/`** → 🚧 Preparado para migración futura (NO usar ahora)
+
+**Para desarrollo local, usa el backend en `/backend/`**
+
+### Paso 1: Requisitos Previos
+
+Asegúrate de tener instalado:
+
+- **Node.js**: >= 18.0.0 → [Descargar](https://nodejs.org/)
+- **pnpm**: >= 8.0.0 → Instalar con `npm install -g pnpm`
+- **PostgreSQL**: 14+ (puede ser vía Docker)
+- **Redis**: (opcional) Para colas de trabajo
+
+Verificar instalación:
+```bash
+node --version  # Debe ser >= 18
+pnpm --version  # Debe ser >= 8
+```
+
+### Paso 2: Clonar e Instalar Dependencias
+
+```bash
+# Clonar repositorio
+git clone <repository-url>
+cd facturador-sri
+
+# Instalar dependencias del monorepo (raíz)
+pnpm install
+
+# Instalar dependencias del backend activo
+cd backend
+npm install
+cd ..
+
+# Instalar dependencias del frontend
+cd packages/web-facturacion
+pnpm install
+cd ../..
+```
+
+### Paso 3: Levantar PostgreSQL
+
+Tienes dos opciones:
+
+#### Opción A: PostgreSQL con Docker (Recomendado)
+
+```bash
+docker run -d \
+  --name facturador-postgres \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=facturador_db \
+  -p 5432:5432 \
+  postgres:16-alpine
+
+# Verificar que esté corriendo
+docker ps | grep postgres
+```
+
+#### Opción B: PostgreSQL Local
+
+Si tienes PostgreSQL instalado localmente:
+
+```bash
+# Crear base de datos
+createdb facturador_db
+
+# O con psql
+psql -U postgres -c "CREATE DATABASE facturador_db;"
+```
+
+### Paso 4: Levantar Signing Service (Microservicio de Firma Digital)
+
+```bash
+cd signing-service
+docker-compose up -d
+cd ..
+
+# Verificar health
+curl http://localhost:18081/api/v1/signature/health
+# Debe responder: {"status":"UP"}
+```
+
+### Paso 5: Configurar Variables de Entorno
+
+#### Backend (directorio `/backend/`)
+
+```bash
+# Copiar archivo de ejemplo
+cp backend/.env-example backend/.env
+
+# Editar el archivo backend/.env con tus configuraciones
+# Las configuraciones mínimas para desarrollo local ya están listas:
+# - DATABASE_URL: postgresql://postgres:postgres@localhost:5432/facturador_db?schema=public
+# - JWT_SECRET: tu-secret-super-seguro-cambiar-en-produccion
+# - PORT: 3000
+# - SIGNING_SERVICE_URL: http://localhost:18081
+```
+
+Variables importantes en `backend/.env`:
+
+```env
+# APPLICATION
+NODE_ENV=development
+PORT=3000
+API_PREFIX=api/v1
+
+# DATABASE
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/facturador_db?schema=public"
+
+# JWT
+JWT_SECRET=tu-secret-super-seguro-cambiar-en-produccion
+JWT_EXPIRATION=7d
+
+# CORS
+CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+
+# SRI Web Services (ambiente de pruebas)
+SRI_RECEPTION_URL_TEST=https://celcer.sri.gob.ec/comprobantes-electronicos-ws/RecepcionComprobantesOffline?wsdl
+SRI_AUTHORIZATION_URL_TEST=https://celcer.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline?wsdl
+
+# Signing Service
+SIGNING_SERVICE_URL=http://localhost:18081
+
+# Cloudflare R2 (dejar vacío para desarrollo local)
+R2_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET_NAME=
+
+# Mailjet (dejar vacío para desarrollo local)
+MAILJET_API_KEY=
+MAILJET_SECRET_KEY=
+```
+
+#### Frontend (directorio `/packages/web-facturacion/`)
+
+```bash
+# Crear archivo de configuración
+cat > packages/web-facturacion/.env.local << 'EOF'
+NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
+EOF
+```
+
+### Paso 6: Configurar Base de Datos
+
+```bash
+cd backend
+
+# Generar cliente de Prisma
+npx prisma generate
+
+# Aplicar migraciones a la base de datos
+npx prisma migrate deploy
+
+# O usar db push para desarrollo rápido (sin crear migración)
+npx prisma db push
+
+# Opcional: Ver la base de datos con Prisma Studio
+npx prisma studio
+# Se abre en http://localhost:5555
+
+cd ..
+```
+
+### Paso 7: Levantar Backend (Backend Activo en `/backend/`)
+
+```bash
+cd backend
+
+# Modo desarrollo (con hot-reload)
+npm run start:dev
+
+# El backend se levantará en http://localhost:3000
+```
+
+El backend estará disponible en:
+- **API Base**: http://localhost:3000
+- **API v1**: http://localhost:3000/api/v1
+- **Swagger Docs**: http://localhost:3000/api/docs
+- **Health Check**: http://localhost:3000/api/v1/health
+
+### Paso 8: Levantar Frontend (en otra terminal)
+
+```bash
+cd packages/web-facturacion
+
+# Modo desarrollo
+pnpm dev
+
+# El frontend se levantará en http://localhost:3001
+```
+
+El frontend estará disponible en:
+- **Web App**: http://localhost:3001
+
+### Paso 9: Verificación Final
+
+Abre tu navegador y verifica que todo esté funcionando:
+
+✅ **1. Backend API Health**
+```bash
+curl http://localhost:3000/api/v1/health
+# Debe responder: {"status":"ok"}
+```
+
+✅ **2. Swagger Docs**
+- Abre en navegador: http://localhost:3000/api/docs
+- Debe mostrar la documentación interactiva de la API
+
+✅ **3. Signing Service**
+```bash
+curl http://localhost:18081/api/v1/signature/health
+# Debe responder: {"status":"UP"}
+```
+
+✅ **4. Frontend**
+- Abre en navegador: http://localhost:3001
+- Debe mostrar la página de login/registro
+
+✅ **5. PostgreSQL**
+```bash
+docker ps | grep postgres
+# Debe mostrar el contenedor corriendo
+```
+
+### Resumen Rápido para Levantar Todo
+
+Una vez que todo esté configurado, estos son los comandos para levantar el proyecto:
+
+```bash
+# Terminal 1: PostgreSQL (si usas Docker)
+docker start facturador-postgres
+
+# Terminal 2: Signing Service
+cd signing-service && docker-compose up
+
+# Terminal 3: Backend
+cd backend && npm run start:dev
+
+# Terminal 4: Frontend
+cd packages/web-facturacion && pnpm dev
+```
+
+Luego abre http://localhost:3001 en tu navegador.
+
+---
+
+## Solución Rápida de Problemas
+
+### PostgreSQL no conecta
+
+```bash
+# Ver logs
+docker logs facturador-postgres
+
+# Reiniciar
+docker restart facturador-postgres
+
+# Verificar que esté escuchando en puerto 5432
+docker port facturador-postgres
+```
+
+### Backend no inicia - Error de Prisma
+
+```bash
+cd backend
+
+# Regenerar cliente Prisma
+npx prisma generate
+
+# Aplicar schema
+npx prisma db push
+
+# Si persiste el error, resetear DB (⚠️ elimina datos)
+npx prisma migrate reset
+```
+
+### Backend no inicia - Error de dependencias
+
+```bash
+cd backend
+
+# Limpiar node_modules
+rm -rf node_modules package-lock.json
+
+# Reinstalar
+npm install
+```
+
+### Signing Service no responde
+
+```bash
+cd signing-service
+
+# Ver logs
+docker-compose logs -f
+
+# Reiniciar
+docker-compose restart
+
+# Levantar de nuevo
+docker-compose up -d
+
+# Verificar
+curl http://localhost:18081/api/v1/signature/health
+```
+
+### Frontend no conecta con Backend
+
+```bash
+# 1. Verificar variable de entorno
+cat packages/web-facturacion/.env.local
+# Debe contener: NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
+
+# 2. Verificar que backend esté corriendo
+curl http://localhost:3000/api/v1/health
+
+# 3. Verificar CORS en backend/.env
+cat backend/.env | grep CORS_ORIGINS
+# Debe contener: CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+
+# 4. Reiniciar frontend
+cd packages/web-facturacion
+pnpm dev
+```
+
+### Error: "Port 3000 already in use"
+
+```bash
+# Encontrar proceso usando el puerto
+lsof -i :3000
+
+# Matar el proceso
+kill -9 <PID>
+
+# O cambiar el puerto en backend/.env
+PORT=3001
+```
+
+### Frontend muestra página en blanco
+
+```bash
+cd packages/web-facturacion
+
+# Limpiar cache de Next.js
+rm -rf .next
+
+# Reinstalar dependencias
+rm -rf node_modules
+pnpm install
+
+# Levantar de nuevo
+pnpm dev
+```
+
 ## Arquitectura del Proyecto
 
 Este es un **monorepo pnpm** que contiene múltiples paquetes:
