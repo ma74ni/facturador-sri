@@ -1,12 +1,10 @@
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["multiSchema"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["facturacion_core"]
 }
 
 // ==================== ENUMS ====================
@@ -17,14 +15,12 @@ enum Role {
   USER
   VIEWER
 
-  @@schema("facturacion_core")
 }
 
 enum SRIEnvironment {
   TEST
   PRODUCTION
 
-  @@schema("facturacion_core")
 }
 
 enum SRIStatus {
@@ -36,7 +32,6 @@ enum SRIStatus {
   ERROR      // Error en el proceso
   CANCELLED  // Cancelada antes de enviar al SRI
 
-  @@schema("facturacion_core")
 }
 
 enum CompanyStatus {
@@ -44,7 +39,6 @@ enum CompanyStatus {
   APPROVED
   REJECTED
 
-  @@schema("facturacion_core")
 }
 
 // ==================== USERS ====================
@@ -75,7 +69,6 @@ model User {
   @@index([email])
   @@index([companyId])
   @@index([verificationToken])
-  @@schema("facturacion_core")
   @@map("users")
 }
 
@@ -135,7 +128,6 @@ model Company {
   creditNotes    CreditNote[]
 
   @@index([ruc])
-  @@schema("facturacion_core")
   @@map("companies")
 }
 
@@ -160,7 +152,6 @@ model Establishment {
 
   @@unique([companyId, code])
   @@index([companyId])
-  @@schema("facturacion_core")
   @@map("establishments")
 }
 
@@ -183,7 +174,6 @@ model EmissionPoint {
 
   @@unique([establishmentId, code])
   @@index([establishmentId])
-  @@schema("facturacion_core")
   @@map("emission_points")
 }
 
@@ -212,7 +202,6 @@ model Customer {
   @@unique([companyId, identification])
   @@index([companyId])
   @@index([identification])
-  @@schema("facturacion_core")
   @@map("customers")
 }
 
@@ -239,7 +228,6 @@ model Product {
 
   @@unique([companyId, mainCode])
   @@index([companyId])
-  @@schema("facturacion_core")
   @@map("products")
 }
 
@@ -259,7 +247,6 @@ model EmailLog {
 
   @@index([invoiceId])
   @@index([status])
-  @@schema("facturacion_core")
   @@map("email_logs")
 }
 
@@ -324,7 +311,6 @@ model Invoice {
   @@index([sriStatus])
   @@index([companyId, issueDate])
   @@index([customerId])
-  @@schema("facturacion_core")
   @@map("invoices")
 }
 
@@ -346,7 +332,6 @@ model InvoiceItem {
   createdAt DateTime @default(now())
 
   @@index([invoiceId])
-  @@schema("facturacion_core")
   @@map("invoice_items")
 }
 
@@ -420,7 +405,6 @@ model CreditNote {
   @@index([companyId, issueDate])
   @@index([customerId])
   @@index([modifiedInvoiceId])
-  @@schema("facturacion_core")
   @@map("credit_notes")
 }
 
@@ -442,7 +426,6 @@ model CreditNoteItem {
   createdAt DateTime @default(now())
 
   @@index([creditNoteId])
-  @@schema("facturacion_core")
   @@map("credit_note_items")
 }
 
@@ -460,6 +443,5 @@ model CreditNoteEmailLog {
 
   @@index([creditNoteId])
   @@index([status])
-  @@schema("facturacion_core")
   @@map("credit_note_email_logs")
 }
