@@ -7,4 +7,4 @@ services:
     branch: dev
     rootDir: packages/facturacion-core
     buildCommand: cd ../.. && corepack enable && corepack prepare pnpm@latest --activate && pnpm install && pnpm --filter facturacion-core prisma:generate && pnpm --filter facturacion-core build
-    startCommand: npx prisma migrate deploy && npm run start:prod
+    startCommand: ./render-start.sh
