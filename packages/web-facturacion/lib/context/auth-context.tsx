@@ -87,14 +87,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (data: LoginFormData) => {
     try {
       const response = await apiClient.post('/auth/login', data);
-      const { access_token, user: userData, company: companyData } = response.data;
+      const { access_token, user: userData } = response.data;
 
       setToken(access_token);
       setUser(userData);
-      setCompany(companyData);
 
       localStorage.setItem('token', access_token);
       localStorage.setItem('user', JSON.stringify(userData));
+
+      // Obtener datos completos del perfil (incluyendo company)
+      try {
+        const profileResponse = await apiClient.get('/auth/profile');
+        setCompany(profileResponse.data.company);
+      } catch (profileError) {
+        console.error('Error al obtener datos de la empresa:', profileError);
+      }
 
       router.push('/dashboard');
     } catch (error: any) {
@@ -131,6 +138,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       localStorage.setItem('token', access_token);
       localStorage.setItem('user', JSON.stringify(userData));
+
+      // Obtener datos completos del perfil (por si acaso)
+      try {
+        const profileResponse = await apiClient.get('/auth/profile');
+        setCompany(profileResponse.data.company);
+      } catch (profileError) {
+        console.error('Error al obtener datos de la empresa:', profileError);
+        // No lanzamos error aquí porque ya tenemos companyData del registro
+      }
 
       router.push('/dashboard');
     } catch (error: any) {
