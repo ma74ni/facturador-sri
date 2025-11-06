@@ -119,6 +119,8 @@ export class AuthService {
         email: result.company.email,
         environment: result.company.environment,
         status: result.company.status,
+        phone: result.company.phone,
+        address: result.company.address,
       },
       access_token: token,
     };
@@ -208,6 +210,8 @@ export class AuthService {
             email: true,
             environment: true,
             status: true,
+            phone: true,
+            address: true,
           },
         },
       },

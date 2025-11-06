@@ -1,19 +1,14 @@
-# Fix: Migraciones automáticas en Render
+# Migraciones en Render - Configuración Manual
 
-## Problema Original
+## ⚠️ IMPORTANTE: Migraciones NO automáticas
 
-Las migraciones de Prisma NO se estaban ejecutando automáticamente en Render durante el deploy, causando que la base de datos en Supabase no tuviera las columnas nuevas (como `companies.status`), resultando en errores 500.
+Debido a problemas de conectividad con Supabase durante el deploy de Render, las migraciones de Prisma se deben aplicar **MANUALMENTE** antes de hacer deploy.
 
-## Causa Raíz
+## Problema
 
-El `startCommand` en `render.yaml` ejecutaba:
-```bash
-npx prisma migrate deploy && npm run start:prod
-```
+La conexión a Supabase durante el proceso de deploy de Render es inestable, causando timeouts y errores de autenticación cuando se intentan ejecutar migraciones automáticas con `prisma migrate deploy`.
 
-Pero se ejecutaba desde el directorio **raíz del monorepo** (`/opt/render/project/src/`), no desde `packages/facturacion-core/`, por lo que Prisma no encontraba el archivo `schema.prisma`.
-
-## Solución Implementada
+## Solución: Migraciones Manuales
 
 ### 1. Creado `render-start.sh`
 
