@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,15 +18,9 @@ import {
   AlertCircle,
   Plus
 } from 'lucide-react';
-import { invoicesApi, InvoiceStats } from '@/lib/api/invoices';
-import { customersApi } from '@/lib/api/customers';
-import { productsApi } from '@/lib/api/products';
-
-interface DashboardStats {
-  invoices: InvoiceStats;
-  customersCount: number;
-  productsCount: number;
-}
+import { useInvoices, useInvoiceStats } from '@/lib/hooks/use-invoices';
+import { useCustomers } from '@/lib/hooks/use-customers';
+import { useProducts } from '@/lib/hooks/use-products';
 
 interface RecentInvoice {
   id: string;
@@ -40,63 +34,31 @@ interface RecentInvoice {
 export default function DashboardPage() {
   const { user, company } = useAuth();
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<DashboardStats>({
-    invoices: {
-      total: 0,
-      authorized: 0,
-      pending: 0,
-      rejected: 0,
-      totalAmount: 0,
-    },
-    customersCount: 0,
-    productsCount: 0,
-  });
-  const [recentInvoices, setRecentInvoices] = useState<RecentInvoice[]>([]);
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
+  // React Query hooks - Se ejecutan en paralelo automáticamente
+  const { data: invoiceStats, isLoading: loadingStats } = useInvoiceStats();
+  const { data: customers = [], isLoading: loadingCustomers } = useCustomers();
+  const { data: products = [], isLoading: loadingProducts } = useProducts();
+  const { data: invoices = [], isLoading: loadingInvoices } = useInvoices();
 
-  const loadDashboardData = async () => {
-    try {
-      setLoading(true);
+  const loading = loadingStats || loadingCustomers || loadingProducts || loadingInvoices;
 
-      // Cargar estadísticas en paralelo
-      const [invoiceStats, customers, products, invoices] = await Promise.all([
-        invoicesApi.getStats(),
-        customersApi.getAll(),
-        productsApi.getAll(),
-        invoicesApi.getAll(),
-      ]);
+  // Calcular facturas recientes (memoizado)
+  const recentInvoices = useMemo<RecentInvoice[]>(() => {
+    if (!Array.isArray(invoices)) return [];
 
-      setStats({
-        invoices: invoiceStats,
-        customersCount: Array.isArray(customers) ? customers.length : 0,
-        productsCount: Array.isArray(products) ? products.length : 0,
-      });
-
-      // Obtener las últimas 5 facturas
-      if (Array.isArray(invoices)) {
-        const recent = invoices
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-          .slice(0, 5)
-          .map(inv => ({
-            id: inv.id,
-            sequential: `${inv.establishmentCode}-${inv.emissionPointCode}-${inv.sequential}`,
-            customerName: inv.customerName,
-            issueDate: new Date(inv.issueDate).toLocaleDateString('es-EC'),
-            totalAmount: inv.totalAmount,
-            status: inv.status,
-          }));
-        setRecentInvoices(recent);
-      }
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    return invoices
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5)
+      .map(inv => ({
+        id: inv.id,
+        sequential: `${inv.establishmentCode}-${inv.emissionPointCode}-${inv.sequential}`,
+        customerName: inv.customerName,
+        issueDate: new Date(inv.issueDate).toLocaleDateString('es-EC'),
+        totalAmount: inv.totalAmount,
+        status: inv.status,
+      }));
+  }, [invoices]);
 
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline', icon: any, label: string }> = {
@@ -127,28 +89,28 @@ export default function DashboardPage() {
   const statsCards = [
     {
       title: 'Facturas Totales',
-      value: loading ? '...' : stats.invoices.total.toString(),
+      value: loading ? '...' : (invoiceStats?.total || 0).toString(),
       icon: FileText,
-      description: `${stats.invoices.authorized} autorizadas, ${stats.invoices.pending} pendientes`,
+      description: `${invoiceStats?.authorized || 0} autorizadas, ${invoiceStats?.pending || 0} pendientes`,
       color: 'text-blue-600',
     },
     {
       title: 'Ingresos Totales',
-      value: loading ? '...' : formatCurrency(stats.invoices.totalAmount),
+      value: loading ? '...' : formatCurrency(invoiceStats?.totalAmount || 0),
       icon: DollarSign,
       description: 'Total facturado',
       color: 'text-green-600',
     },
     {
       title: 'Clientes',
-      value: loading ? '...' : stats.customersCount.toString(),
+      value: loading ? '...' : customers.length.toString(),
       icon: Users,
       description: 'clientes registrados',
       color: 'text-purple-600',
     },
     {
       title: 'Productos',
-      value: loading ? '...' : stats.productsCount.toString(),
+      value: loading ? '...' : products.length.toString(),
       icon: Package,
       description: 'en catálogo',
       color: 'text-orange-600',

@@ -2,7 +2,7 @@
 
 ## ⚠️ IMPORTANTE: Migraciones NO automáticas
 
-Debido a problemas de conectividad con Supabase durante el deploy de Render, las migraciones de Prisma se deben aplicar **MANUALMENTE** antes de hacer deploy.
+Debido a problemas de conectividad con Supabase durante el deploy de Render, las migraciones de Prisma se deben aplicar **MANUALMENTE** en Supabase SQL Editor antes de hacer deploy.
 
 ## Problema
 
@@ -10,13 +10,9 @@ La conexión a Supabase durante el proceso de deploy de Render es inestable, cau
 
 ## Solución: Migraciones Manuales
 
-### 1. Creado `render-start.sh`
+### 1. `render-start.sh` simplificado
 
-Script que:
-- Se ejecuta desde el directorio correcto (`packages/facturacion-core/`)
-- Ejecuta `npx prisma migrate deploy` antes de iniciar la app
-- Muestra mensajes claros de progreso
-- Maneja errores con `set -e`
+El script ahora solo inicia la aplicación, **sin ejecutar migraciones**:
 
 ```bash
 #!/bin/bash
@@ -24,34 +20,29 @@ set -e
 
 echo "🚀 Starting application in production..."
 
-# Aplicar migraciones de base de datos
-echo "🔄 Running database migrations..."
-npx prisma migrate deploy
-
-echo "✅ Migrations completed!"
-
 # Iniciar aplicación
 echo "🎯 Starting NestJS application..."
 npm run start:prod
 ```
 
-### 2. Actualizado `render.yaml`
+### 2. `render.yaml`
 
-Cambiado el `startCommand` de:
-```yaml
-startCommand: npx prisma migrate deploy && npm run start:prod
-```
-
-A:
 ```yaml
 startCommand: ./render-start.sh
 ```
 
-Esto asegura que el script se ejecute desde el directorio correcto con el contexto adecuado.
-
 ## Cómo Funciona Ahora
 
-### Durante cada deploy en Render:
+### Antes de cada deploy en Render:
+
+1. **Aplicar migraciones manualmente en Supabase SQL Editor** (ver `MANUAL-MIGRATIONS.md`)
+   - Identificar migraciones pendientes en `prisma/migrations/`
+   - Copiar el SQL de cada migración
+   - Ejecutar en Supabase SQL Editor
+   - ⚠️ **IMPORTANTE**: ENUMs requieren ejecutar cada `ALTER TYPE ADD VALUE` por separado
+   - Verificar que se aplicaron: `SELECT * FROM "_prisma_migrations" ORDER BY finished_at DESC`
+
+### Durante el deploy en Render:
 
 1. **Build Phase** (`buildCommand`):
    - Instala dependencias con pnpm
@@ -60,77 +51,83 @@ Esto asegura que el script se ejecute desde el directorio correcto con el contex
 
 2. **Start Phase** (`startCommand`):
    - ✅ **Ejecuta `render-start.sh`**
-   - ✅ **Aplica migraciones pendientes** con `prisma migrate deploy`
    - ✅ **Inicia el backend** con `npm run start:prod`
+   - ❌ **NO ejecuta migraciones** (ya aplicadas manualmente)
 
 ### Ventajas:
 
-- ✅ **Migraciones automáticas**: No necesitas aplicarlas manualmente en Supabase
-- ✅ **Seguro**: Si las migraciones fallan, el backend no inicia
-- ✅ **Consistente**: Mismo proceso en cada deploy
-- ✅ **Visible en logs**: Puedes ver en los logs de Render si las migraciones se aplicaron
+- ✅ **Evita errores de conexión**: No depende de conectividad inestable durante deploy
+- ✅ **Control total**: Aplicas migraciones cuando quieras, no durante deploy
+- ✅ **Previsible**: Puedes verificar migraciones antes de deploy
+- ✅ **Manejo de ENUMs**: Puedes ejecutar ALTER TYPE por separado sin problemas
 
-## Verificación
+## Proceso completo para nuevas migraciones
 
-Después del próximo deploy, verás en los logs de Render:
+### Paso 1: Crear migración en local
 
-```
-🚀 Starting application in production...
-🔄 Running database migrations...
-Prisma schema loaded from prisma/schema.prisma
-Datasource "db": PostgreSQL database "postgres" at "db.xxxx.supabase.co:5432"
-
-2 migrations found in prisma/migrations
-
-Applying migration `20251029110350_add_email_verification_and_company_status`
-Applying migration `20251030231045_add_draft_cancelled_states`
-
-The following migrations have been applied:
-
-migrations/
-  └─ 20251029110350_add_email_verification_and_company_status/
-      └─ migration.sql
-  └─ 20251030231045_add_draft_cancelled_states/
-      └─ migration.sql
-
-✅ Migrations completed!
-🎯 Starting NestJS application...
-[Nest] 87  - 11/05/2025, 9:45:00 PM     LOG [NestFactory] Starting Nest application...
+```bash
+cd packages/facturacion-core
+npx prisma migrate dev --name descripcion_cambio
 ```
 
-## Archivos Modificados
+### Paso 2: Aplicar manualmente en Supabase
+
+1. Ir a https://supabase.com/dashboard → SQL Editor
+2. Copiar contenido de `prisma/migrations/[TIMESTAMP]_[nombre]/migration.sql`
+3. Si hay ENUMs, ejecutar cada `ALTER TYPE ADD VALUE` por separado
+4. Ejecutar el resto de la migración
+5. Verificar: `SELECT * FROM "_prisma_migrations" ORDER BY finished_at DESC`
+
+### Paso 3: Deploy a Render
+
+```bash
+git add .
+git commit -m "feat: nueva funcionalidad con migraciones"
+git push origin dev  # Trigger deploy automático
+```
+
+## Archivos del sistema
 
 ```
 packages/facturacion-core/
-├── render-start.sh (nuevo - script de inicio con migraciones)
-├── render-migrate.sh (nuevo - script standalone de migraciones)
-└── render.yaml (modificado - usa render-start.sh)
+├── render-start.sh (script simplificado - solo inicia app)
+├── render.yaml (usa render-start.sh)
+├── MANUAL-MIGRATIONS.md (guía detallada de migraciones manuales)
+└── RENDER-MIGRATIONS-FIX.md (este archivo)
 ```
 
 ## Troubleshooting
 
-### Si las migraciones fallan en Render:
+### Error: "Column does not exist" después del deploy
 
-1. Revisar logs en Render Dashboard
-2. Verificar que `DATABASE_URL` esté correcta en las variables de entorno
-3. Verificar que Supabase esté activo y accesible
-4. Si es necesario, aplicar manualmente en Supabase SQL Editor
+**Causa**: Olvidaste aplicar las migraciones en Supabase antes del deploy.
 
-### Para aplicar migraciones manualmente:
+**Solución**:
+1. Aplica las migraciones manualmente en Supabase SQL Editor
+2. Reinicia el servicio en Render (no necesitas re-deploy)
+
+### Error: "unsafe use of new value of enum"
+
+**Causa**: Intentaste agregar múltiples valores a un ENUM en la misma transacción.
+
+**Solución**: Ejecuta cada `ALTER TYPE ADD VALUE` por separado (ver `MANUAL-MIGRATIONS.md`).
+
+### Ver migraciones pendientes
 
 ```bash
-# Desde packages/facturacion-core/
-npx prisma migrate deploy
+cd packages/facturacion-core
+npx prisma migrate status
 ```
 
 ## Notas Importantes
 
-- **Schema flexible**: El `schema.prisma` ya no usa `multiSchema`, funciona con cualquier schema (public o facturacion_core)
-- **Compatible con local**: Las migraciones funcionan igual en desarrollo local
-- **Variables de entorno**: Render debe tener `DATABASE_URL` apuntando a Supabase
+- **Schema flexible**: El `schema.prisma` no usa `multiSchema`, funciona con cualquier schema (public o facturacion_core)
+- **Compatible con local**: Las migraciones locales usan `npx prisma migrate dev`
+- **Variables de entorno**: Render debe tener `DATABASE_URL` apuntando a Supabase con pooler connection
+- **Documentación detallada**: Ver `MANUAL-MIGRATIONS.md` para proceso completo
 
 ---
 
-**Fecha**: 2025-11-05
-**Versión**: 1.4.1
-**Estado**: ✅ Implementado y testeado
+**Fecha**: 2025-11-06
+**Versión**: 1.5.0
+**Estado**: ✅ Implementado - Migraciones manuales únicamente

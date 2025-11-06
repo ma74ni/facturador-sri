@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,47 +17,28 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Plus, Search, Edit, Trash2, DollarSign, Package, Loader2 } from 'lucide-react';
-import { productsApi, Product, CreateProductDto } from '@/lib/api/products';
+import { Product, CreateProductDto } from '@/lib/api/products';
 import { ProductDialog } from '@/components/products/product-dialog';
-import { useToast } from '@/hooks/use-toast';
 import { getTaxLabel } from '@/lib/constants/tax-codes';
+import {
+  useProducts,
+  useCreateProduct,
+  useUpdateProduct,
+  useDeleteProduct,
+} from '@/lib/hooks/use-products';
 
 export default function ProductosPage() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
-  const { toast } = useToast();
 
-  const loadProducts = async () => {
-    try {
-      setLoading(true);
-      const data = await productsApi.getAll();
-      console.log('Datos recibidos del backend:', data);
-      console.log('Es un array?', Array.isArray(data));
-      console.log('Cantidad de productos:', data?.length);
-      setProducts(Array.isArray(data) ? data : []);
-    } catch (error: any) {
-      console.error('Error al cargar productos:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.response?.data?.message || 'Error al cargar productos',
-      });
-      setProducts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Mover función antes de useEffect para evitar warning de setState durante render
-  useEffect(() => {
-    loadProducts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // React Query hooks
+  const { data: products = [], isLoading } = useProducts();
+  const createProduct = useCreateProduct();
+  const updateProduct = useUpdateProduct();
+  const deleteProduct = useDeleteProduct();
 
   const handleCreate = () => {
     setSelectedProduct(undefined);
@@ -72,26 +53,13 @@ export default function ProductosPage() {
   const handleSave = async (data: CreateProductDto) => {
     try {
       if (selectedProduct) {
-        await productsApi.update(selectedProduct.id, data);
-        toast({
-          title: 'Producto actualizado',
-          description: 'El producto se ha actualizado correctamente',
-        });
+        await updateProduct.mutateAsync({ id: selectedProduct.id, data });
       } else {
-        await productsApi.create(data);
-        toast({
-          title: 'Producto creado',
-          description: 'El producto se ha creado correctamente',
-        });
+        await createProduct.mutateAsync(data);
       }
-      await loadProducts();
       setDialogOpen(false);
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.response?.data?.message || 'Error al guardar el producto',
-      });
+    } catch (error) {
+      // Error handled by mutation hooks
       throw error;
     }
   };
@@ -105,19 +73,11 @@ export default function ProductosPage() {
     if (!productToDelete) return;
 
     try {
-      await productsApi.delete(productToDelete.id);
-      toast({
-        title: 'Producto eliminado',
-        description: 'El producto se ha eliminado correctamente',
-      });
-      await loadProducts();
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.response?.data?.message || 'Error al eliminar el producto',
-      });
-    } finally {
+      await deleteProduct.mutateAsync(productToDelete.id);
+      setDeleteDialogOpen(false);
+      setProductToDelete(null);
+    } catch (error) {
+      // Error handled by mutation hook
       setDeleteDialogOpen(false);
       setProductToDelete(null);
     }
@@ -182,7 +142,7 @@ export default function ProductosPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
