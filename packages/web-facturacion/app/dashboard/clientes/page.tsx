@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,46 +17,27 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Plus, Search, Edit, Trash2, Mail, Phone, MapPin, Loader2 } from 'lucide-react';
-import { customersApi, Customer, CreateCustomerDto } from '@/lib/api/customers';
+import { Customer, CreateCustomerDto } from '@/lib/api/customers';
 import { CustomerDialog } from '@/components/customers/customer-dialog';
-import { useToast } from '@/hooks/use-toast';
+import {
+  useCustomers,
+  useCreateCustomer,
+  useUpdateCustomer,
+  useDeleteCustomer,
+} from '@/lib/hooks/use-customers';
 
 export default function ClientesPage() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | undefined>();
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
-  const { toast } = useToast();
 
-  const loadCustomers = async () => {
-    try {
-      setLoading(true);
-      const data = await customersApi.getAll();
-      console.log('Datos recibidos del backend:', data);
-      console.log('Es un array?', Array.isArray(data));
-      console.log('Cantidad de clientes:', data?.length);
-      setCustomers(Array.isArray(data) ? data : []);
-    } catch (error: any) {
-      console.error('Error al cargar clientes:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.response?.data?.message || 'Error al cargar clientes',
-      });
-      setCustomers([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Cargar clientes al montar el componente
-  useEffect(() => {
-    loadCustomers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // React Query hooks
+  const { data: customers = [], isLoading } = useCustomers();
+  const createCustomer = useCreateCustomer();
+  const updateCustomer = useUpdateCustomer();
+  const deleteCustomer = useDeleteCustomer();
 
   const handleCreate = () => {
     setSelectedCustomer(undefined);
@@ -71,26 +52,13 @@ export default function ClientesPage() {
   const handleSave = async (data: CreateCustomerDto) => {
     try {
       if (selectedCustomer) {
-        await customersApi.update(selectedCustomer.id, data);
-        toast({
-          title: 'Cliente actualizado',
-          description: 'El cliente se ha actualizado correctamente',
-        });
+        await updateCustomer.mutateAsync({ id: selectedCustomer.id, data });
       } else {
-        await customersApi.create(data);
-        toast({
-          title: 'Cliente creado',
-          description: 'El cliente se ha creado correctamente',
-        });
+        await createCustomer.mutateAsync(data);
       }
-      await loadCustomers();
       setDialogOpen(false);
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.response?.data?.message || 'Error al guardar el cliente',
-      });
+    } catch (error) {
+      // Error handled by mutation hooks
       throw error;
     }
   };
@@ -104,19 +72,11 @@ export default function ClientesPage() {
     if (!customerToDelete) return;
 
     try {
-      await customersApi.delete(customerToDelete.id);
-      toast({
-        title: 'Cliente eliminado',
-        description: 'El cliente se ha eliminado correctamente',
-      });
-      await loadCustomers();
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.response?.data?.message || 'Error al eliminar el cliente',
-      });
-    } finally {
+      await deleteCustomer.mutateAsync(customerToDelete.id);
+      setDeleteDialogOpen(false);
+      setCustomerToDelete(null);
+    } catch (error) {
+      // Error handled by mutation hook
       setDeleteDialogOpen(false);
       setCustomerToDelete(null);
     }
@@ -182,7 +142,7 @@ export default function ClientesPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>

@@ -34,30 +34,29 @@ import {
   Trash2
 } from 'lucide-react';
 import { invoicesApi, Invoice, CreateInvoiceDto, InvoiceStats } from '@/lib/api/invoices';
-import { customersApi, Customer } from '@/lib/api/customers';
-import { productsApi, Product } from '@/lib/api/products';
-import { establishmentsApi, Establishment } from '@/lib/api/establishments';
+import { Customer } from '@/lib/api/customers';
+import { Product } from '@/lib/api/products';
+import { Establishment } from '@/lib/api/establishments';
 import { InvoiceDialog } from '@/components/invoices/invoice-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useInvoices, useInvoiceStats } from '@/lib/hooks/use-invoices';
+import { useCustomers } from '@/lib/hooks/use-customers';
+import { useProducts } from '@/lib/hooks/use-products';
+import { useEstablishments } from '@/lib/hooks/use-establishments';
 
 export default function FacturasPage() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [loading, setLoading] = useState(false);
 
-  // Data
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [establishments, setEstablishments] = useState<Establishment[]>([]);
-  const [stats, setStats] = useState<InvoiceStats>({
-    total: 0,
-    authorized: 0,
-    pending: 0,
-    rejected: 0,
-    totalAmount: 0,
-  });
+  // React Query hooks - Se ejecutan en paralelo y usan caché
+  const { data: invoices = [], isLoading: loadingInvoices, refetch: refetchInvoices } = useInvoices();
+  const { data: customers = [], isLoading: loadingCustomers } = useCustomers();
+  const { data: products = [], isLoading: loadingProducts } = useProducts();
+  const { data: establishments = [], isLoading: loadingEstablishments } = useEstablishments();
+  const { data: stats, isLoading: loadingStats, refetch: refetchStats } = useInvoiceStats();
+
+  const loading = loadingInvoices || loadingCustomers || loadingProducts || loadingEstablishments || loadingStats;
 
   // Dialog states
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
@@ -65,65 +64,13 @@ export default function FacturasPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
 
-  // Load all data
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [invoicesData, customersData, productsData, establishmentsData, statsData] = await Promise.all([
-        invoicesApi.getAll(),
-        customersApi.getAll(),
-        productsApi.getAll(),
-        establishmentsApi.getAll(),
-        invoicesApi.getStats(),
-      ]);
-
-      setInvoices(Array.isArray(invoicesData) ? invoicesData : []);
-      setCustomers(Array.isArray(customersData) ? customersData : []);
-      setProducts(Array.isArray(productsData) ? productsData : []);
-      setEstablishments(Array.isArray(establishmentsData) ? establishmentsData : []);
-      setStats({
-        total: statsData?.total ?? 0,
-        authorized: statsData?.authorized ?? 0,
-        pending: statsData?.pending ?? 0,
-        rejected: statsData?.rejected ?? 0,
-        totalAmount: statsData?.totalAmount ?? 0,
-      });
-    } catch (error: any) {
-      console.error('Error loading data:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.response?.data?.message || 'Error al cargar datos',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
   const facturas = invoices;
 
-  // Load individual resources
-  const loadCustomers = async () => {
-    try {
-      const customersData = await customersApi.getAll();
-      setCustomers(Array.isArray(customersData) ? customersData : []);
-    } catch (error) {
-      console.error('Error loading customers:', error);
-    }
+  // Helper para refrescar datos después de crear/modificar facturas
+  const loadData = async () => {
+    await Promise.all([refetchInvoices(), refetchStats()]);
   };
 
-  const loadProducts = async () => {
-    try {
-      const productsData = await productsApi.getAll();
-      setProducts(Array.isArray(productsData) ? productsData : []);
-    } catch (error) {
-      console.error('Error loading products:', error);
-    }
-  };
 
   // Handlers
   const handleCreateInvoice = async (data: CreateInvoiceDto) => {
@@ -626,8 +573,6 @@ export default function FacturasPage() {
         customers={customers}
         products={products}
         establishments={establishments}
-        onCustomerCreated={loadCustomers}
-        onProductCreated={loadProducts}
       />
 
       {/* Delete Confirmation Dialog */}

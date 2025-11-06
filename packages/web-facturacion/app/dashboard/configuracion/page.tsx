@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/lib/context/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,8 +36,6 @@ import {
   User
 } from 'lucide-react';
 import {
-  establishmentsApi,
-  emissionPointsApi,
   Establishment,
   EmissionPoint,
   CreateEstablishmentDto,
@@ -48,6 +46,14 @@ import { EstablishmentDialog } from '@/components/establishments/establishment-d
 import { EmissionPointDialog } from '@/components/establishments/emission-point-dialog';
 import { CertificateManager } from '@/components/certificates/certificate-manager';
 import { useToast } from '@/hooks/use-toast';
+import {
+  useEstablishments,
+  useCreateEstablishment,
+  useUpdateEstablishment,
+  useDeleteEstablishment,
+  useCreateEmissionPoint,
+  useDeleteEmissionPoint,
+} from '@/lib/hooks/use-establishments';
 
 interface UserData {
   id: string;
@@ -62,9 +68,15 @@ export default function ConfiguracionPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'establishments' | 'users' | 'security' | 'certificate'>('establishments');
 
-  // Establishments state
-  const [establishments, setEstablishments] = useState<Establishment[]>([]);
-  const [loading, setLoading] = useState(false);
+  // React Query hooks
+  const { data: establishments = [], isLoading: loading } = useEstablishments();
+  const createEstablishment = useCreateEstablishment();
+  const updateEstablishment = useUpdateEstablishment();
+  const deleteEstablishment = useDeleteEstablishment();
+  const createEmissionPoint = useCreateEmissionPoint();
+  const deleteEmissionPointMutation = useDeleteEmissionPoint();
+
+  // Dialog states
   const [establishmentDialogOpen, setEstablishmentDialogOpen] = useState(false);
   const [emissionPointDialogOpen, setEmissionPointDialogOpen] = useState(false);
   const [selectedEstablishment, setSelectedEstablishment] = useState<Establishment | undefined>();
@@ -82,29 +94,6 @@ export default function ConfiguracionPage() {
     // Lista vacía por ahora - pendiente implementar
   ];
 
-  // Load establishments
-  const loadEstablishments = async () => {
-    try {
-      setLoading(true);
-      const data = await establishmentsApi.getAll();
-      setEstablishments(Array.isArray(data) ? data : []);
-    } catch (error: any) {
-      console.error('Error loading establishments:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.response?.data?.message || 'Error al cargar establecimientos',
-      });
-      setEstablishments([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadEstablishments();
-  }, []);
-
   // Establishment handlers
   const handleCreateEstablishment = () => {
     setSelectedEstablishment(undefined);
@@ -119,45 +108,27 @@ export default function ConfiguracionPage() {
   const handleSaveEstablishment = async (data: CreateEstablishmentDto | UpdateEstablishmentDto) => {
     try {
       if (selectedEstablishment) {
-        await establishmentsApi.update(selectedEstablishment.id, data as UpdateEstablishmentDto);
-        toast({
-          title: 'Establecimiento actualizado',
-          description: 'Los cambios han sido guardados correctamente',
+        await updateEstablishment.mutateAsync({
+          id: selectedEstablishment.id,
+          data: data as UpdateEstablishmentDto
         });
       } else {
-        await establishmentsApi.create(data as CreateEstablishmentDto);
-        toast({
-          title: 'Establecimiento creado',
-          description: 'El establecimiento ha sido creado correctamente',
-        });
+        await createEstablishment.mutateAsync(data as CreateEstablishmentDto);
       }
-      await loadEstablishments();
-    } catch (error: any) {
-      console.error('Error saving establishment:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.response?.data?.message || 'Error al guardar el establecimiento',
-      });
+      setEstablishmentDialogOpen(false);
+    } catch (error) {
+      // Error handled by mutation hooks
       throw error;
     }
   };
 
   const handleDeleteEstablishment = async (id: string) => {
     try {
-      await establishmentsApi.delete(id);
-      toast({
-        title: 'Establecimiento eliminado',
-        description: 'El establecimiento ha sido eliminado correctamente',
-      });
-      await loadEstablishments();
-    } catch (error: any) {
-      console.error('Error deleting establishment:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.response?.data?.message || 'Error al eliminar el establecimiento',
-      });
+      await deleteEstablishment.mutateAsync(id);
+      setDeleteEstablishmentId(null);
+    } catch (error) {
+      // Error handled by mutation hook
+      setDeleteEstablishmentId(null);
     }
   };
 
@@ -171,38 +142,25 @@ export default function ConfiguracionPage() {
     if (!emissionPointEstablishment) return;
 
     try {
-      await emissionPointsApi.create(emissionPointEstablishment.id, data);
-      toast({
-        title: 'Punto de emisión creado',
-        description: 'El punto de emisión ha sido creado correctamente',
+      await createEmissionPoint.mutateAsync({
+        establishmentId: emissionPointEstablishment.id,
+        data
       });
-      await loadEstablishments();
-    } catch (error: any) {
-      console.error('Error creating emission point:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.response?.data?.message || 'Error al crear el punto de emisión',
-      });
+      setEmissionPointDialogOpen(false);
+      setEmissionPointEstablishment(null);
+    } catch (error) {
+      // Error handled by mutation hook
       throw error;
     }
   };
 
   const handleDeleteEmissionPoint = async (establishmentId: string, emissionPointId: string) => {
     try {
-      await emissionPointsApi.delete(establishmentId, emissionPointId);
-      toast({
-        title: 'Punto de emisión eliminado',
-        description: 'El punto de emisión ha sido eliminado correctamente',
-      });
-      await loadEstablishments();
-    } catch (error: any) {
-      console.error('Error deleting emission point:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.response?.data?.message || 'Error al eliminar el punto de emisión',
-      });
+      await deleteEmissionPointMutation.mutateAsync({ establishmentId, emissionPointId });
+      setDeleteEmissionPoint(null);
+    } catch (error) {
+      // Error handled by mutation hook
+      setDeleteEmissionPoint(null);
     }
   };
 
