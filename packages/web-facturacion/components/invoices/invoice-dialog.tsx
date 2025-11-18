@@ -22,14 +22,16 @@ import {
 } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CreateInvoiceDto, InvoiceItemDto } from '@/lib/api/invoices';
-import { Customer, CreateCustomerDto, customersApi } from '@/lib/api/customers';
-import { Product, CreateProductDto, productsApi } from '@/lib/api/products';
+import { Customer, CreateCustomerDto } from '@/lib/api/customers';
+import { Product, CreateProductDto } from '@/lib/api/products';
 import { Establishment } from '@/lib/api/establishments';
 import { AlertCircle, Plus, Trash2, UserPlus, PackagePlus, Search, Check } from 'lucide-react';
 import { getTaxPercentage } from '@/lib/constants/tax-codes';
 import { CustomerDialog } from '@/components/customers/customer-dialog';
 import { ProductDialog } from '@/components/products/product-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useCreateCustomer } from '@/lib/hooks/use-customers';
+import { useCreateProduct } from '@/lib/hooks/use-products';
 
 interface InvoiceDialogProps {
   open: boolean;
@@ -38,8 +40,6 @@ interface InvoiceDialogProps {
   customers: Customer[];
   products: Product[];
   establishments: Establishment[];
-  onCustomerCreated?: () => void;
-  onProductCreated?: () => void;
 }
 
 interface InvoiceItemWithCalc extends InvoiceItemDto {
@@ -85,10 +85,10 @@ export function InvoiceDialog({
   customers,
   products,
   establishments,
-  onCustomerCreated,
-  onProductCreated,
 }: InvoiceDialogProps) {
   const { toast } = useToast();
+  const createCustomerMutation = useCreateCustomer();
+  const createProductMutation = useCreateProduct();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
@@ -311,42 +311,22 @@ export function InvoiceDialog({
 
   const handleCreateCustomer = async (data: CreateCustomerDto) => {
     try {
-      const newCustomer = await customersApi.create(data);
-      const customerName = getCustomerDisplayName(newCustomer);
-
-      toast({
-        title: 'Cliente creado',
-        description: `${customerName} ha sido creado exitosamente.`,
-      });
+      const newCustomer = await createCustomerMutation.mutateAsync(data);
       setShowCustomerDialog(false);
       setSelectedCustomer(newCustomer.id);
-      if (onCustomerCreated) await onCustomerCreated();
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.message || 'No se pudo crear el cliente',
-        variant: 'destructive',
-      });
+      // Error handling is done in the mutation hook
       throw error;
     }
   };
 
   const handleCreateProduct = async (data: CreateProductDto) => {
     try {
-      const newProduct = await productsApi.create(data);
-      toast({
-        title: 'Producto creado',
-        description: `${newProduct.name} ha sido creado exitosamente.`,
-      });
+      const newProduct = await createProductMutation.mutateAsync(data);
       setShowProductDialog(false);
       setSelectedProduct(newProduct.id);
-      if (onProductCreated) await onProductCreated();
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.message || 'No se pudo crear el producto',
-        variant: 'destructive',
-      });
+      // Error handling is done in the mutation hook
       throw error;
     }
   };

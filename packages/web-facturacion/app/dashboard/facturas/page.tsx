@@ -63,6 +63,7 @@ export default function FacturasPage() {
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
+  const [deletingInvoice, setDeletingInvoice] = useState(false);
 
   const facturas = invoices;
 
@@ -213,7 +214,7 @@ export default function FacturasPage() {
     if (!invoiceToDelete) return;
 
     try {
-      setLoading(true);
+      setDeletingInvoice(true);
       await invoicesApi.delete(invoiceToDelete.id);
       toast({
         title: 'Factura eliminada',
@@ -230,7 +231,7 @@ export default function FacturasPage() {
         description: error.response?.data?.message || 'No se pudo eliminar la factura',
       });
     } finally {
-      setLoading(false);
+      setDeletingInvoice(false);
     }
   };
 
@@ -283,7 +284,7 @@ export default function FacturasPage() {
       </div>
 
       {/* Stats */}
-      {facturas.length > 0 && (
+      {facturas.length > 0 && stats && (
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -599,13 +600,13 @@ export default function FacturasPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={loading}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={deletingInvoice}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteConfirm}
-              disabled={loading}
+              disabled={deletingInvoice}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {loading ? 'Eliminando...' : 'Eliminar'}
+              {deletingInvoice ? 'Eliminando...' : 'Eliminar'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
