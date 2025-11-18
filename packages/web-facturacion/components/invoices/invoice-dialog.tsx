@@ -26,12 +26,12 @@ import { Customer, CreateCustomerDto } from '@/lib/api/customers';
 import { Product, CreateProductDto } from '@/lib/api/products';
 import { Establishment } from '@/lib/api/establishments';
 import { AlertCircle, Plus, Trash2, UserPlus, PackagePlus, Search, Check } from 'lucide-react';
-import { getTaxPercentage } from '@/lib/constants/tax-codes';
 import { CustomerDialog } from '@/components/customers/customer-dialog';
 import { ProductDialog } from '@/components/products/product-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useCreateCustomer } from '@/lib/hooks/use-customers';
 import { useCreateProduct } from '@/lib/hooks/use-products';
+import { useTaxCodes, getTaxPercentage } from '@/lib/hooks/use-tax-codes';
 
 interface InvoiceDialogProps {
   open: boolean;
@@ -89,6 +89,7 @@ export function InvoiceDialog({
   const { toast } = useToast();
   const createCustomerMutation = useCreateCustomer();
   const createProductMutation = useCreateProduct();
+  const { data: taxCodesData, isLoading: taxCodesLoading } = useTaxCodes();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
@@ -187,7 +188,7 @@ export function InvoiceDialog({
   ): { subtotal: number; taxValue: number; total: number } => {
     const subtotal = unitPrice * qty;
     const subtotalAfterDiscount = subtotal - disc;
-    const taxPercentage = getTaxPercentage(taxCode);
+    const taxPercentage = getTaxPercentage(taxCodesData?.taxCodes || [], taxCode);
     const taxValue = subtotalAfterDiscount * (taxPercentage / 100);
     const total = subtotalAfterDiscount + taxValue;
 

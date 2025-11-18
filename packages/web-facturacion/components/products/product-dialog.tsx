@@ -23,7 +23,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Product, CreateProductDto } from '@/lib/api/products';
 import { AlertCircle } from 'lucide-react';
-import { getTaxLabel, getAllTaxCodes, COMMON_TAX_CODES } from '@/lib/constants/tax-codes';
+import { useTaxCodes, getTaxLabel } from '@/lib/hooks/use-tax-codes';
 
 interface ProductDialogProps {
   open: boolean;
@@ -33,6 +33,7 @@ interface ProductDialogProps {
 }
 
 export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDialogProps) {
+  const { data: taxCodesData, isLoading: taxCodesLoading } = useTaxCodes();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState<CreateProductDto>({
@@ -274,32 +275,37 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {COMMON_TAX_CODES.map((code) => (
-                  <SelectItem key={code} value={code}>
-                    {getTaxLabel(code)}
+                {taxCodesLoading ? (
+                  <SelectItem value="loading" disabled>
+                    Cargando...
                   </SelectItem>
-                ))}
+                ) : (
+                  taxCodesData?.commonCodes.map((code) => (
+                    <SelectItem key={code} value={code}>
+                      {getTaxLabel(taxCodesData.taxCodes, code)}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
               Selecciona el tipo de IVA que aplica a este producto según la normativa del SRI
             </p>
           </div>
-
           {/* Margen de Ganancia (Informativo) */}
-          {formData.cost && formData.cost > 0 && formData.unitPrice > 0 && (
+          {/* {formData.cost && formData.cost > 0 && formData.unitPrice > 0 && (
             <div className="rounded-lg bg-slate-100 p-4">
+              jjjj
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Margen de Ganancia:</span>
-                <span className="text-lg font-bold">
-                  {((formData.unitPrice - formData.cost) / formData.cost * 100).toFixed(1)}%
-                </span>
+                kkkk
               </div>
               <div className="mt-2 text-xs text-muted-foreground">
                 Ganancia: ${(formData.unitPrice - formData.cost).toFixed(2)}
               </div>
+              ffff
             </div>
-          )}
+          )} */}
 
           <DialogFooter>
             <Button
