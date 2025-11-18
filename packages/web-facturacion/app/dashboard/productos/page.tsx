@@ -19,7 +19,7 @@ import {
 import { Plus, Search, Edit, Trash2, DollarSign, Package, Loader2 } from 'lucide-react';
 import { Product, CreateProductDto } from '@/lib/api/products';
 import { ProductDialog } from '@/components/products/product-dialog';
-import { getTaxLabel } from '@/lib/constants/tax-codes';
+import { useTaxCodes, getTaxLabel } from '@/lib/hooks/use-tax-codes';
 import {
   useProducts,
   useCreateProduct,
@@ -36,6 +36,7 @@ export default function ProductosPage() {
 
   // React Query hooks
   const { data: products = [], isLoading } = useProducts();
+  const { data: taxCodesData } = useTaxCodes();
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
   const deleteProduct = useDeleteProduct();
@@ -203,7 +204,7 @@ export default function ProductosPage() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">
-                          {getTaxLabel(product.taxPercentageCode)}
+                          {getTaxLabel(taxCodesData?.taxCodes || [], product.taxPercentageCode)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right text-muted-foreground">
