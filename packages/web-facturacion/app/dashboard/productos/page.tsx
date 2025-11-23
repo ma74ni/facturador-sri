@@ -94,16 +94,16 @@ export default function ProductosPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Productos</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Productos</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Administra tu catálogo de productos y servicios
           </p>
         </div>
-        <Button onClick={handleCreate}>
+        <Button onClick={handleCreate} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
           Nuevo Producto
         </Button>
@@ -118,16 +118,14 @@ export default function ProductosPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nombre, código o descripción..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nombre, código o descripción..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
           </div>
         </CardContent>
       </Card>
@@ -173,13 +171,10 @@ export default function ProductosPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Código</TableHead>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead>IVA</TableHead>
-                  <TableHead className="text-right">Costo</TableHead>
+                  <TableHead>Producto</TableHead>
+                  <TableHead className="hidden md:table-cell">Descripción</TableHead>
+                  <TableHead className="hidden lg:table-cell">IVA</TableHead>
                   <TableHead className="text-right">Precio</TableHead>
-                  <TableHead className="text-right">Margen</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -193,50 +188,61 @@ export default function ProductosPage() {
 
                   return (
                     <TableRow key={product.id}>
-                      <TableCell className="font-medium">
-                        {product.mainCode}
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <span className="font-mono text-xs text-muted-foreground">
+                            {product.mainCode}
+                          </span>
+                          <span className="font-medium text-sm">
+                            {product.name}
+                          </span>
+                          {/* Show IVA badge on mobile */}
+                          <div className="lg:hidden">
+                            <Badge variant="outline" className="text-xs">
+                              {getTaxLabel(taxCodesData?.taxCodes || [], product.taxPercentageCode)}
+                            </Badge>
+                          </div>
+                          {/* Show cost and margin on mobile */}
+                          <div className="flex gap-2 text-xs text-muted-foreground mt-1">
+                            {cost && (
+                              <span>Costo: ${cost.toFixed(2)}</span>
+                            )}
+                            {margen !== null && (
+                              <span className={margen > '30' ? 'text-green-600' : margen > '15' ? 'text-yellow-600' : 'text-red-600'}>
+                                Margen: {margen}%
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </TableCell>
-                      <TableCell className="font-medium">
-                        {product.name}
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate text-muted-foreground">
+                      <TableCell className="hidden md:table-cell max-w-xs truncate text-sm text-muted-foreground">
                         {product.description || '-'}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         <Badge variant="outline">
                           {getTaxLabel(taxCodesData?.taxCodes || [], product.taxPercentageCode)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {cost ? `$${cost.toFixed(2)}` : '-'}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
+                      <TableCell className="text-right font-medium text-sm">
                         ${unitPrice.toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {margen !== null ? (
-                          <span className={margen > '30' ? 'text-green-600' : margen > '15' ? 'text-yellow-600' : 'text-red-600'}>
-                            {margen}%
-                          </span>
-                        ) : (
-                          '-'
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1 sm:gap-2">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleEdit(product)}
+                            className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                           >
-                            <Edit className="h-4 w-4" />
+                            <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteClick(product)}
+                            className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                           >
-                            <Trash2 className="h-4 w-4 text-destructive" />
+                            <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 text-destructive" />
                           </Button>
                         </div>
                       </TableCell>
@@ -251,7 +257,7 @@ export default function ProductosPage() {
 
       {/* Stats */}
       {products.length > 0 && (
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">

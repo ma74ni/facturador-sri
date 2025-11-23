@@ -172,7 +172,7 @@ export default function ConfiguracionPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Configuración</h1>
@@ -204,7 +204,7 @@ export default function ConfiguracionPage() {
 
       {/* Establishments Tab */}
       {activeTab === 'establishments' && (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <Alert variant="info">
             <Info className="h-4 w-4" />
             <AlertTitle>Establecimientos y Puntos de Emisión</AlertTitle>
@@ -216,7 +216,7 @@ export default function ConfiguracionPage() {
 
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <CardTitle>Establecimientos</CardTitle>
                   <CardDescription>
@@ -247,7 +247,7 @@ export default function ConfiguracionPage() {
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   {establishments.map((establishment) => (
                     <div key={establishment.id} className="border rounded-lg p-4">
                       <div className="flex items-start justify-between mb-4">
@@ -362,14 +362,14 @@ export default function ConfiguracionPage() {
 
       {/* Certificate Tab */}
       {activeTab === 'certificate' && (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <CertificateManager />
         </div>
       )}
 
       {/* Users Tab */}
       {activeTab === 'users' && (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <Alert variant="info">
             <Info className="h-4 w-4" />
             <AlertTitle>Gestión de Usuarios</AlertTitle>
@@ -381,7 +381,7 @@ export default function ConfiguracionPage() {
 
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <CardTitle>Usuarios del Sistema</CardTitle>
                   <CardDescription>
@@ -501,7 +501,7 @@ export default function ConfiguracionPage() {
 
       {/* Security Tab */}
       {activeTab === 'security' && (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <Alert variant="info">
             <Info className="h-4 w-4" />
             <AlertTitle>Seguridad de la Cuenta</AlertTitle>

@@ -118,23 +118,23 @@ export default function EmpresaPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Empresa</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Empresa</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Información y configuración de tu empresa
           </p>
         </div>
         {!isEditing ? (
-          <Button onClick={() => setIsEditing(true)}>
+          <Button onClick={() => setIsEditing(true)} className="w-full sm:w-auto">
             <Edit className="mr-2 h-4 w-4" />
             Editar Información
           </Button>
         ) : (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={handleCancel} disabled={loading}>
+            <Button variant="outline" onClick={handleCancel} disabled={loading} className="flex-1 sm:flex-initial">
               <X className="mr-2 h-4 w-4" />
               Cancelar
             </Button>
@@ -182,7 +182,7 @@ export default function EmpresaPage() {
       )}
 
       {/* Status Cards */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Estado de la Empresa</CardTitle>
@@ -232,7 +232,7 @@ export default function EmpresaPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="ruc">RUC</Label>
               <div className="flex items-center">
@@ -346,7 +346,7 @@ export default function EmpresaPage() {
               </AlertDescription>
             </Alert>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2">
               <div className="p-4 border rounded-lg">
                 <p className="text-sm font-medium mb-2">URL del SRI</p>
                 <p className="text-xs text-muted-foreground font-mono">
