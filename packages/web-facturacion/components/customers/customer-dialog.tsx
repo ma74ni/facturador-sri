@@ -332,7 +332,7 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
             />
           </div>
 
-          <DialogFooter>
+          <DialogFooter className='gap-4'>
             <Button
               type="button"
               variant="outline"

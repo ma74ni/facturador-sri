@@ -307,7 +307,7 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
             </div>
           )} */}
 
-          <DialogFooter>
+          <DialogFooter className='gap-4'>
             <Button
               type="button"
               variant="outline"

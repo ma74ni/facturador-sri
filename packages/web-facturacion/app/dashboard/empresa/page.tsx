@@ -133,7 +133,7 @@ export default function EmpresaPage() {
             Editar Información
           </Button>
         ) : (
-          <div className="flex gap-2">
+          <div className="flex md:flex-row flex-col gap-2">
             <Button variant="outline" onClick={handleCancel} disabled={loading} className="flex-1 sm:flex-initial">
               <X className="mr-2 h-4 w-4" />
               Cancelar
@@ -345,24 +345,6 @@ export default function EmpresaPage() {
                 )}
               </AlertDescription>
             </Alert>
-
-            <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2">
-              <div className="p-4 border rounded-lg">
-                <p className="text-sm font-medium mb-2">URL del SRI</p>
-                <p className="text-xs text-muted-foreground font-mono">
-                  {company?.environment === 'PRODUCTION'
-                    ? 'https://cel.sri.gob.ec'
-                    : 'https://celcer.sri.gob.ec'}
-                </p>
-              </div>
-
-              <div className="p-4 border rounded-lg">
-                <p className="text-sm font-medium mb-2">Tipo de Emisión</p>
-                <p className="text-xs text-muted-foreground">
-                  Emisión Normal (Código: 1)
-                </p>
-              </div>
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -381,7 +363,7 @@ export default function EmpresaPage() {
               Si necesitas modificar el estado de tu empresa, cambiar al ambiente de producción,
               o tienes alguna duda sobre la configuración, contacta con nuestro equipo de soporte.
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-col lg:flex-row gap-2">
               <Button variant="outline" size="sm">
                 <Mail className="mr-2 h-4 w-4" />
                 Contactar Soporte

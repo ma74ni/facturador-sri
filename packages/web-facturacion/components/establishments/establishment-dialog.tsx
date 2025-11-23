@@ -185,7 +185,7 @@ export function EstablishmentDialog({ open, onOpenChange, onSave, establishment 
             )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className='gap-4'>
             <Button
               type="button"
               variant="outline"
