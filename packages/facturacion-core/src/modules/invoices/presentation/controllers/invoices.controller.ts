@@ -18,12 +18,13 @@ import { InvoicesService } from '../../application/services/invoices.service';
 import { CreateInvoiceDto } from '../../application/dto/create-invoice.dto';
 import { BatchProcessDto } from '../../application/dto/batch-process.dto';
 import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
+import { EmailVerifiedGuard } from '../../../auth/infrastructure/guards/email-verified.guard';
 import { PrismaService } from '../../../../shared/database/prisma.service';
 import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
 
 @ApiTags('invoices')
 @Controller('invoices')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmailVerifiedGuard)
 @ApiBearerAuth()
 export class InvoicesController {
   constructor(

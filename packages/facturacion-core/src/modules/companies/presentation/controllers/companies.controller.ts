@@ -17,6 +17,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { CompaniesService } from '../../application/services/companies.service';
 import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
+import { EmailVerifiedGuard } from '../../../auth/infrastructure/guards/email-verified.guard';
 import { PrismaService } from '../../../../shared/database/prisma.service';
 import { Response } from 'express';
 import { EmailService } from '@/shared/email/email.service';
@@ -48,6 +49,7 @@ export class CompaniesController {
   }
 
   @Post('certificate')
+  @UseGuards(EmailVerifiedGuard)
   @ApiOperation({ summary: 'Subir certificado digital (.p12)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -101,6 +103,7 @@ export class CompaniesController {
   }
 
   @Delete('certificate')
+  @UseGuards(EmailVerifiedGuard)
   @ApiOperation({ summary: 'Eliminar certificado digital' })
   async deleteCertificate(@Request() req: any) {
     const companyId = await this.getCompanyId(req.user.userId);

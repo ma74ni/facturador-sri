@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verificación de Email</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: 20px auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+    .content {
+      padding: 30px;
+    }
+    .verification-box {
+      background-color: #f8f9fa;
+      padding: 20px;
+      border-radius: 6px;
+      margin: 20px 0;
+      text-align: center;
+    }
+    .button {
+      display: inline-block;
+      padding: 15px 40px;
+      background-color: #667eea;
+      color: white !important;
+      text-decoration: none;
+      border-radius: 6px;
+      margin: 20px 0;
+      font-weight: bold;
+      font-size: 16px;
+    }
+    .button:hover {
+      background-color: #5568d3;
+    }
+    .footer {
+      background-color: #f8f9fa;
+      padding: 20px;
+      text-align: center;
+      font-size: 12px;
+      color: #666;
+    }
+    .expiry-notice {
+      background-color: #fff3cd;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 20px 0;
+      border-left: 4px solid #ffc107;
+      font-size: 14px;
+    }
+    .link-text {
+      color: #667eea;
+      word-break: break-all;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>✉️ Verificación de Email</h1>
+      <p>Sistema de Facturación Electrónica SRI</p>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <p>Hola <strong>{{userName}}</strong>,</p>
+
+      <p>Gracias por registrarte en nuestro sistema de facturación electrónica. Para completar tu registro y activar tu cuenta, necesitamos verificar tu dirección de email.</p>
+
+      <!-- Verification Box -->
+      <div class="verification-box">
+        <p style="margin-bottom: 20px; font-size: 16px;">Haz clic en el siguiente botón para verificar tu email:</p>
+
+        <a href="{{verificationLink}}" class="button">
+          Verificar mi Email
+        </a>
+
+        <p style="margin-top: 20px; color: #666; font-size: 13px;">
+          O copia y pega este enlace en tu navegador:
+        </p>
+        <p class="link-text">{{verificationLink}}</p>
+      </div>
+
+      <!-- Expiry Notice -->
+      <div class="expiry-notice">
+        <strong>⏰ Nota importante:</strong> Este enlace de verificación expirará en <strong>5 minutos</strong>.
+        Si el enlace ha expirado, puedes solicitar uno nuevo desde tu panel de control.
+      </div>
+
+      <p style="color: #666; font-size: 14px; margin-top: 30px;">
+        Si no creaste una cuenta en nuestro sistema, puedes ignorar este mensaje de forma segura.
+      </p>
+
+      <p style="margin-top: 30px;">
+        Saludos cordiales,<br>
+        <strong>Sistema de Facturación Electrónica SRI</strong>
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>Este es un mensaje automático, por favor no responder a este correo.</p>
+      <p>© {{year}} Sistema de Facturación Electrónica. Todos los derechos reservados.</p>
+    </div>
+  </div>
+</body>
+</html>

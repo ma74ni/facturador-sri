@@ -28,13 +28,25 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token inválido o expirado
-      if (typeof window !== 'undefined') {
+      // No cerrar sesión si es un error de verificación de email
+      const isVerifyEmailRequest = error.config?.url?.includes('/auth/verify-email');
+
+      if (!isVerifyEmailRequest && typeof window !== 'undefined') {
+        // Token inválido o expirado en otras rutas
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.location.href = '/login';
       }
     }
+
+    // Marcar errores de email no verificado para manejo en componentes
+    if (error.response?.status === 403) {
+      const message = error.response?.data?.message || '';
+      if (message.includes('verificar tu email')) {
+        error.isEmailNotVerified = true;
+      }
+    }
+
     return Promise.reject(error);
   }
 );

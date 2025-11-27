@@ -16,11 +16,12 @@ import { ProductsService } from '../../application/services/products.service';
 import { CreateProductDto } from '../../application/dto/create-product.dto';
 import { UpdateProductDto } from '../../application/dto/update-product.dto';
 import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
+import { EmailVerifiedGuard } from '../../../auth/infrastructure/guards/email-verified.guard';
 import { PrismaService } from '../../../../shared/database/prisma.service';
 
 @ApiTags('products')
 @Controller('products')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmailVerifiedGuard)
 @ApiBearerAuth()
 export class ProductsController {
   constructor(

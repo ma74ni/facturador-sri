@@ -39,6 +39,7 @@ import { Product } from '@/lib/api/products';
 import { Establishment } from '@/lib/api/establishments';
 import { InvoiceDialog } from '@/components/invoices/invoice-dialog';
 import { CertificateRequiredDialog } from '@/components/shared/certificate-required-dialog';
+import { EmailVerificationRequiredDialog } from '@/components/shared/email-verification-required-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useInvoices, useInvoiceStats } from '@/lib/hooks/use-invoices';
 import { useCustomers } from '@/lib/hooks/use-customers';
@@ -66,6 +67,7 @@ export default function FacturasPage() {
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
   const [deletingInvoice, setDeletingInvoice] = useState(false);
   const [certificateDialogOpen, setCertificateDialogOpen] = useState(false);
+  const [emailVerificationDialogOpen, setEmailVerificationDialogOpen] = useState(false);
 
   const facturas = invoices;
 
@@ -118,6 +120,13 @@ export default function FacturasPage() {
       await loadData();
     } catch (error: any) {
       console.error('Error creating invoice:', error);
+
+      // Si el error es por email no verificado
+      if (error.isEmailNotVerified) {
+        setEmailVerificationDialogOpen(true);
+        return;
+      }
+
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -640,6 +649,12 @@ export default function FacturasPage() {
       <CertificateRequiredDialog
         open={certificateDialogOpen}
         onOpenChange={setCertificateDialogOpen}
+      />
+
+      {/* Email Verification Required Dialog */}
+      <EmailVerificationRequiredDialog
+        open={emailVerificationDialogOpen}
+        onOpenChange={setEmailVerificationDialogOpen}
       />
     </div>
   );
