@@ -563,20 +563,20 @@ export default function FacturasPage() {
                 .map((factura) => (
                   <div
                     key={factura.id}
-                    className="flex items-center justify-between p-3 border rounded-lg bg-green-50/50"
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 border rounded-lg bg-green-50/50"
                   >
-                    <div className="space-y-1">
+                    <div className="space-y-1 flex-1 min-w-0">
                       <p className="text-sm font-medium">
                         {factura.establishmentCode}-{factura.emissionPointCode}-{factura.sequential}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {factura.customerName} • {factura.customerIdentification}
                       </p>
-                      <p className="text-xs font-mono text-green-700">
+                      <p className="text-xs font-mono text-green-700 truncate" title={factura.authorizationNumber}>
                         {factura.authorizationNumber}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-left sm:text-right flex-shrink-0">
                       <p className="text-sm font-medium">${Number(factura.totalAmount).toFixed(2)}</p>
                       <p className="text-xs text-muted-foreground">
                         {factura.authorizationDate &&

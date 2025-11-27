@@ -710,58 +710,117 @@ export function InvoiceDialog({
                 </Button>
               </div>
 
-              {/* Items Table */}
+              {/* Items List - Responsive: Cards on mobile, Table on desktop */}
               {items.length > 0 && (
-                <div className="border rounded-lg">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Producto</TableHead>
-                        <TableHead className="text-right">Cantidad</TableHead>
-                        <TableHead className="text-right">P. Unit</TableHead>
-                        <TableHead className="text-right">Desc.</TableHead>
-                        <TableHead className="text-right">Subtotal</TableHead>
-                        <TableHead className="text-right">IVA</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
-                        <TableHead></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {normalized.map((item, index) => (
-                        <TableRow key={index}>
-                          <TableCell>{item.description}</TableCell>
-                          <TableCell className="text-right">
-                            {item.quantity}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            ${item.unitPrice.toFixed(2)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            ${item.discount.toFixed(2)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            ${item.subtotal.toFixed(2)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            ${item.taxValue.toFixed(2)}
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            ${item.total.toFixed(2)}
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveItem(index)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </TableCell>
+                <>
+                  {/* Mobile View - Cards */}
+                  <div className="md:hidden space-y-3">
+                    {normalized.map((item, index) => (
+                      <div
+                        key={index}
+                        className="border rounded-lg p-4 bg-white shadow-sm"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-slate-900 mb-1">
+                              {item.description}
+                            </h4>
+                            <p className="text-sm text-slate-500">
+                              Cantidad: {item.quantity} × ${item.unitPrice.toFixed(2)}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveItem(index)}
+                            className="h-8 w-8 p-0 -mt-1 -mr-1"
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="text-slate-500">Descuento:</span>
+                            <span className="ml-1 font-medium">
+                              ${item.discount.toFixed(2)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Subtotal:</span>
+                            <span className="ml-1 font-medium">
+                              ${item.subtotal.toFixed(2)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">IVA:</span>
+                            <span className="ml-1 font-medium">
+                              ${item.taxValue.toFixed(2)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Total:</span>
+                            <span className="ml-1 font-bold text-primary">
+                              ${item.total.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop View - Table */}
+                  <div className="hidden md:block border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Producto</TableHead>
+                          <TableHead className="text-right">Cantidad</TableHead>
+                          <TableHead className="text-right">P. Unit</TableHead>
+                          <TableHead className="text-right">Desc.</TableHead>
+                          <TableHead className="text-right">Subtotal</TableHead>
+                          <TableHead className="text-right">IVA</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                          <TableHead></TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {normalized.map((item, index) => (
+                          <TableRow key={index}>
+                            <TableCell>{item.description}</TableCell>
+                            <TableCell className="text-right">
+                              {item.quantity}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              ${item.unitPrice.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              ${item.discount.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              ${item.subtotal.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              ${item.taxValue.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              ${item.total.toFixed(2)}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveItem(index)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
               )}
 
               {/* RESUMEN DE TOTALES - Más visible y claro */}

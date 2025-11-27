@@ -301,15 +301,19 @@ export class InvoicesService {
   }
 
   async getStats(companyId: string) {
+    // Filtro base: excluir facturas canceladas/eliminadas
+    const baseWhere = { companyId, cancelledAt: null };
+
     const [total, pending, authorized, rejected] = await Promise.all([
-      this.prisma.invoice.count({ where: { companyId } }),
-      this.prisma.invoice.count({ where: { companyId, sriStatus: 'PENDING' } }),
-      this.prisma.invoice.count({ where: { companyId, sriStatus: 'AUTHORIZED' } }),
-      this.prisma.invoice.count({ where: { companyId, sriStatus: 'REJECTED' } }),
+      this.prisma.invoice.count({ where: baseWhere }),
+      this.prisma.invoice.count({ where: { ...baseWhere, sriStatus: 'PENDING' } }),
+      this.prisma.invoice.count({ where: { ...baseWhere, sriStatus: 'AUTHORIZED' } }),
+      this.prisma.invoice.count({ where: { ...baseWhere, sriStatus: 'REJECTED' } }),
     ]);
 
+    // Sumar solo facturas activas (no canceladas)
     const totalAmount = await this.prisma.invoice.aggregate({
-      where: { companyId },
+      where: baseWhere,
       _sum: { total: true },
     });
 
