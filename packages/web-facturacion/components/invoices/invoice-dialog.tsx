@@ -51,6 +51,8 @@ import {
 } from "@/lib/hooks/use-customers";
 import { useCreateProduct } from "@/lib/hooks/use-products";
 import { useTaxCodes, getTaxPercentage } from "@/lib/hooks/use-tax-codes";
+import { useCertificateStatus } from "@/lib/hooks/use-certificate";
+import { CertificateRequiredDialog } from "@/components/shared/certificate-required-dialog";
 
 interface InvoiceDialogProps {
   open: boolean;
@@ -126,6 +128,7 @@ export function InvoiceDialog({
   const updateCustomerMutation = useUpdateCustomer();
   const createProductMutation = useCreateProduct();
   const { data: taxCodesData, isLoading: taxCodesLoading } = useTaxCodes();
+  const { data: certificateStatus } = useCertificateStatus();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selectedCustomer, setSelectedCustomer] = useState<string>("");
@@ -149,6 +152,7 @@ export function InvoiceDialog({
   const [showCustomerDialog, setShowCustomerDialog] = useState(false);
   const [showProductDialog, setShowProductDialog] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [showCertificateDialog, setShowCertificateDialog] = useState(false);
 
   // Customer search/combobox state
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
@@ -412,8 +416,8 @@ export function InvoiceDialog({
   // Render
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] w-full lg:max-w-7xl h-[95vh] flex flex-col p-0">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b flex-shrink-0">
+      <DialogContent className="max-w-[95vw] w-full lg:max-w-7xl max-h-[95vh] overflow-y-auto">
+        <DialogHeader>
           <DialogTitle className="text-2xl">
             Nueva Factura Electrónica
           </DialogTitle>
@@ -423,8 +427,7 @@ export function InvoiceDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4">
-          <div className="space-y-6">
+        <div className="space-y-6">
             {/* SECCIÓN 1: Datos Generales */}
             <div className="border-b pb-4">
               <h3 className="text-lg font-semibold text-slate-700 mb-4">
@@ -535,7 +538,21 @@ export function InvoiceDialog({
                     </div>
                   )}
                 </div>
-
+                {/* Customer Info Card - Mostrar cuando hay un cliente seleccionado */}
+                {selectedCustomerData && (
+                  <div className="mt-4">
+                    <CustomerInfoCard
+                      customer={selectedCustomerData}
+                      onEdit={handleEditCustomer}
+                      onClose={() => {
+                        setSelectedCustomer("");
+                        setCustomerSearchQuery("");
+                        setErrors({ ...errors, customer: "" });
+                      }}
+                      compact={true}
+                    />
+                  </div>
+                )}
                 {/* Fecha */}
                 <div className="space-y-2 md:col-span-2 lg:col-span-1">
                   <Label htmlFor="issueDate">Fecha de Emisión *</Label>
@@ -614,22 +631,6 @@ export function InvoiceDialog({
                   )}
                 </div>
               </div>
-
-              {/* Customer Info Card - Mostrar cuando hay un cliente seleccionado */}
-              {selectedCustomerData && (
-                <div className="mt-4">
-                  <CustomerInfoCard
-                    customer={selectedCustomerData}
-                    onEdit={handleEditCustomer}
-                    onClose={() => {
-                      setSelectedCustomer("");
-                      setCustomerSearchQuery("");
-                      setErrors({ ...errors, customer: "" });
-                    }}
-                    compact={true}
-                  />
-                </div>
-              )}
             </div>
 
             {/* SECCIÓN 2: Productos */}
@@ -902,9 +903,8 @@ export function InvoiceDialog({
               </div>
             )}
           </div>
-        </div>
 
-        <DialogFooter className="px-6 py-4 border-t flex-shrink-0 gap-2 sm:gap-3">
+        <DialogFooter className="gap-2 sm:gap-3 mt-6">
           <Button
             type="button"
             variant="outline"

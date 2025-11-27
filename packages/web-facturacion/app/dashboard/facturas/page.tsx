@@ -38,6 +38,7 @@ import { Customer } from '@/lib/api/customers';
 import { Product } from '@/lib/api/products';
 import { Establishment } from '@/lib/api/establishments';
 import { InvoiceDialog } from '@/components/invoices/invoice-dialog';
+import { CertificateRequiredDialog } from '@/components/shared/certificate-required-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useInvoices, useInvoiceStats } from '@/lib/hooks/use-invoices';
 import { useCustomers } from '@/lib/hooks/use-customers';
@@ -64,6 +65,7 @@ export default function FacturasPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
   const [deletingInvoice, setDeletingInvoice] = useState(false);
+  const [certificateDialogOpen, setCertificateDialogOpen] = useState(false);
 
   const facturas = invoices;
 
@@ -91,12 +93,12 @@ export default function FacturasPage() {
           console.error('Error sending to SRI:', sriError);
           const errorMessage = sriError.response?.data?.message || 'La factura se creó pero hubo un error al enviar al SRI';
 
-          // Si el error es por falta de certificado, mostrar mensaje específico
-          if (errorMessage.includes('certificado') || errorMessage.includes('firmada')) {
+          // Si el error es por falta de certificado, mostrar diálogo específico
+          if (errorMessage.includes('certificado') || errorMessage.includes('firmada') || errorMessage.includes('firma')) {
+            setCertificateDialogOpen(true);
             toast({
-              variant: 'destructive',
-              title: 'Certificado requerido',
-              description: 'Debes subir un certificado digital en la configuración de tu empresa para firmar facturas. La factura fue creada pero no enviada.',
+              title: 'Factura creada',
+              description: 'La factura fue creada pero no se pudo enviar al SRI. Se requiere certificado digital.',
             });
           } else {
             toast({
@@ -633,6 +635,12 @@ export default function FacturasPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Certificate Required Dialog */}
+      <CertificateRequiredDialog
+        open={certificateDialogOpen}
+        onOpenChange={setCertificateDialogOpen}
+      />
     </div>
   );
 }

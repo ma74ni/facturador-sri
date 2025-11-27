@@ -21,6 +21,7 @@ import {
 import { useInvoices, useInvoiceStats } from '@/lib/hooks/use-invoices';
 import { useCustomers } from '@/lib/hooks/use-customers';
 import { useProducts } from '@/lib/hooks/use-products';
+import { CertificateAlertBanner } from '@/components/shared/certificate-alert-banner';
 
 interface RecentInvoice {
   id: string;
@@ -119,6 +120,9 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6 lg:space-y-8">
+      {/* Certificate Alert Banner */}
+      <CertificateAlertBanner />
+
       {/* Header */}
       <div className="flex justify-between items-start md:items-center md:flex-row flex-col gap-4">
         <div>
