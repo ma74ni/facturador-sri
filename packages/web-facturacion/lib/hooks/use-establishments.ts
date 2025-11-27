@@ -8,10 +8,11 @@ import {
   CreateEmissionPointDto,
 } from '@/lib/api/establishments';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/lib/context/auth-context';
 
 // Query keys
 export const establishmentKeys = {
-  all: ['establishments'] as const,
+  all: (companyId?: string) => ['establishments', companyId] as const,
   detail: (id: string) => ['establishments', id] as const,
 };
 
@@ -19,14 +20,18 @@ export const establishmentKeys = {
  * Hook para obtener todos los establecimientos
  * - Caché de 5 minutos
  * - Incluye emission points anidados
+ * - Filtra por companyId del usuario autenticado
  */
 export function useEstablishments() {
+  const { user } = useAuth();
+
   return useQuery({
-    queryKey: establishmentKeys.all,
+    queryKey: establishmentKeys.all(user?.companyId),
     queryFn: async () => {
       const data = await establishmentsApi.getAll();
       return Array.isArray(data) ? data : [];
     },
+    enabled: !!user?.companyId,
   });
 }
 
@@ -48,11 +53,12 @@ export function useEstablishment(id: string) {
 export function useCreateEstablishment() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: (data: CreateEstablishmentDto) => establishmentsApi.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: establishmentKeys.all });
+      queryClient.invalidateQueries({ queryKey: establishmentKeys.all(user?.companyId) });
       toast({
         title: 'Establecimiento creado',
         description: 'El establecimiento se ha creado correctamente',
@@ -75,12 +81,13 @@ export function useCreateEstablishment() {
 export function useUpdateEstablishment() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateEstablishmentDto }) =>
       establishmentsApi.update(id, data),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: establishmentKeys.all });
+      queryClient.invalidateQueries({ queryKey: establishmentKeys.all(user?.companyId) });
       queryClient.invalidateQueries({ queryKey: establishmentKeys.detail(variables.id) });
       toast({
         title: 'Establecimiento actualizado',
@@ -104,11 +111,12 @@ export function useUpdateEstablishment() {
 export function useDeleteEstablishment() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: (id: string) => establishmentsApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: establishmentKeys.all });
+      queryClient.invalidateQueries({ queryKey: establishmentKeys.all(user?.companyId) });
       toast({
         title: 'Establecimiento eliminado',
         description: 'El establecimiento se ha eliminado correctamente',
@@ -131,12 +139,13 @@ export function useDeleteEstablishment() {
 export function useCreateEmissionPoint() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: ({ establishmentId, data }: { establishmentId: string; data: CreateEmissionPointDto }) =>
       emissionPointsApi.create(establishmentId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: establishmentKeys.all });
+      queryClient.invalidateQueries({ queryKey: establishmentKeys.all(user?.companyId) });
       toast({
         title: 'Punto de emisión creado',
         description: 'El punto de emisión se ha creado correctamente',
@@ -159,12 +168,13 @@ export function useCreateEmissionPoint() {
 export function useDeleteEmissionPoint() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: ({ establishmentId, emissionPointId }: { establishmentId: string; emissionPointId: string }) =>
       emissionPointsApi.delete(establishmentId, emissionPointId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: establishmentKeys.all });
+      queryClient.invalidateQueries({ queryKey: establishmentKeys.all(user?.companyId) });
       toast({
         title: 'Punto de emisión eliminado',
         description: 'El punto de emisión se ha eliminado correctamente',
