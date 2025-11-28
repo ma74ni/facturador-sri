@@ -1,5 +1,7 @@
 import { create } from 'zustand';
-import { OrderItem, TipoOrden } from '@/lib/types';
+import type { OrderItem } from '@/lib/types';
+import { TipoOrden } from '@/lib/types';
+import { calculateCartTotals } from '@/lib/utils/cartCalculations';
 
 interface CartState {
   items: OrderItem[];
@@ -19,6 +21,13 @@ interface CartState {
   // Computed
   getSubtotal: () => number;
   getItemCount: () => number;
+  getTotals: () => {
+    subtotal: number;
+    recargoPorcentaje: number;
+    recargoMonto: number;
+    deliveryFee: number;
+    total: number;
+  };
 }
 
 export const useCartStore = create<CartState>((set, get) => ({
@@ -71,5 +80,11 @@ export const useCartStore = create<CartState>((set, get) => ({
   getItemCount: () => {
     const { items } = get();
     return items.reduce((sum, item) => sum + item.cantidad, 0);
+  },
+
+  getTotals: () => {
+    const { tipo } = get();
+    const subtotal = get().getSubtotal();
+    return calculateCartTotals(subtotal, tipo);
   },
 }));
