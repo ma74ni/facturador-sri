@@ -11,9 +11,9 @@ export class FacturacionApiService {
   private readonly companyId: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.apiUrl = this.configService.get<string>('facturacion.apiUrl');
-    this.apiToken = this.configService.get<string>('facturacion.apiToken');
-    this.companyId = this.configService.get<string>('facturacion.companyId');
+    this.apiUrl = this.configService.get<string>('facturacion.apiUrl', '');
+    this.apiToken = this.configService.get<string>('facturacion.apiToken', '');
+    this.companyId = this.configService.get<string>('facturacion.companyId', '');
 
     this.httpClient = axios.create({
       baseURL: this.apiUrl,

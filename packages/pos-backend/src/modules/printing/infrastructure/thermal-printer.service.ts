@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import ThermalPrinter from 'node-thermal-printer';
+import { ThermalPrinter, PrinterTypes } from 'node-thermal-printer';
 
 export interface PrinterConfig {
   type: 'epson' | 'star';
@@ -40,8 +40,6 @@ export class ThermalPrinterService {
    * Crear instancia de impresora
    */
   private createPrinter(): any {
-    const { Types, PrinterTypes } = ThermalPrinter;
-
     let printerType: any;
     switch (this.printerConfig.type) {
       case 'epson':
@@ -57,7 +55,7 @@ export class ThermalPrinterService {
     return new ThermalPrinter({
       type: printerType,
       interface: this.printerConfig.interface,
-      characterSet: this.printerConfig.characterSet,
+      characterSet: this.printerConfig.characterSet as any,
       removeSpecialCharacters: this.printerConfig.removeSpecialCharacters,
       lineCharacter: this.printerConfig.lineCharacter,
       options: {

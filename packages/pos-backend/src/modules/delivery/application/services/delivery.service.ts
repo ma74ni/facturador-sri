@@ -283,12 +283,12 @@ export class DeliveryService {
     newState: EstadoDelivery,
   ): void {
     const validTransitions: Record<EstadoDelivery, EstadoDelivery[]> = {
-      PENDIENTE: ['ASIGNADO', 'CANCELADO'],
-      ASIGNADO: ['RECOGIDO', 'CANCELADO'],
-      RECOGIDO: ['EN_RUTA', 'CANCELADO'],
-      EN_RUTA: ['ENTREGADO', 'CANCELADO'],
-      ENTREGADO: [], // Estado final
-      CANCELADO: [], // Estado final
+      [EstadoDelivery.PENDIENTE]: [EstadoDelivery.ASIGNADO, EstadoDelivery.CANCELADO],
+      [EstadoDelivery.ASIGNADO]: [EstadoDelivery.RECOGIDO, EstadoDelivery.CANCELADO],
+      [EstadoDelivery.RECOGIDO]: [EstadoDelivery.EN_RUTA, EstadoDelivery.CANCELADO],
+      [EstadoDelivery.EN_RUTA]: [EstadoDelivery.ENTREGADO, EstadoDelivery.CANCELADO],
+      [EstadoDelivery.ENTREGADO]: [], // Estado final
+      [EstadoDelivery.CANCELADO]: [], // Estado final
     };
 
     const allowedStates = validTransitions[currentState] || [];

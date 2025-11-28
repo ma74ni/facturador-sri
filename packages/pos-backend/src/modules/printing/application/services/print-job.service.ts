@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@shared/prisma/prisma.service';
+import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ComandaGeneratorService } from './comanda-generator.service';
 import { TicketGeneratorService } from './ticket-generator.service';
@@ -13,6 +14,7 @@ export class PrintJobService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
     private readonly comandaGenerator: ComandaGeneratorService,
     private readonly ticketGenerator: TicketGeneratorService,
     private readonly cierreCajaGenerator: CierreCajaGeneratorService,
@@ -25,7 +27,7 @@ export class PrintJobService {
   async processQueue(): Promise<void> {
     const pendingJobs = await this.prisma.printJob.findMany({
       where: {
-        estado: 'PENDING',
+        estado: 'PENDIENTE',
         intentos: {
           lt: this.MAX_REINTENTOS,
         },
@@ -58,7 +60,7 @@ export class PrintJobService {
       await this.prisma.printJob.update({
         where: { id: job.id },
         data: {
-          estado: 'PROCESSING',
+          estado: 'PROCESANDO',
           intentos: job.intentos + 1,
         },
       });
@@ -68,15 +70,15 @@ export class PrintJobService {
       // Ejecutar impresión según tipo
       switch (job.tipo) {
         case 'COMANDA':
-          success = await this.comandaGenerator.print(job.datos as any);
+          success = await this.comandaGenerator.print(job.contenido as any);
           break;
 
         case 'TICKET':
-          success = await this.ticketGenerator.print(job.datos as any);
+          success = await this.ticketGenerator.print(job.contenido as any);
           break;
 
         case 'CIERRE_CAJA':
-          success = await this.cierreCajaGenerator.print(job.datos as any);
+          success = await this.cierreCajaGenerator.print(job.contenido as any);
           break;
 
         default:
@@ -88,8 +90,7 @@ export class PrintJobService {
         await this.prisma.printJob.update({
           where: { id: job.id },
           data: {
-            estado: 'COMPLETED',
-            procesadoAt: new Date(),
+            estado: 'COMPLETADO',
           },
         });
 
@@ -105,8 +106,8 @@ export class PrintJobService {
         await this.prisma.printJob.update({
           where: { id: job.id },
           data: {
-            estado: 'FAILED',
-            error: error.message,
+            estado: 'ERROR',
+            mensajeError: error.message,
           },
         });
 
@@ -118,8 +119,8 @@ export class PrintJobService {
         await this.prisma.printJob.update({
           where: { id: job.id },
           data: {
-            estado: 'PENDING',
-            error: error.message,
+            estado: 'PENDIENTE',
+            mensajeError: error.message,
           },
         });
 
@@ -133,14 +134,15 @@ export class PrintJobService {
   /**
    * Crear trabajo de impresión de comanda
    */
-  async createComandaJob(orderId: string, data: any): Promise<PrintJob> {
+  async createComandaJob(orderId: string | null, data: any): Promise<PrintJob> {
     return this.prisma.printJob.create({
       data: {
         orderId,
         tipo: 'COMANDA',
-        estado: 'PENDING',
+        estado: 'PENDIENTE',
         intentos: 0,
-        datos: data,
+        printerName: this.configService.get('printer.name', 'Default Printer'),
+        contenido: data,
       },
     });
   }
@@ -148,14 +150,15 @@ export class PrintJobService {
   /**
    * Crear trabajo de impresión de ticket
    */
-  async createTicketJob(orderId: string, data: any): Promise<PrintJob> {
+  async createTicketJob(orderId: string | null, data: any): Promise<PrintJob> {
     return this.prisma.printJob.create({
       data: {
         orderId,
         tipo: 'TICKET',
-        estado: 'PENDING',
+        estado: 'PENDIENTE',
         intentos: 0,
-        datos: data,
+        printerName: this.configService.get('printer.name', 'Default Printer'),
+        contenido: data,
       },
     });
   }
@@ -167,9 +170,10 @@ export class PrintJobService {
     return this.prisma.printJob.create({
       data: {
         tipo: 'CIERRE_CAJA',
-        estado: 'PENDING',
+        estado: 'PENDIENTE',
         intentos: 0,
-        datos: data,
+        printerName: this.configService.get('printer.name', 'Default Printer'),
+        contenido: data,
       },
     });
   }
@@ -191,9 +195,10 @@ export class PrintJobService {
       data: {
         orderId: job.orderId,
         tipo: job.tipo,
-        estado: 'PENDING',
+        estado: 'PENDIENTE',
         intentos: 0,
-        datos: job.datos,
+        printerName: job.printerName,
+        contenido: job.contenido as any,
       },
     });
   }
@@ -214,7 +219,7 @@ export class PrintJobService {
   async findPending(): Promise<PrintJob[]> {
     return this.prisma.printJob.findMany({
       where: {
-        estado: 'PENDING',
+        estado: 'PENDIENTE',
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -226,7 +231,7 @@ export class PrintJobService {
   async findFailed(): Promise<PrintJob[]> {
     return this.prisma.printJob.findMany({
       where: {
-        estado: 'FAILED',
+        estado: 'ERROR',
       },
       orderBy: { createdAt: 'desc' },
       take: 50,
@@ -243,9 +248,9 @@ export class PrintJobService {
       await this.prisma.printJob.update({
         where: { id: job.id },
         data: {
-          estado: 'PENDING',
+          estado: 'PENDIENTE',
           intentos: 0,
-          error: null,
+          mensajeError: null,
         },
       });
     }
@@ -268,7 +273,7 @@ export class PrintJobService {
           lt: thirtyDaysAgo,
         },
         estado: {
-          in: ['COMPLETED', 'FAILED'],
+          in: ['COMPLETADO', 'ERROR'],
         },
       },
     });

@@ -1,5 +1,5 @@
 export default () => ({
-  port: parseInt(process.env.PORT, 10) || 3001,
+  port: parseInt(process.env.PORT || '3001', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   database: {
     url: process.env.DATABASE_URL,
@@ -15,15 +15,15 @@ export default () => ({
     characterSet: process.env.PRINTER_CHARACTER_SET || 'PC437_USA',
     removeSpecialCharacters: process.env.PRINTER_REMOVE_SPECIAL_CHARS === 'true',
     lineCharacter: process.env.PRINTER_LINE_CHARACTER || '-',
-    width: parseInt(process.env.PRINTER_WIDTH, 10) || 48,
+    width: parseInt(process.env.PRINTER_WIDTH || '48', 10),
   },
   recargos: {
-    llevar: parseFloat(process.env.RECARGO_LLEVAR) || 0.10,
-    delivery: parseFloat(process.env.RECARGO_DELIVERY) || 0.20,
-    deliveryFee: parseFloat(process.env.DELIVERY_FEE) || 2.00,
+    llevar: parseFloat(process.env.RECARGO_LLEVAR || '0.10'),
+    delivery: parseFloat(process.env.RECARGO_DELIVERY || '0.20'),
+    deliveryFee: parseFloat(process.env.DELIVERY_FEE || '2.00'),
   },
   workers: {
     invoiceQueueCron: process.env.INVOICE_QUEUE_CRON || '0 23 * * *',
-    printQueueInterval: parseInt(process.env.PRINT_QUEUE_INTERVAL, 10) || 2000,
+    printQueueInterval: parseInt(process.env.PRINT_QUEUE_INTERVAL || '2000', 10),
   },
 });

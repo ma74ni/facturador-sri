@@ -12,7 +12,7 @@ export class OrderValidatorService {
    */
   canModifyItems(estado: EstadoOrden): boolean {
     // Solo se pueden modificar órdenes en estado NEW o PAID
-    const estadosPermitidos: EstadoOrden[] = ['NEW', 'PAID'];
+    const estadosPermitidos: EstadoOrden[] = [EstadoOrden.NEW, EstadoOrden.PAID];
     return estadosPermitidos.includes(estado);
   }
 
@@ -21,7 +21,10 @@ export class OrderValidatorService {
    */
   canBeCancelled(estado: EstadoOrden): boolean {
     // No se pueden cancelar órdenes ya entregadas o canceladas
-    const estadosNoPermitidos: EstadoOrden[] = ['DELIVERED', 'CANCELLED'];
+    const estadosNoPermitidos: EstadoOrden[] = [
+      EstadoOrden.DELIVERED,
+      EstadoOrden.CANCELLED,
+    ];
     return !estadosNoPermitidos.includes(estado);
   }
 
@@ -30,7 +33,7 @@ export class OrderValidatorService {
    */
   canBePaid(estado: EstadoOrden): boolean {
     // Solo se pueden pagar órdenes en estado NEW
-    return estado === 'NEW';
+    return estado === EstadoOrden.NEW;
   }
 
   /**
@@ -41,13 +44,17 @@ export class OrderValidatorService {
     newState: EstadoOrden,
   ): void {
     const validTransitions: Record<EstadoOrden, EstadoOrden[]> = {
-      NEW: ['PAID', 'CANCELLED'],
-      PAID: ['PREPARING', 'CANCELLED'],
-      PREPARING: ['READY', 'CANCELLED'],
-      READY: ['DELIVERING', 'DELIVERED', 'CANCELLED'],
-      DELIVERING: ['DELIVERED', 'CANCELLED'],
-      DELIVERED: [], // Estado final
-      CANCELLED: [], // Estado final
+      [EstadoOrden.NEW]: [EstadoOrden.PAID, EstadoOrden.CANCELLED],
+      [EstadoOrden.PAID]: [EstadoOrden.PREPARING, EstadoOrden.CANCELLED],
+      [EstadoOrden.PREPARING]: [EstadoOrden.READY, EstadoOrden.CANCELLED],
+      [EstadoOrden.READY]: [
+        EstadoOrden.DELIVERING,
+        EstadoOrden.DELIVERED,
+        EstadoOrden.CANCELLED,
+      ],
+      [EstadoOrden.DELIVERING]: [EstadoOrden.DELIVERED, EstadoOrden.CANCELLED],
+      [EstadoOrden.DELIVERED]: [], // Estado final
+      [EstadoOrden.CANCELLED]: [], // Estado final
     };
 
     const allowedStates = validTransitions[currentState] || [];
@@ -87,10 +94,10 @@ export class OrderValidatorService {
   validateCanAddIncremental(estado: EstadoOrden): void {
     // Solo se pueden añadir items incrementales a órdenes PAID o posteriores
     const estadosPermitidos: EstadoOrden[] = [
-      'PAID',
-      'PREPARING',
-      'READY',
-      'DELIVERING',
+      EstadoOrden.PAID,
+      EstadoOrden.PREPARING,
+      EstadoOrden.READY,
+      EstadoOrden.DELIVERING,
     ];
 
     if (!estadosPermitidos.includes(estado)) {

@@ -26,14 +26,6 @@ export class InvoiceQueueService {
           lt: this.MAX_REINTENTOS,
         },
       },
-      include: {
-        order: {
-          include: {
-            items: true,
-            local: true,
-          },
-        },
-      },
       orderBy: {
         createdAt: 'asc',
       },
@@ -96,7 +88,7 @@ export class InvoiceQueueService {
           precioUnitario: parseFloat(item.precioUnitario.toString()),
           descuento: 0,
         })),
-        formaPago: this.mapMetodoPago(order.metodoPago),
+        formaPago: this.mapMetodoPago(order.metodoPago || 'EFECTIVO'),
       };
 
       // Crear factura en facturacion-core
@@ -107,8 +99,9 @@ export class InvoiceQueueService {
         where: { id: queueItem.id },
         data: {
           estado: 'COMPLETADA',
-          facturaId: invoice.id,
-          procesadoAt: new Date(),
+          claveAcceso: invoice.claveAcceso,
+          numeroAutorizacion: invoice.numeroAutorizacion,
+          fechaAutorizacion: invoice.fechaAutorizacion ? new Date(invoice.fechaAutorizacion) : null,
         },
       });
 
@@ -127,7 +120,7 @@ export class InvoiceQueueService {
           where: { id: queueItem.id },
           data: {
             estado: 'ERROR',
-            error: error.message,
+            mensajeError: error.message,
           },
         });
 
@@ -140,7 +133,7 @@ export class InvoiceQueueService {
           where: { id: queueItem.id },
           data: {
             estado: 'PENDIENTE',
-            error: error.message,
+            mensajeError: error.message,
           },
         });
       }
@@ -169,9 +162,6 @@ export class InvoiceQueueService {
       where: {
         estado: 'PENDIENTE',
       },
-      include: {
-        order: true,
-      },
       orderBy: {
         createdAt: 'asc',
       },
@@ -185,9 +175,6 @@ export class InvoiceQueueService {
     return this.prisma.invoiceQueue.findMany({
       where: {
         estado: 'ERROR',
-      },
-      include: {
-        order: true,
       },
       orderBy: {
         createdAt: 'desc',
@@ -208,7 +195,7 @@ export class InvoiceQueueService {
         data: {
           estado: 'PENDIENTE',
           intentos: 0,
-          error: null,
+          mensajeError: null,
         },
       });
     }

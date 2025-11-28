@@ -89,10 +89,10 @@ export class OrdersService {
         nombreProducto: producto.nombre,
         precioUnitario: new Prisma.Decimal(itemCalc.precioUnitario),
         cantidad: itemDto.cantidad || 1,
-        sabores: itemDto.sabores || [],
-        toppings: itemDto.toppings || [],
-        aderezos: itemDto.aderezos || [],
-        sustituciones: itemDto.sustituciones || [],
+        sabores: (itemDto.sabores || []) as any,
+        toppings: (itemDto.toppings || []) as any,
+        aderezos: (itemDto.aderezos || []) as any,
+        sustituciones: (itemDto.sustituciones || []) as any,
         subtotalItem: new Prisma.Decimal(itemCalc.subtotalItem),
         notas: itemDto.notas,
         esIncremental: false,
@@ -153,8 +153,8 @@ export class OrdersService {
     const order = await this.findOne(orderId);
 
     // Validar si se puede modificar
-    if (!addItemDto.esIncremental && !this.validator.canModifyItems(order.estado)) {
-      this.validator.validateCanAddIncremental(order.estado);
+    if (!addItemDto.esIncremental && !this.validator.canModifyItems(order.estado as any)) {
+      this.validator.validateCanAddIncremental(order.estado as any);
       addItemDto.esIncremental = true;
     }
 
@@ -204,10 +204,10 @@ export class OrdersService {
         nombreProducto: producto.nombre,
         precioUnitario: new Prisma.Decimal(itemCalc.precioUnitario),
         cantidad: addItemDto.cantidad || 1,
-        sabores: addItemDto.sabores || [],
-        toppings: addItemDto.toppings || [],
-        aderezos: addItemDto.aderezos || [],
-        sustituciones: addItemDto.sustituciones || [],
+        sabores: (addItemDto.sabores || []) as any,
+        toppings: (addItemDto.toppings || []) as any,
+        aderezos: (addItemDto.aderezos || []) as any,
+        sustituciones: (addItemDto.sustituciones || []) as any,
         subtotalItem: new Prisma.Decimal(itemCalc.subtotalItem),
         notas: addItemDto.notas,
         esIncremental: addItemDto.esIncremental || false,
@@ -239,7 +239,7 @@ export class OrdersService {
     const order = await this.findOne(orderId);
 
     // Validar si se puede modificar
-    if (!this.validator.canModifyItems(order.estado)) {
+    if (!this.validator.canModifyItems(order.estado as any)) {
       throw new Error('No se puede modificar esta orden');
     }
 
@@ -272,7 +272,7 @@ export class OrdersService {
     );
 
     // Recalcular totales
-    const orderCalc = this.calculator.calculateOrderTotal(subtotal, order.tipo);
+    const orderCalc = this.calculator.calculateOrderTotal(subtotal, order.tipo as any);
 
     // Actualizar orden
     await this.prisma.order.update({
@@ -314,7 +314,7 @@ export class OrdersService {
   async findByLocal(localId: string, estado?: EstadoOrden): Promise<Order[]> {
     const where: any = { localId };
     if (estado) {
-      where.estado = estado;
+      where.estado = estado as any;
     }
 
     return this.prisma.order.findMany({
@@ -348,11 +348,11 @@ export class OrdersService {
     const order = await this.findOne(id);
 
     // Validar transición de estado
-    this.validator.validateStateTransition(order.estado, nuevoEstado);
+    this.validator.validateStateTransition(order.estado as any, nuevoEstado);
 
     return this.prisma.order.update({
       where: { id },
-      data: { estado: nuevoEstado },
+      data: { estado: nuevoEstado as any },
       include: {
         items: true,
         colaborador: true,
@@ -369,7 +369,7 @@ export class OrdersService {
     // Si se actualiza estado, validar transición
     if (updateOrderDto.estado) {
       const order = await this.findOne(id);
-      this.validator.validateStateTransition(order.estado, updateOrderDto.estado);
+      this.validator.validateStateTransition(order.estado as any, updateOrderDto.estado);
     }
 
     return this.prisma.order.update({

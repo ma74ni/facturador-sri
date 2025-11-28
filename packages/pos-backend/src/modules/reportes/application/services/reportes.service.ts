@@ -224,13 +224,13 @@ export class ReportesService {
     const turnos = await this.prisma.turno.findMany({
       where: {
         localId,
-        apertura: {
+        horaApertura: {
           gte: inicio,
           lte: fin,
         },
       },
       orderBy: {
-        apertura: 'desc',
+        horaApertura: 'desc',
       },
       take: 10,
     });
@@ -252,9 +252,9 @@ export class ReportesService {
       })),
       turnosRecientes: turnos.map((turno) => ({
         id: turno.id,
-        numeroTurno: turno.numeroTurno,
-        apertura: turno.apertura,
-        cierre: turno.cierre,
+        numeroTurno: turno.numeroSecuencial,
+        apertura: turno.horaApertura,
+        cierre: turno.horaCierre,
         estado: turno.estado,
         totalVentas: turno.totalVentas
           ? parseFloat(turno.totalVentas.toString())

@@ -39,7 +39,7 @@ export class OrderPaymentService {
     }
 
     // Validar que se puede pagar
-    this.validator.canBePaid(order.estado);
+    this.validator.canBePaid(order.estado as any);
 
     // Validar que el turno esté abierto
     if (!order.turno || order.turno.estado !== 'ABIERTO') {
@@ -163,6 +163,9 @@ export class OrderPaymentService {
       await this.prisma.invoiceQueue.create({
         data: {
           orderId,
+          localId: '', // Will be populated by worker
+          facturacionCustomerId: '', // Will be populated by worker
+          payload: {} as any, // Will be populated by worker
           estado: 'PENDIENTE',
           intentos: 0,
         },
@@ -190,7 +193,7 @@ export class OrderPaymentService {
 
       // Crear job para comanda de cocina (solo si tiene items preparables)
       const itemsPreparables = order.items.filter(
-        (item) => !item.esIncremental || item.esIncremental === false,
+        (item) => !item.esIncremental,
       );
 
       if (itemsPreparables.length > 0) {
@@ -200,7 +203,8 @@ export class OrderPaymentService {
             tipo: 'COMANDA',
             estado: 'PENDIENTE',
             intentos: 0,
-            datos: {
+            printerName: 'Default Printer',
+            contenido: {
               numeroOrden: order.numeroSecuencial,
               tipo: order.tipo,
               mesa: order.numeroMesa,
@@ -213,7 +217,7 @@ export class OrderPaymentService {
                 sustituciones: item.sustituciones,
                 notas: item.notas,
               })),
-            },
+            } as any,
           },
         });
       }
@@ -225,7 +229,8 @@ export class OrderPaymentService {
           tipo: 'TICKET',
           estado: 'PENDIENTE',
           intentos: 0,
-          datos: {
+          printerName: 'Default Printer',
+          contenido: {
             numeroOrden: order.numeroSecuencial,
             local: order.local.nombre,
             fecha: order.createdAt,
@@ -247,7 +252,7 @@ export class OrderPaymentService {
               ? parseFloat(order.montoPagado.toString())
               : 0,
             cambio: order.cambio ? parseFloat(order.cambio.toString()) : 0,
-          },
+          } as any,
         },
       });
     } catch (error) {
@@ -359,7 +364,8 @@ export class OrderPaymentService {
           tipo: 'TICKET',
           estado: 'PENDIENTE',
           intentos: 0,
-          datos: {
+          printerName: 'Default Printer',
+          contenido: {
             numeroOrden: order.numeroSecuencial,
             local: order.local.nombre,
             fecha: new Date(),
@@ -375,7 +381,7 @@ export class OrderPaymentService {
               (sum, item) => sum + parseFloat(item.subtotalItem.toString()),
               0,
             ),
-          },
+          } as any,
         },
       });
     } catch (error) {
