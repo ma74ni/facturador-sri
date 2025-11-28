@@ -8,14 +8,15 @@ export interface AbrirTurnoDto {
 }
 
 export interface CerrarTurnoDto {
-  efectivoFinal: number;
-  observaciones?: string;
+  efectivoReal: number;
+  notas?: string;
+  procesarFacturas?: boolean;
 }
 
 export const turnosApi = {
   getTurnoActivo: async (localId: string): Promise<Turno | null> => {
     try {
-      const response = await apiClient.get(`/turnos/activo/${localId}`);
+      const response = await apiClient.get(`/turnos/activo/local/${localId}`);
       return response.data;
     } catch (error: any) {
       if (error.response?.status === 404) {

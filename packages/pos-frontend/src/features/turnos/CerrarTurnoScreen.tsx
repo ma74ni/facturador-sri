@@ -32,9 +32,15 @@ export function CerrarTurnoScreen({ isOpen, onClose }: CerrarTurnoScreenProps) {
   const [efectivoFinal, setEfectivoFinal] = useState('');
   const [observaciones, setObservaciones] = useState('');
 
+  // Helper para convertir Decimal de Prisma a número
+  const toNumber = (value: any): number => {
+    if (typeof value === 'number') return value;
+    return parseFloat(value?.toString() || '0');
+  };
+
   // Mutation para cerrar turno
   const cerrarTurnoMutation = useMutation({
-    mutationFn: (data: { efectivoFinal: number; observaciones?: string }) =>
+    mutationFn: (data: { efectivoReal: number; notas?: string }) =>
       turnosApi.cerrarTurno(turnoActivo!.id, data),
     onSuccess: () => {
       toast.success('Turno cerrado exitosamente');
@@ -54,8 +60,8 @@ export function CerrarTurnoScreen({ isOpen, onClose }: CerrarTurnoScreenProps) {
     }
 
     cerrarTurnoMutation.mutate({
-      efectivoFinal: parseFloat(efectivoFinal),
-      observaciones: observaciones || undefined,
+      efectivoReal: parseFloat(efectivoFinal),
+      notas: observaciones || undefined,
     });
   };
 
@@ -64,9 +70,7 @@ export function CerrarTurnoScreen({ isOpen, onClose }: CerrarTurnoScreenProps) {
   }
 
   // Calcular esperado vs contado
-  const efectivoEsperado =
-    parseFloat(turnoActivo.efectivoInicial.toString()) +
-    parseFloat(turnoActivo.totalEfectivo.toString());
+  const efectivoEsperado = toNumber(turnoActivo.efectivoInicial) + toNumber(turnoActivo.totalEfectivo);
   const efectivoContado = parseFloat(efectivoFinal || '0');
   const diferencia = efectivoContado - efectivoEsperado;
 
@@ -86,17 +90,19 @@ export function CerrarTurnoScreen({ isOpen, onClose }: CerrarTurnoScreenProps) {
             <CardContent className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Turno #:</span>
-                <span className="font-medium">{turnoActivo.numeroTurno}</span>
+                <span className="font-medium">{turnoActivo.numeroSecuencial}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Apertura:</span>
                 <span className="font-medium">
-                  {format(new Date(turnoActivo.aperturaAt), "dd/MM/yyyy HH:mm", { locale: es })}
+                  {turnoActivo.horaApertura
+                    ? format(new Date(turnoActivo.horaApertura), "dd/MM/yyyy HH:mm", { locale: es })
+                    : 'N/A'}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Efectivo Inicial:</span>
-                <span className="font-medium">${turnoActivo.efectivoInicial.toFixed(2)}</span>
+                <span className="font-medium">${toNumber(turnoActivo.efectivoInicial).toFixed(2)}</span>
               </div>
             </CardContent>
           </Card>
@@ -115,7 +121,7 @@ export function CerrarTurnoScreen({ isOpen, onClose }: CerrarTurnoScreenProps) {
                   <Banknote className="mr-2 h-5 w-5 text-green-600" />
                   <span className="text-sm font-medium">Efectivo</span>
                 </div>
-                <span className="text-lg font-bold">${turnoActivo.totalEfectivo.toFixed(2)}</span>
+                <span className="text-lg font-bold">${toNumber(turnoActivo.totalEfectivo).toFixed(2)}</span>
               </div>
 
               <div className="flex items-center justify-between rounded-lg border p-3">
@@ -123,7 +129,7 @@ export function CerrarTurnoScreen({ isOpen, onClose }: CerrarTurnoScreenProps) {
                   <CreditCard className="mr-2 h-5 w-5 text-blue-600" />
                   <span className="text-sm font-medium">Tarjeta</span>
                 </div>
-                <span className="text-lg font-bold">${turnoActivo.totalTarjeta.toFixed(2)}</span>
+                <span className="text-lg font-bold">${toNumber(turnoActivo.totalTarjeta).toFixed(2)}</span>
               </div>
 
               <div className="flex items-center justify-between rounded-lg border p-3">
@@ -132,14 +138,14 @@ export function CerrarTurnoScreen({ isOpen, onClose }: CerrarTurnoScreenProps) {
                   <span className="text-sm font-medium">Transferencia</span>
                 </div>
                 <span className="text-lg font-bold">
-                  ${turnoActivo.totalTransferencia.toFixed(2)}
+                  ${toNumber(turnoActivo.totalTransferencia).toFixed(2)}
                 </span>
               </div>
 
               <div className="flex items-center justify-between rounded-lg bg-primary/10 p-3">
                 <span className="font-semibold">Total Ventas</span>
                 <span className="text-xl font-bold text-primary">
-                  ${turnoActivo.totalVentas.toFixed(2)}
+                  ${toNumber(turnoActivo.totalVentas).toFixed(2)}
                 </span>
               </div>
 

@@ -116,7 +116,7 @@ export function LoginScreen() {
               <SelectContent>
                 {locales?.map((local) => (
                   <SelectItem key={local.id} value={local.id}>
-                    {local.nombre} - {local.ciudad}
+                    {local.nombre}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -140,7 +140,7 @@ export function LoginScreen() {
               <SelectContent>
                 {colaboradores?.map((colaborador) => (
                   <SelectItem key={colaborador.id} value={colaborador.id}>
-                    {colaborador.nombre} {colaborador.apellido} - {colaborador.rol}
+                    {colaborador.nombre} {colaborador.apellido || ''}
                   </SelectItem>
                 ))}
               </SelectContent>

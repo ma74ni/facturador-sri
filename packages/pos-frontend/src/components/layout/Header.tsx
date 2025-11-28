@@ -33,9 +33,11 @@ export function Header() {
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-muted-foreground" />
                   <div className="text-sm">
-                    <p className="font-medium">Turno #{turnoActivo.numeroTurno}</p>
+                    <p className="font-medium">Turno #{turnoActivo.numeroTurno || turnoActivo.numeroSecuencial}</p>
                     <p className="text-xs text-muted-foreground">
-                      {format(new Date(turnoActivo.aperturaAt), 'HH:mm', { locale: es })}
+                      {turnoActivo.aperturaAt || turnoActivo.horaApertura
+                        ? format(new Date(turnoActivo.aperturaAt || turnoActivo.horaApertura), 'HH:mm', { locale: es })
+                        : 'N/A'}
                     </p>
                   </div>
                 </div>
@@ -43,9 +45,9 @@ export function Header() {
                 <div className="flex items-center gap-2">
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                   <div className="text-sm">
-                    <p className="font-medium">${turnoActivo.totalVentas.toFixed(2)}</p>
+                    <p className="font-medium">${Number(turnoActivo.totalVentas || 0).toFixed(2)}</p>
                     <p className="text-xs text-muted-foreground">
-                      {turnoActivo.numeroVentas} venta{turnoActivo.numeroVentas !== 1 ? 's' : ''}
+                      {turnoActivo.numeroVentas || 0} venta{(turnoActivo.numeroVentas || 0) !== 1 ? 's' : ''}
                     </p>
                   </div>
                 </div>
@@ -59,9 +61,8 @@ export function Header() {
               <User className="h-4 w-4 text-muted-foreground" />
               <div className="text-sm">
                 <p className="font-medium">
-                  {colaborador?.nombre} {colaborador?.apellido}
+                  {colaborador?.nombre} {colaborador?.apellido || ''}
                 </p>
-                <p className="text-xs text-muted-foreground">{colaborador?.rol}</p>
               </div>
             </div>
 

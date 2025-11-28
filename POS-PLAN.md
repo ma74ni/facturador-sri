@@ -2337,10 +2337,116 @@ export class ThermalPrinterService {
 
 1. ✅ **Modificadores:** ¿Has revisado los ejemplos de pedidos? ¿La estructura de modificadores por categoría es correcta?
 2. ⏳ **Inventario de sabores:** ¿Necesitas reportes de "sabores más vendidos" aunque no controles stock exacto?
-3. ⏳ **Multi-dispositivo:** ¿Varios dispositivos POS en el mismo local o solo uno?
+3. ✅ **Multi-dispositivo y Multi-colaborador:** CONFIRMADO - Ver sección abajo
 4. ⏳ **Roles/permisos:** ¿Todos los colaboradores tienen los mismos permisos o hay roles (cajero, admin)?
 5. ⏳ **Propinas:** ¿Se manejan propinas en el sistema?
 6. ⏳ **Descuentos/promociones:** ¿Necesitas aplicar descuentos o cupones?
+
+---
+
+## 🔄 Multi-Colaborador en Dispositivo Compartido
+
+### Escenario Actual
+- **1 computadora** por local inicialmente
+- **Múltiples colaboradores** usando el mismo dispositivo durante el mismo turno
+- **Futuro**: Posibilidad de tablets adicionales
+
+### Arquitectura Implementada
+
+**Backend (✅ YA SOPORTA MULTI-COLABORADOR):**
+```prisma
+model Turno {
+  colaboradorId  String  // Quien ABRE el turno
+  ordenes        Order[]
+}
+
+model Order {
+  turnoId        String  // A qué turno pertenece
+  colaboradorId  String  // Quien CREÓ esta orden específica
+}
+```
+
+**Flujo de Trabajo:**
+1. **Colaborador A** abre el turno al inicio del día
+2. **Colaborador A** toma órdenes → Órdenes registradas a nombre de Colaborador A
+3. **Colaborador B** llega y hace "switch" en el sistema
+4. **Colaborador B** toma órdenes → Órdenes registradas a nombre de Colaborador B
+5. Ambos colaboradores trabajan en el **mismo turno activo**
+6. Al final del día, **Colaborador A** (o quien tenga permiso) cierra el turno
+
+### Características Clave
+
+✅ **Un solo turno activo** por local
+✅ **Múltiples colaboradores** pueden atender en el mismo turno
+✅ **Registro individual** de quién toma cada orden
+✅ **Switch rápido** entre colaboradores con PIN
+✅ **Trazabilidad** completa de quién hizo qué
+
+### Frontend - Cambios Necesarios
+
+**Componente: "Switch de Colaborador"**
+- Botón/Avatar del colaborador actual en el Header
+- Al hacer clic → Modal para cambiar colaborador
+- Lista de colaboradores activos del local
+- Validación de PIN del nuevo colaborador
+- Actualización del estado sin cerrar sesión ni turno
+
+**Estado en sessionStore:**
+```typescript
+interface SessionState {
+  turnoActivo: Turno;           // Se mantiene igual
+  local: Local;                 // Se mantiene igual
+  colaborador: Colaborador;     // Cambio dinámico
+  colaboradorTurno: Colaborador; // Quien abrió el turno (readonly)
+}
+```
+
+**UX Propuesta:**
+```
+┌────────────────────────────────────────┐
+│ [≡] Local Centro | Turno #42          │
+│                                        │
+│ Atendiendo: 🔵 Juan P. [Cambiar]      │ ← Click aquí
+└────────────────────────────────────────┘
+
+     ↓ Click en [Cambiar]
+
+┌─────────────────────────────────────┐
+│  Cambiar Colaborador                │
+├─────────────────────────────────────┤
+│                                     │
+│  Turno abierto por: Juan Pérez      │
+│                                     │
+│  Selecciona colaborador:            │
+│  ┌──────────────┐                   │
+│  │ 🔵 Juan P.   │ ← Actual          │
+│  ├──────────────┤                   │
+│  │ 🟢 María G.  │                   │
+│  ├──────────────┤                   │
+│  │ 🔴 Carlos R. │                   │
+│  └──────────────┘                   │
+│                                     │
+│  PIN de María:                      │
+│  [____]                             │
+│                                     │
+│  [Cancelar]  [Confirmar]            │
+└─────────────────────────────────────┘
+```
+
+### Reportes y Auditoría
+
+**Reporte de cierre de turno incluye:**
+- Total de ventas del turno
+- Desglose por colaborador:
+  - Juan Pérez: 15 órdenes, $245.50
+  - María García: 12 órdenes, $198.30
+  - Carlos Ruiz: 5 órdenes, $87.20
+
+**Beneficios:**
+- ✅ Responsabilidad individual
+- ✅ Métricas de desempeño
+- ✅ Auditoría completa
+- ✅ Flexibilidad operativa
 
 ---
 

@@ -66,8 +66,9 @@ export class ColaboradoresController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Validar PIN de colaborador' })
   @ApiResponse({ status: 200, description: 'PIN validado' })
-  validatePin(@Param('id') id: string, @Body('pin') pin: string) {
-    return this.colaboradoresService.validatePin(id, pin);
+  async validatePin(@Param('id') id: string, @Body('pin') pin: string) {
+    const valid = await this.colaboradoresService.validatePin(id, pin);
+    return { valid };
   }
 
   @Patch(':id')
