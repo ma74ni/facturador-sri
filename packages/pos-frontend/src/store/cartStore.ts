@@ -1,0 +1,75 @@
+import { create } from 'zustand';
+import { OrderItem, TipoOrden } from '@/lib/types';
+
+interface CartState {
+  items: OrderItem[];
+  tipo: TipoOrden;
+  numeroMesa?: string;
+  notas?: string;
+
+  // Actions
+  addItem: (item: OrderItem) => void;
+  removeItem: (index: number) => void;
+  updateItemQuantity: (index: number, cantidad: number) => void;
+  clearCart: () => void;
+  setTipo: (tipo: TipoOrden) => void;
+  setNumeroMesa: (numeroMesa?: string) => void;
+  setNotas: (notas?: string) => void;
+
+  // Computed
+  getSubtotal: () => number;
+  getItemCount: () => number;
+}
+
+export const useCartStore = create<CartState>((set, get) => ({
+  items: [],
+  tipo: TipoOrden.AQUI,
+  numeroMesa: undefined,
+  notas: undefined,
+
+  addItem: (item) =>
+    set((state) => ({
+      items: [...state.items, item],
+    })),
+
+  removeItem: (index) =>
+    set((state) => ({
+      items: state.items.filter((_, i) => i !== index),
+    })),
+
+  updateItemQuantity: (index, cantidad) =>
+    set((state) => {
+      const newItems = [...state.items];
+      if (newItems[index]) {
+        newItems[index] = {
+          ...newItems[index],
+          cantidad,
+          subtotalItem: newItems[index].precioUnitario * cantidad,
+        };
+      }
+      return { items: newItems };
+    }),
+
+  clearCart: () =>
+    set({
+      items: [],
+      numeroMesa: undefined,
+      notas: undefined,
+    }),
+
+  setTipo: (tipo) => set({ tipo }),
+
+  setNumeroMesa: (numeroMesa) => set({ numeroMesa }),
+
+  setNotas: (notas) => set({ notas }),
+
+  getSubtotal: () => {
+    const { items } = get();
+    return items.reduce((sum, item) => sum + item.subtotalItem, 0);
+  },
+
+  getItemCount: () => {
+    const { items } = get();
+    return items.reduce((sum, item) => sum + item.cantidad, 0);
+  },
+}));
