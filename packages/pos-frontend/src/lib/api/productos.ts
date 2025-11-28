@@ -14,9 +14,9 @@ export const productosApi = {
     return response.data;
   },
 
-  // Listar todos los modificadores
+  // Listar todos los modificadores disponibles
   async getModificadores(): Promise<Modificador[]> {
-    const response = await apiClient.get('/modificadores');
+    const response = await apiClient.get('/modificadores/disponibles');
     return response.data;
   },
 

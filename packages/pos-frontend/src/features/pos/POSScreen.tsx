@@ -1,20 +1,27 @@
 import { useState } from 'react';
 import { useSessionStore } from '@/store/sessionStore';
+import { useCartStore } from '@/store/cartStore';
 import { useCategorias, useProductosByLocal } from '@/lib/hooks/useProductos';
-import type { Categoria, Producto } from '@/lib/types';
+import type { Categoria, Producto, OrderItem } from '@/lib/types';
 import { CategoriaGrid } from '@/components/pos/CategoriaGrid';
 import { ProductoGrid } from '@/components/pos/ProductoGrid';
 import { CartPanel } from '@/components/pos/CartPanel';
+import { ModificadoresModal } from '@/components/pos/ModificadoresModal';
+import { PaymentModal } from '@/features/payment/PaymentModal';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export function POSScreen() {
   const { local } = useSessionStore();
+  const { addItem, getItemCount } = useCartStore();
   const [selectedCategoria, setSelectedCategoria] = useState<Categoria | null>(
     null
   );
   const [selectedProducto, setSelectedProducto] = useState<Producto | null>(
     null
   );
+  const [modalOpen, setModalOpen] = useState(false);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
   // Fetch data
   const { data: categorias, isLoading: loadingCategorias } = useCategorias();
@@ -28,14 +35,28 @@ export function POSScreen() {
     : productos || [];
 
   const handleSelectProducto = (producto: Producto) => {
-    // TODO: Open ModificadoresModal
     setSelectedProducto(producto);
-    console.log('Selected product:', producto);
+    setModalOpen(true);
+  };
+
+  const handleAddToCart = (item: OrderItem) => {
+    addItem(item);
+    toast.success(`${item.nombreProducto} agregado al carrito`);
   };
 
   const handleCheckout = () => {
-    // TODO: Open PaymentModal
-    console.log('Checkout clicked');
+    const itemCount = getItemCount();
+    if (itemCount === 0) {
+      toast.error('El carrito está vacío');
+      return;
+    }
+    setPaymentModalOpen(true);
+  };
+
+  const handlePaymentSuccess = () => {
+    toast.success('¡Venta completada!', {
+      description: 'La orden ha sido procesada exitosamente',
+    });
   };
 
   if (loadingCategorias || loadingProductos) {
@@ -88,6 +109,21 @@ export function POSScreen() {
       <div className="w-96 shrink-0">
         <CartPanel onCheckout={handleCheckout} />
       </div>
+
+      {/* Modificadores Modal */}
+      <ModificadoresModal
+        producto={selectedProducto}
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onAddToCart={handleAddToCart}
+      />
+
+      {/* Payment Modal */}
+      <PaymentModal
+        open={paymentModalOpen}
+        onClose={() => setPaymentModalOpen(false)}
+        onSuccess={handlePaymentSuccess}
+      />
     </div>
   );
 }

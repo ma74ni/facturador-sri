@@ -50,7 +50,7 @@ export function calculateCartTotals(
 }
 
 export function calculateItemSubtotal(
-  precioBase: number,
+  precioBase: number | string,
   cantidad: number,
   modificadores: {
     sabores?: any[];
@@ -59,21 +59,32 @@ export function calculateItemSubtotal(
     sustituciones?: any[];
   }
 ): number {
-  let precioUnitario = precioBase;
+  // Convert precioBase to number if it's a string
+  let precioUnitario = typeof precioBase === 'string' ? parseFloat(precioBase) : precioBase;
 
   // Sumar precios de modificadores
-  if (modificadores.toppings) {
+  if (modificadores.toppings && Array.isArray(modificadores.toppings)) {
     modificadores.toppings.forEach((topping) => {
       if (topping.precioAdicional) {
-        precioUnitario += topping.precioAdicional;
+        const precio = typeof topping.precioAdicional === 'string'
+          ? parseFloat(topping.precioAdicional)
+          : topping.precioAdicional;
+        if (!isNaN(precio)) {
+          precioUnitario += precio;
+        }
       }
     });
   }
 
-  if (modificadores.aderezos) {
+  if (modificadores.aderezos && Array.isArray(modificadores.aderezos)) {
     modificadores.aderezos.forEach((aderezo) => {
       if (aderezo.precioAdicional) {
-        precioUnitario += aderezo.precioAdicional;
+        const precio = typeof aderezo.precioAdicional === 'string'
+          ? parseFloat(aderezo.precioAdicional)
+          : aderezo.precioAdicional;
+        if (!isNaN(precio)) {
+          precioUnitario += precio;
+        }
       }
     });
   }
