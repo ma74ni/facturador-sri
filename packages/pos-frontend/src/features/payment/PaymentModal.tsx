@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSessionStore } from '@/store/sessionStore';
 import { useCartStore } from '@/store/cartStore';
 import { useCreateOrder, usePayOrder } from '@/lib/hooks/useOrders';
+import { ordersApi } from '@/lib/api/orders';
 import type { CustomerSearchResult } from '@/lib/api/facturacion';
 import { MetodoPago } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils/cartCalculations';
@@ -19,7 +21,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { FacturaDialog } from './FacturaDialog';
-import { Loader2, CreditCard, Banknote, Smartphone } from 'lucide-react';
+import { Loader2, CreditCard, Banknote, Smartphone, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PaymentModalProps {
@@ -31,8 +33,19 @@ interface PaymentModalProps {
 const QUICK_AMOUNTS = [5, 10, 20, 50, 100];
 
 export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
+  const navigate = useNavigate();
   const { local, colaborador, turnoActivo: turno } = useSessionStore();
-  const { items, tipo, numeroMesa, notas, getTotals, clearCart } = useCartStore();
+  const {
+    items,
+    tipo,
+    numeroMesa,
+    notas,
+    getTotals,
+    clearCart,
+    isIncrementalMode,
+    incrementalOrderId,
+    disableIncrementalMode,
+  } = useCartStore();
   const totals = getTotals();
 
   const [metodoPago, setMetodoPago] = useState<MetodoPago>(MetodoPago.EFECTIVO);
@@ -40,6 +53,7 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
   const [requiereFactura, setRequiereFactura] = useState(false);
   const [facturaDialogOpen, setFacturaDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerSearchResult | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const createOrder = useCreateOrder();
   const payOrder = usePayOrder();
@@ -51,6 +65,12 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
     if (items.length === 0) return false;
     if (!local || !colaborador || !turno) return false;
 
+    // In incremental mode, we don't need payment info
+    if (isIncrementalMode && incrementalOrderId) {
+      return true;
+    }
+
+    // Normal mode: validate payment
     if (metodoPago === MetodoPago.EFECTIVO) {
       const monto = parseFloat(montoPagado);
       if (isNaN(monto) || monto < totals.total) return false;
@@ -69,53 +89,88 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
     if (!canProceed() || !local || !colaborador || !turno) return;
 
     try {
-      // 1. Create order
-      const orderData = {
-        localId: local.id,
-        turnoId: turno.id,
-        colaboradorId: colaborador.id,
-        tipo,
-        numeroMesa,
-        items: items.map((item) => ({
-          productoId: item.productoId,
-          nombreProducto: item.nombreProducto,
-          precioUnitario: item.precioUnitario,
-          cantidad: item.cantidad,
-          sabores: item.sabores,
-          toppings: item.toppings,
-          aderezos: item.aderezos,
-          sustituciones: item.sustituciones,
-          subtotalItem: item.subtotalItem,
-          notas: item.notas,
-        })),
-        notas,
+      setIsProcessing(true);
+
+      // Helper function to transform modificadores to backend format
+      const transformModificadores = (modificadores?: any[]) => {
+        if (!modificadores || modificadores.length === 0) return undefined;
+        return modificadores.map((mod) => ({
+          id: mod.id,
+          nombre: mod.nombre,
+          precio: mod.precioAdicional ? parseFloat(mod.precioAdicional) : undefined,
+        }));
       };
 
-      const order = await createOrder.mutateAsync(orderData);
+      const transformedItems = items.map((item) => ({
+        productoId: item.productoId,
+        cantidad: item.cantidad,
+        sabores: transformModificadores(item.sabores),
+        toppings: transformModificadores(item.toppings),
+        aderezos: transformModificadores(item.aderezos),
+        sustituciones: transformModificadores(item.sustituciones),
+        notas: item.notas,
+      }));
 
-      // 2. Process payment
-      const paymentData = {
-        metodoPago,
-        montoPagado: metodoPago === MetodoPago.EFECTIVO ? parseFloat(montoPagado) : totals.total,
-        requiereFactura,
-        facturacionCustomerId: selectedCustomer?.id,
-      };
+      // INCREMENTAL MODE: Add items to existing order
+      if (isIncrementalMode && incrementalOrderId) {
+        // Add each item to the existing order
+        for (const item of transformedItems) {
+          await ordersApi.addItem(incrementalOrderId, item);
+        }
 
-      await payOrder.mutateAsync({
-        orderId: order.id!,
-        payment: paymentData,
-      });
+        // Success
+        clearCart();
+        disableIncrementalMode();
+        handleClose();
+        onSuccess();
+        navigate('/ordenes');
+        toast.success('¡Productos añadidos exitosamente!', {
+          description: `${items.length} ${items.length === 1 ? 'producto agregado' : 'productos agregados'}`,
+        });
+      } else {
+        // NORMAL MODE: Create new order and process payment
+        // 1. Create order
+        const orderData = {
+          localId: local.id,
+          turnoId: turno.id,
+          colaboradorId: colaborador.id,
+          tipo,
+          numeroMesa,
+          items: transformedItems,
+          notas,
+        };
 
-      // 3. Success
-      clearCart();
-      handleClose();
-      onSuccess();
-      toast.success('¡Pago procesado exitosamente!', {
-        description: `Orden #${order.numeroSecuencial} - ${formatCurrency(totals.total)}`,
-      });
+        const order = await createOrder.mutateAsync(orderData);
+
+        // 2. Process payment
+        const paymentData = {
+          metodoPago,
+          montoPagado: metodoPago === MetodoPago.EFECTIVO ? parseFloat(montoPagado) : totals.total,
+          requiereFactura,
+          facturacionCustomerId: selectedCustomer?.id,
+        };
+
+        await payOrder.mutateAsync({
+          orderId: order.id!,
+          payment: paymentData,
+        });
+
+        // 3. Success
+        clearCart();
+        handleClose();
+        onSuccess();
+        toast.success('¡Pago procesado exitosamente!', {
+          description: `Orden #${order.numeroSecuencial} - ${formatCurrency(totals.total)}`,
+        });
+      }
     } catch (error) {
-      // Errors handled by mutations
+      // Errors handled by mutations or show generic error
       console.error('Payment error:', error);
+      toast.error('Error al procesar', {
+        description: 'Por favor intenta nuevamente',
+      });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -147,18 +202,31 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
-              Procesar Pago
+              {isIncrementalMode ? (
+                <>
+                  <Plus className="h-5 w-5" />
+                  Añadir Productos
+                </>
+              ) : (
+                <>
+                  <CreditCard className="h-5 w-5" />
+                  Procesar Pago
+                </>
+              )}
             </DialogTitle>
             <DialogDescription>
-              Completa la información para procesar el pago
+              {isIncrementalMode
+                ? 'Confirma los productos a añadir a la orden existente'
+                : 'Completa la información para procesar el pago'}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             {/* Total to Pay */}
             <div className="p-4 bg-primary/10 rounded-lg">
-              <div className="text-sm text-muted-foreground mb-1">Total a cobrar</div>
+              <div className="text-sm text-muted-foreground mb-1">
+                {isIncrementalMode ? 'Total de productos' : 'Total a cobrar'}
+              </div>
               <div className="text-3xl font-bold text-primary">
                 {formatCurrency(totals.total)}
               </div>
@@ -167,12 +235,20 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
                   Incluye recargo de {formatCurrency(totals.recargoMonto)}
                 </div>
               )}
+              {isIncrementalMode && (
+                <div className="text-xs text-muted-foreground mt-1">
+                  Estos productos se añadirán a la orden existente
+                </div>
+              )}
             </div>
 
-            <Separator />
+            {/* Only show payment options in normal mode */}
+            {!isIncrementalMode && (
+              <>
+                <Separator />
 
-            {/* Payment Method */}
-            <div>
+                {/* Payment Method */}
+                <div>
               <Label className="text-base font-semibold mb-3 block">
                 Método de Pago
               </Label>
@@ -247,37 +323,39 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
               </div>
             )}
 
-            <Separator />
+                <Separator />
 
-            {/* Invoice Option */}
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="factura"
-                checked={requiereFactura}
-                onCheckedChange={handleRequiereFacturaChange}
-              />
-              <Label
-                htmlFor="factura"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-              >
-                ¿Requiere factura?
-              </Label>
-            </div>
+                {/* Invoice Option */}
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="factura"
+                    checked={requiereFactura}
+                    onCheckedChange={handleRequiereFacturaChange}
+                  />
+                  <Label
+                    htmlFor="factura"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    ¿Requiere factura?
+                  </Label>
+                </div>
 
-            {/* Selected Customer */}
-            {selectedCustomer && (
-              <div className="p-3 bg-muted rounded-lg text-sm">
-                <div className="font-semibold">{selectedCustomer.nombre}</div>
-                <div className="text-muted-foreground">{selectedCustomer.identificacion}</div>
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="p-0 h-auto"
-                  onClick={() => setFacturaDialogOpen(true)}
-                >
-                  Cambiar cliente
-                </Button>
-              </div>
+                {/* Selected Customer */}
+                {selectedCustomer && (
+                  <div className="p-3 bg-muted rounded-lg text-sm">
+                    <div className="font-semibold">{selectedCustomer.razonSocial}</div>
+                    <div className="text-muted-foreground">{selectedCustomer.identificacion}</div>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="p-0 h-auto"
+                      onClick={() => setFacturaDialogOpen(true)}
+                    >
+                      Cambiar cliente
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Actions */}
@@ -287,16 +365,18 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
               </Button>
               <Button
                 onClick={handleProcesarPago}
-                disabled={!canProceed() || createOrder.isPending || payOrder.isPending}
+                disabled={!canProceed() || isProcessing || createOrder.isPending || payOrder.isPending}
                 className="flex-1"
                 size="lg"
               >
-                {createOrder.isPending || payOrder.isPending ? (
+                {isProcessing || createOrder.isPending || payOrder.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : isIncrementalMode ? (
+                  <Plus className="h-4 w-4 mr-2" />
                 ) : (
                   <CreditCard className="h-4 w-4 mr-2" />
                 )}
-                Procesar Pago
+                {isIncrementalMode ? 'Añadir Productos' : 'Procesar Pago'}
               </Button>
             </div>
           </div>

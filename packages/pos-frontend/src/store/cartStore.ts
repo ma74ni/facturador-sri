@@ -9,6 +9,10 @@ interface CartState {
   numeroMesa?: string;
   notas?: string;
 
+  // Incremental order mode
+  isIncrementalMode: boolean;
+  incrementalOrderId?: string;
+
   // Actions
   addItem: (item: OrderItem) => void;
   removeItem: (index: number) => void;
@@ -17,6 +21,10 @@ interface CartState {
   setTipo: (tipo: TipoOrden) => void;
   setNumeroMesa: (numeroMesa?: string) => void;
   setNotas: (notas?: string) => void;
+
+  // Incremental mode actions
+  enableIncrementalMode: (orderId: string) => void;
+  disableIncrementalMode: () => void;
 
   // Computed
   getSubtotal: () => number;
@@ -35,6 +43,8 @@ export const useCartStore = create<CartState>((set, get) => ({
   tipo: TipoOrden.AQUI,
   numeroMesa: undefined,
   notas: undefined,
+  isIncrementalMode: false,
+  incrementalOrderId: undefined,
 
   addItem: (item) =>
     set((state) => ({
@@ -64,6 +74,8 @@ export const useCartStore = create<CartState>((set, get) => ({
       items: [],
       numeroMesa: undefined,
       notas: undefined,
+      isIncrementalMode: false,
+      incrementalOrderId: undefined,
     }),
 
   setTipo: (tipo) => set({ tipo }),
@@ -71,6 +83,19 @@ export const useCartStore = create<CartState>((set, get) => ({
   setNumeroMesa: (numeroMesa) => set({ numeroMesa }),
 
   setNotas: (notas) => set({ notas }),
+
+  enableIncrementalMode: (orderId) =>
+    set({
+      isIncrementalMode: true,
+      incrementalOrderId: orderId,
+      items: [], // Start with empty cart for incremental items
+    }),
+
+  disableIncrementalMode: () =>
+    set({
+      isIncrementalMode: false,
+      incrementalOrderId: undefined,
+    }),
 
   getSubtotal: () => {
     const { items } = get();

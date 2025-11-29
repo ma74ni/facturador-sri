@@ -27,6 +27,7 @@ export class ModificadorSeleccionado {
   nombre: string;
 
   @ApiProperty({ description: 'Precio adicional', required: false })
+  @IsOptional()
   precio?: number;
 }
 
@@ -37,6 +38,7 @@ export class CreateOrderItemDto {
   productoId: string;
 
   @ApiProperty({ description: 'Cantidad', example: 1, default: 1 })
+  @IsOptional()
   cantidad?: number;
 
   @ApiProperty({

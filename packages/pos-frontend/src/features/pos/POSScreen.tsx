@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSessionStore } from '@/store/sessionStore';
 import { useCartStore } from '@/store/cartStore';
 import { useCategorias, useProductosByLocal } from '@/lib/hooks/useProductos';
@@ -8,12 +9,20 @@ import { ProductoGrid } from '@/components/pos/ProductoGrid';
 import { CartPanel } from '@/components/pos/CartPanel';
 import { ModificadoresModal } from '@/components/pos/ModificadoresModal';
 import { PaymentModal } from '@/features/payment/PaymentModal';
-import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, ArrowLeft, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function POSScreen() {
+  const navigate = useNavigate();
   const { local } = useSessionStore();
-  const { addItem, getItemCount } = useCartStore();
+  const {
+    addItem,
+    getItemCount,
+    isIncrementalMode,
+    incrementalOrderId,
+    disableIncrementalMode,
+  } = useCartStore();
   const [selectedCategoria, setSelectedCategoria] = useState<Categoria | null>(
     null
   );
@@ -59,6 +68,11 @@ export function POSScreen() {
     });
   };
 
+  const handleCancelIncremental = () => {
+    disableIncrementalMode();
+    navigate('/ordenes');
+  };
+
   if (loadingCategorias || loadingProductos) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -71,11 +85,36 @@ export function POSScreen() {
     <div className="h-full flex gap-4">
       {/* Main Content - Product Catalog */}
       <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+        {/* Incremental Mode Banner */}
+        {/* Incremental Mode Banner */}
+        {isIncrementalMode && incrementalOrderId && (
+          <div className="bg-blue-50 border border-blue-200 rounded p-3 flex items-center gap-3">
+            <Plus className="h-4 w-4 text-blue-600" />
+            <div className="flex items-center justify-between w-full">
+              <span className="text-blue-900 font-medium">
+                Añadiendo productos a orden existente
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCancelIncremental}
+                className="text-blue-700 hover:text-blue-900"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Cancelar y volver
+              </Button>
+            </div>
+          </div>
+        )}
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold">Punto de Venta</h1>
+          <h1 className="text-2xl font-bold">
+            {isIncrementalMode ? 'Añadir Productos' : 'Punto de Venta'}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Selecciona productos para crear una orden
+            {isIncrementalMode
+              ? 'Selecciona productos adicionales para la orden'
+              : 'Selecciona productos para crear una orden'}
           </p>
         </div>
 

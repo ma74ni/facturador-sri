@@ -31,7 +31,7 @@ export function FacturaDialog({
 
   // Form state for creating customer
   const [formData, setFormData] = useState({
-    nombre: '',
+    razonSocial: '',
     email: '',
     telefono: '',
     direccion: '',
@@ -44,6 +44,13 @@ export function FacturaDialog({
 
   const createCustomer = useCreateCustomer();
 
+  // Auto-detect tipo de identificacion
+  const getTipoIdentificacion = (id: string): string => {
+    if (id.length === 13) return 'RUC';
+    if (id.length === 10) return 'CEDULA';
+    return 'PASAPORTE';
+  };
+
   const handleSearch = async () => {
     if (identificacion.length < 10) {
       toast.error('La identificación debe tener al menos 10 dígitos');
@@ -55,14 +62,15 @@ export function FacturaDialog({
   };
 
   const handleCreateCustomer = async () => {
-    if (!formData.nombre || !identificacion) {
-      toast.error('Nombre e identificación son obligatorios');
+    if (!formData.razonSocial || !identificacion) {
+      toast.error('Razón Social e identificación son obligatorios');
       return;
     }
 
     try {
       const newCustomer = await createCustomer.mutateAsync({
         identificacion,
+        tipoIdentificacion: getTipoIdentificacion(identificacion),
         ...formData,
       });
       onCustomerSelected(newCustomer);
@@ -83,7 +91,7 @@ export function FacturaDialog({
     setIdentificacion('');
     setSearchTriggered(false);
     setShowCreateForm(false);
-    setFormData({ nombre: '', email: '', telefono: '', direccion: '' });
+    setFormData({ razonSocial: '', email: '', telefono: '', direccion: '' });
     onClose();
   };
 
@@ -139,7 +147,10 @@ export function FacturaDialog({
               </div>
               <div className="space-y-1 text-sm">
                 <p>
-                  <strong>Nombre:</strong> {customer.nombre}
+                  <strong>Razón Social:</strong> {customer.razonSocial}
+                </p>
+                <p>
+                  <strong>Tipo:</strong> {customer.tipoIdentificacion}
                 </p>
                 {customer.email && (
                   <p>
@@ -181,16 +192,16 @@ export function FacturaDialog({
               <h3 className="font-semibold">Crear Nuevo Cliente</h3>
 
               <div>
-                <Label htmlFor="nombre">
-                  Nombre Completo <span className="text-destructive">*</span>
+                <Label htmlFor="razonSocial">
+                  Razón Social / Nombre Completo <span className="text-destructive">*</span>
                 </Label>
                 <Input
-                  id="nombre"
-                  value={formData.nombre}
+                  id="razonSocial"
+                  value={formData.razonSocial}
                   onChange={(e) =>
-                    setFormData({ ...formData, nombre: e.target.value })
+                    setFormData({ ...formData, razonSocial: e.target.value })
                   }
-                  placeholder="Juan Pérez"
+                  placeholder="Juan Pérez o Empresa S.A."
                 />
               </div>
 

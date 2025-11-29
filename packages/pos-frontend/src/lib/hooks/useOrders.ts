@@ -8,7 +8,7 @@ export function useOrders(localId: string) {
     queryKey: ['orders', localId],
     queryFn: () => ordersApi.getByLocal(localId),
     enabled: !!localId,
-    refetchInterval: 5000, // Auto-refresh cada 5 segundos
+    // No auto-refresh - se actualiza manualmente o con invalidación de cache
   });
 }
 

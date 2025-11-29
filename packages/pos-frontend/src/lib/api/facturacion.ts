@@ -3,7 +3,8 @@ import apiClient from './client';
 export interface CustomerSearchResult {
   id: string;
   identificacion: string;
-  nombre: string;
+  tipoIdentificacion: string;
+  razonSocial: string;
   email?: string;
   telefono?: string;
   direccion?: string;
@@ -11,7 +12,8 @@ export interface CustomerSearchResult {
 
 export interface CreateCustomerDto {
   identificacion: string;
-  nombre: string;
+  tipoIdentificacion: string; // 'RUC' | 'CEDULA' | 'PASAPORTE'
+  razonSocial: string;
   email?: string;
   telefono?: string;
   direccion?: string;
@@ -21,7 +23,7 @@ export const facturacionApi = {
   // Buscar cliente por identificación
   async searchCustomer(identificacion: string): Promise<CustomerSearchResult | null> {
     try {
-      const response = await apiClient.get(`/facturacion/clientes/search`, {
+      const response = await apiClient.get(`/facturacion/customers/search`, {
         params: { q: identificacion },
       });
       return response.data;
@@ -35,7 +37,7 @@ export const facturacionApi = {
 
   // Crear nuevo cliente
   async createCustomer(data: CreateCustomerDto): Promise<CustomerSearchResult> {
-    const response = await apiClient.post('/facturacion/clientes', data);
+    const response = await apiClient.post('/facturacion/customers', data);
     return response.data;
   },
 
