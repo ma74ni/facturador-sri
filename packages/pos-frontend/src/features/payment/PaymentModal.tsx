@@ -3,10 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { useSessionStore } from '@/store/sessionStore';
 import { useCartStore } from '@/store/cartStore';
 import { useCreateOrder, usePayOrder } from '@/lib/hooks/useOrders';
+import { useCreateDelivery } from '@/lib/hooks/useDeliveries';
 import { ordersApi } from '@/lib/api/orders';
 import type { CustomerSearchResult } from '@/lib/api/facturacion';
-import { MetodoPago } from '@/lib/types';
+import { MetodoPago, TipoOrden } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils/cartCalculations';
+import {
+  DeliveryForm,
+  validateDeliveryForm,
+  type DeliveryFormData,
+} from '@/components/deliveries/DeliveryForm';
 import {
   Dialog,
   DialogContent,
@@ -55,8 +61,18 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerSearchResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Delivery form data
+  const [deliveryData, setDeliveryData] = useState<DeliveryFormData>({
+    clienteNombre: '',
+    clienteTelefono: '',
+    direccion: '',
+    referencia: '',
+    tiempoEstimado: 30,
+  });
+
   const createOrder = useCreateOrder();
   const payOrder = usePayOrder();
+  const createDelivery = useCreateDelivery();
 
   // Calculate change
   const cambio = montoPagado ? Math.max(0, parseFloat(montoPagado) - totals.total) : 0;
@@ -77,6 +93,12 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
     }
 
     if (requiereFactura && !selectedCustomer) return false;
+
+    // If delivery order, validate delivery data
+    if (tipo === TipoOrden.DELIVERY) {
+      const validationError = validateDeliveryForm(deliveryData);
+      if (validationError) return false;
+    }
 
     return true;
   };
@@ -155,7 +177,15 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
           payment: paymentData,
         });
 
-        // 3. Success
+        // 3. If delivery order, create delivery
+        if (tipo === TipoOrden.DELIVERY) {
+          await createDelivery.mutateAsync({
+            orderId: order.id!,
+            ...deliveryData,
+          });
+        }
+
+        // 4. Success
         clearCart();
         handleClose();
         onSuccess();
@@ -184,6 +214,13 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
     setMontoPagado('');
     setRequiereFactura(false);
     setSelectedCustomer(null);
+    setDeliveryData({
+      clienteNombre: '',
+      clienteTelefono: '',
+      direccion: '',
+      referencia: '',
+      tiempoEstimado: 30,
+    });
     onClose();
   };
 
@@ -241,6 +278,14 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
                 </div>
               )}
             </div>
+
+            {/* Delivery Form - Only for DELIVERY orders */}
+            {!isIncrementalMode && tipo === TipoOrden.DELIVERY && (
+              <>
+                <Separator />
+                <DeliveryForm data={deliveryData} onChange={setDeliveryData} />
+              </>
+            )}
 
             {/* Only show payment options in normal mode */}
             {!isIncrementalMode && (

@@ -229,3 +229,38 @@ export interface Turno {
   local?: Local;
   colaborador?: Colaborador;
 }
+
+export enum EstadoDelivery {
+  PENDIENTE = 'PENDIENTE',
+  LISTO = 'LISTO',
+  EN_CAMINO = 'EN_CAMINO',
+  ENTREGADO = 'ENTREGADO',
+  CANCELADO = 'CANCELADO',
+}
+
+export interface Delivery {
+  id: string;
+  orderId: string;
+
+  // Datos del cliente
+  clienteNombre: string;
+  clienteTelefono: string;
+  direccion: string;
+  referencia?: string;
+
+  // Estado y logística
+  estado: EstadoDelivery;
+  repartidor?: string;
+  tiempoEstimado?: number; // minutos
+
+  // Timestamps
+  despachadoAt?: string | Date;
+  retiradoAt?: string | Date;
+  entregadoAt?: string | Date;
+
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+
+  // Relaciones opcionales
+  order?: Order;
+}

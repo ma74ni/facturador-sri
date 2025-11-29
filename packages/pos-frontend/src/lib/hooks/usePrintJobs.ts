@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { printingApi, PrintComandaDto, PrintTicketDto } from '../api/printing';
+import { printingApi, type PrintComandaDto, type PrintTicketDto } from '../api/printing';
 import { toast } from 'sonner';
 
 export function usePrintComanda() {

@@ -5,6 +5,7 @@ import { LoginScreen } from '@/features/auth/LoginScreen';
 import { AbrirTurnoScreen } from '@/features/turnos/AbrirTurnoScreen';
 import { POSScreen } from '@/features/pos/POSScreen';
 import { OrdersPage } from '@/features/orders/OrdersPage';
+import { DeliveriesPage } from '@/features/deliveries/DeliveriesPage';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
 
@@ -49,20 +50,12 @@ function App() {
             <Route index element={<Navigate to="/pos" replace />} />
             <Route path="pos" element={<POSScreen />} />
             <Route path="ordenes" element={<OrdersPage />} />
+            <Route path="deliveries" element={<DeliveriesPage />} />
             <Route
               path="productos"
               element={
                 <div className="p-8">
                   <h2 className="text-2xl font-bold">Productos</h2>
-                  <p className="text-muted-foreground">Próximamente...</p>
-                </div>
-              }
-            />
-            <Route
-              path="deliveries"
-              element={
-                <div className="p-8">
-                  <h2 className="text-2xl font-bold">Deliveries</h2>
                   <p className="text-muted-foreground">Próximamente...</p>
                 </div>
               }
