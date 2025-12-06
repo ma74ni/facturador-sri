@@ -14,6 +14,8 @@ export interface CreateCustomerDto {
   identificacion: string;
   tipoIdentificacion: string; // 'RUC' | 'CEDULA' | 'PASAPORTE'
   razonSocial: string;
+  firstName?: string; // Para CEDULA/PASAPORTE
+  lastName?: string;  // Para CEDULA/PASAPORTE
   email?: string;
   telefono?: string;
   direccion?: string;
@@ -43,6 +45,12 @@ export const facturacionApi = {
   // Crear nuevo cliente
   async createCustomer(data: CreateCustomerDto): Promise<CustomerSearchResult> {
     const response = await apiClient.post('/facturacion/customers', data);
+    return response.data;
+  },
+
+  // Actualizar cliente existente
+  async updateCustomer(id: string, data: Partial<CreateCustomerDto>): Promise<CustomerSearchResult> {
+    const response = await apiClient.put(`/facturacion/customers/${id}`, data);
     return response.data;
   },
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useSearchCustomer, useCreateCustomer } from '@/lib/hooks/useFacturacion';
+import { useSearchCustomer, useCreateCustomer, useUpdateCustomer } from '@/lib/hooks/useFacturacion';
 import type { CustomerSearchResult } from '@/lib/api/facturacion';
 import {
   Dialog,
@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Search, UserPlus, CheckCircle2 } from 'lucide-react';
+import { Loader2, Search, UserPlus, CheckCircle2, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface FacturaDialogProps {
@@ -28,10 +28,13 @@ export function FacturaDialog({
   const [identificacion, setIdentificacion] = useState('');
   const [searchTriggered, setSearchTriggered] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
-  // Form state for creating customer
+  // Form state for creating/editing customer
   const [formData, setFormData] = useState({
     razonSocial: '',
+    firstName: '',
+    lastName: '',
     email: '',
     telefono: '',
     direccion: '',
@@ -43,6 +46,7 @@ export function FacturaDialog({
   );
 
   const createCustomer = useCreateCustomer();
+  const updateCustomer = useUpdateCustomer();
 
   // Auto-detect tipo de identificacion
   const getTipoIdentificacion = (id: string): string => {
@@ -58,22 +62,85 @@ export function FacturaDialog({
     }
     setSearchTriggered(true);
     setShowCreateForm(false);
+    setIsEditing(false);
     await refetch();
   };
 
-  const handleCreateCustomer = async () => {
-    if (!formData.razonSocial || !identificacion) {
-      toast.error('Razón Social e identificación son obligatorios');
-      return;
+  const handleEditCustomer = () => {
+    if (customer) {
+      const tipoId = customer.tipoIdentificacion;
+      // Para CEDULA/PASAPORTE, intentar dividir razonSocial en firstName y lastName
+      let firstName = '';
+      let lastName = '';
+      if (tipoId === 'CEDULA' || tipoId === 'PASAPORTE') {
+        const nameParts = (customer.razonSocial || '').trim().split(/\s+/);
+        firstName = nameParts[0] || '';
+        lastName = nameParts.slice(1).join(' ') || '';
+      }
+
+      setFormData({
+        razonSocial: customer.razonSocial || '',
+        firstName: firstName,
+        lastName: lastName,
+        email: customer.email || '',
+        telefono: customer.telefono || '',
+        direccion: customer.direccion || '',
+      });
+      setIsEditing(true);
+      setShowCreateForm(true);
+    }
+  };
+
+  const handleCreateOrUpdateCustomer = async () => {
+    const tipoId = getTipoIdentificacion(identificacion);
+
+    // Validación según tipo de identificación
+    if (tipoId === 'RUC') {
+      if (!formData.razonSocial || !identificacion) {
+        toast.error('Razón Social e identificación son obligatorios');
+        return;
+      }
+    } else {
+      // CEDULA o PASAPORTE
+      if (!formData.firstName || !formData.lastName || !identificacion) {
+        toast.error('Nombres, Apellidos e identificación son obligatorios');
+        return;
+      }
     }
 
     try {
-      const newCustomer = await createCustomer.mutateAsync({
-        identificacion,
-        tipoIdentificacion: getTipoIdentificacion(identificacion),
-        ...formData,
-      });
-      onCustomerSelected(newCustomer);
+      let savedCustomer;
+      // Preparar datos según tipo de identificación
+      const customerData: any = {
+        tipoIdentificacion: tipoId,
+        email: formData.email,
+        telefono: formData.telefono,
+        direccion: formData.direccion,
+      };
+
+      if (tipoId === 'RUC') {
+        customerData.razonSocial = formData.razonSocial;
+      } else {
+        // Para CEDULA/PASAPORTE, enviar firstName, lastName y construir razonSocial
+        customerData.firstName = formData.firstName;
+        customerData.lastName = formData.lastName;
+        customerData.razonSocial = `${formData.firstName} ${formData.lastName}`.trim();
+      }
+
+      if (isEditing && customer) {
+        // Update existing customer
+        savedCustomer = await updateCustomer.mutateAsync({
+          id: customer.id,
+          data: customerData,
+        });
+      } else {
+        // Create new customer
+        savedCustomer = await createCustomer.mutateAsync({
+          identificacion,
+          ...customerData,
+        });
+      }
+      onCustomerSelected(savedCustomer);
       handleClose();
     } catch (error) {
       // Error handled by mutation
@@ -91,7 +158,8 @@ export function FacturaDialog({
     setIdentificacion('');
     setSearchTriggered(false);
     setShowCreateForm(false);
-    setFormData({ razonSocial: '', email: '', telefono: '', direccion: '' });
+    setIsEditing(false);
+    setFormData({ razonSocial: '', firstName: '', lastName: '', email: '', telefono: '', direccion: '' });
     onClose();
   };
 
@@ -163,9 +231,19 @@ export function FacturaDialog({
                   </p>
                 )}
               </div>
-              <Button onClick={handleSelectCustomer} className="w-full mt-2">
-                Confirmar Cliente
-              </Button>
+              <div className="flex gap-2 mt-2">
+                <Button
+                  onClick={handleEditCustomer}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  <Edit className="mr-2 h-4 w-4" />
+                  Editar
+                </Button>
+                <Button onClick={handleSelectCustomer} className="flex-1">
+                  Confirmar Cliente
+                </Button>
+              </div>
             </div>
           )}
 
@@ -186,24 +264,59 @@ export function FacturaDialog({
             </div>
           )}
 
-          {/* Create Customer Form */}
+          {/* Create/Edit Customer Form */}
           {showCreateForm && (
             <div className="space-y-3 p-4 border rounded-lg">
-              <h3 className="font-semibold">Crear Nuevo Cliente</h3>
+              <h3 className="font-semibold">{isEditing ? 'Editar Cliente' : 'Crear Nuevo Cliente'}</h3>
 
-              <div>
-                <Label htmlFor="razonSocial">
-                  Razón Social / Nombre Completo <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="razonSocial"
-                  value={formData.razonSocial}
-                  onChange={(e) =>
-                    setFormData({ ...formData, razonSocial: e.target.value })
-                  }
-                  placeholder="Juan Pérez o Empresa S.A."
-                />
-              </div>
+              {/* Campos según tipo de identificación */}
+              {getTipoIdentificacion(identificacion) === 'RUC' ? (
+                // Para RUC: Solo Razón Social
+                <div>
+                  <Label htmlFor="razonSocial">
+                    Razón Social <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="razonSocial"
+                    value={formData.razonSocial}
+                    onChange={(e) =>
+                      setFormData({ ...formData, razonSocial: e.target.value })
+                    }
+                    placeholder="Empresa S.A."
+                  />
+                </div>
+              ) : (
+                // Para CEDULA/PASAPORTE: Nombres y Apellidos
+                <>
+                  <div>
+                    <Label htmlFor="firstName">
+                      Nombres <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="firstName"
+                      value={formData.firstName}
+                      onChange={(e) =>
+                        setFormData({ ...formData, firstName: e.target.value })
+                      }
+                      placeholder="Juan Carlos"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="lastName">
+                      Apellidos <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="lastName"
+                      value={formData.lastName}
+                      onChange={(e) =>
+                        setFormData({ ...formData, lastName: e.target.value })
+                      }
+                      placeholder="Pérez García"
+                    />
+                  </div>
+                </>
+              )}
 
               <div>
                 <Label htmlFor="email">Email</Label>
@@ -245,20 +358,24 @@ export function FacturaDialog({
               <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => setShowCreateForm(false)}
+                  onClick={() => {
+                    setShowCreateForm(false);
+                    setIsEditing(false);
+                    setFormData({ razonSocial: '', firstName: '', lastName: '', email: '', telefono: '', direccion: '' });
+                  }}
                   className="flex-1"
                 >
                   Cancelar
                 </Button>
                 <Button
-                  onClick={handleCreateCustomer}
-                  disabled={createCustomer.isPending}
+                  onClick={handleCreateOrUpdateCustomer}
+                  disabled={createCustomer.isPending || updateCustomer.isPending}
                   className="flex-1"
                 >
-                  {createCustomer.isPending ? (
+                  {(createCustomer.isPending || updateCustomer.isPending) ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   ) : null}
-                  Crear y Confirmar
+                  {isEditing ? 'Guardar y Confirmar' : 'Crear y Confirmar'}
                 </Button>
               </div>
             </div>

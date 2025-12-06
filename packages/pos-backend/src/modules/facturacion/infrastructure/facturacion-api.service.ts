@@ -184,6 +184,72 @@ export class FacturacionApiService {
   }
 
   /**
+   * Actualizar cliente
+   * @param customerId - Customer ID
+   * @param customerData - Customer data to update
+   * @param sessionToken - Optional session token. If not provided, uses service account token
+   */
+  async updateCustomer(customerId: string, customerData: any, sessionToken?: string): Promise<any> {
+    try {
+      // Split razonSocial into firstName and lastName for individuals if provided
+      let firstName = customerData.firstName;
+      let lastName = customerData.lastName;
+
+      if (customerData.razonSocial && (customerData.tipoIdentificacion === 'CEDULA' || customerData.tipoIdentificacion === 'PASAPORTE')) {
+        const nameParts = customerData.razonSocial.trim().split(/\s+/);
+        firstName = nameParts[0] || null;
+        lastName = nameParts.slice(1).join(' ') || null;
+      }
+
+      // Mapear campos del español (pos-backend) al inglés (facturacion-core)
+      const mappedData: any = {};
+
+      if (customerData.tipoIdentificacion) {
+        mappedData.identificationType = this.mapTipoIdentificacion(customerData.tipoIdentificacion);
+      }
+      if (customerData.identificacion) {
+        mappedData.identification = customerData.identificacion;
+      }
+      if (customerData.razonSocial) {
+        mappedData.businessName = customerData.razonSocial;
+        if (customerData.tipoIdentificacion === 'CEDULA' || customerData.tipoIdentificacion === 'PASAPORTE') {
+          mappedData.firstName = firstName;
+          mappedData.lastName = lastName;
+        }
+      }
+      if (customerData.email !== undefined) {
+        mappedData.email = customerData.email;
+      }
+      if (customerData.telefono !== undefined) {
+        mappedData.phone = customerData.telefono;
+      }
+      if (customerData.direccion !== undefined) {
+        mappedData.address = customerData.direccion;
+      }
+
+      const client = this.getClient(sessionToken);
+      const response = await client.put(`/customers/${customerId}`, mappedData);
+
+      // Mapear respuesta del inglés (facturacion-core) al español (pos-backend)
+      const customer = response.data;
+      return {
+        id: customer.id,
+        identificacion: customer.identification,
+        tipoIdentificacion: this.mapTipoIdentificacionInverse(customer.identificationType),
+        razonSocial: customer.businessName || `${customer.firstName || ''} ${customer.lastName || ''}`.trim(),
+        email: customer.email,
+        telefono: customer.phone,
+        direccion: customer.address,
+      };
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || 'Error desconocido';
+      const errorDetails = error.response?.data || error.message;
+      this.logger.error('Error actualizando cliente:', errorDetails);
+      throw new Error(`Error actualizando cliente: ${errorMessage}`);
+    }
+  }
+
+  /**
    * Mapear tipo de identificación de string español a código
    */
   private mapTipoIdentificacion(tipo: string): string {

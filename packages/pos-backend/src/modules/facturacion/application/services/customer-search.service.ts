@@ -47,6 +47,23 @@ export class CustomerSearchService {
   }
 
   /**
+   * Actualizar cliente
+   * @param id - Customer ID
+   * @param updateCustomerDto - Customer data to update
+   * @param turnoId - Optional turno ID to use session token
+   */
+  async update(
+    id: string,
+    updateCustomerDto: Partial<CreateCustomerDto>,
+    turnoId?: string
+  ): Promise<any> {
+    const sessionToken = turnoId
+      ? await this.facturacionAuth.getTokenForTurno(turnoId)
+      : undefined;
+    return this.facturacionApi.updateCustomer(id, updateCustomerDto, sessionToken);
+  }
+
+  /**
    * Obtener o crear cliente por identificación
    * @param identificacion - Customer identification
    * @param customerData - Customer data if needs to be created

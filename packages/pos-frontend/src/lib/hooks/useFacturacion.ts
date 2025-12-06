@@ -23,3 +23,16 @@ export function useCreateCustomer() {
     },
   });
 }
+
+export function useUpdateCustomer() {
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<CreateCustomerDto> }) =>
+      facturacionApi.updateCustomer(id, data),
+    onSuccess: () => {
+      toast.success('Cliente actualizado exitosamente');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Error al actualizar el cliente');
+    },
+  });
+}

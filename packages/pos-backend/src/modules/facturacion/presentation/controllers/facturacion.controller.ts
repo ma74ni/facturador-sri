@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Body, Query, Headers } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiHeader } from '@nestjs/swagger';
+import { Controller, Get, Post, Put, Body, Query, Headers, Param } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiHeader, ApiParam } from '@nestjs/swagger';
 import { InvoiceQueueService } from '../../application/services/invoice-queue.service';
 import { CustomerSearchService } from '../../application/services/customer-search.service';
 import { FacturacionAuthService } from '../../application/services/facturacion-auth.service';
@@ -52,6 +52,25 @@ export class FacturacionController {
   ) {
     const activeTurnoId = turnoId || turnoIdHeader;
     return this.customerSearchService.create(createCustomerDto, activeTurnoId);
+  }
+
+  @Put('customers/:id')
+  @ApiOperation({ summary: 'Actualizar cliente en facturacion-core' })
+  @ApiParam({ name: 'id', description: 'ID del cliente' })
+  @ApiQuery({ name: 'turnoId', required: false, description: 'ID del turno activo (para usar token de sesión)' })
+  @ApiHeader({ name: 'x-turno-id', required: false, description: 'ID del turno activo (alternativa via header)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Cliente actualizado exitosamente',
+  })
+  async updateCustomer(
+    @Param('id') id: string,
+    @Body() updateCustomerDto: Partial<CreateCustomerDto>,
+    @Query('turnoId') turnoId?: string,
+    @Headers('x-turno-id') turnoIdHeader?: string,
+  ) {
+    const activeTurnoId = turnoId || turnoIdHeader;
+    return this.customerSearchService.update(id, updateCustomerDto, activeTurnoId);
   }
 
   @Post('auth/authenticate-turno')
