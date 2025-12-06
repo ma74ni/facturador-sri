@@ -294,6 +294,9 @@ model Order {
   // Items
   items                   OrderItem[]
 
+  // Payment Details (para pagos mixtos)
+  paymentDetails          PaymentDetail[]
+
   // Notas
   notas                   String?
 
@@ -328,6 +331,33 @@ enum MetodoPago {
   TARJETA
   TRANSFERENCIA
   MIXTO
+}
+
+// ============================================
+// PAYMENT DETAILS - Detalles de pago (para pagos mixtos)
+// ============================================
+
+model PaymentDetail {
+  id              String      @id @default(uuid())
+
+  orderId         String
+  order           Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  metodoPago      MetodoPago
+  monto           Decimal     @db.Decimal(10, 2)
+
+  // Solo para efectivo
+  montoPagado     Decimal?    @db.Decimal(10, 2)
+  cambio          Decimal?    @db.Decimal(10, 2)
+
+  // Metadata
+  referencia      String?     // Número de transferencia, últimos 4 dígitos de tarjeta, etc.
+  notas           String?
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@map("payment_details")
 }
 
 // ============================================

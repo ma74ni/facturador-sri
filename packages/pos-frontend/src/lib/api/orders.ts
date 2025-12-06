@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { Order, MetodoPago } from '../types';
+import type { Order, MetodoPago, PaymentMethod } from '../types';
 
 export interface CreateOrderDto {
   localId: string;
@@ -18,6 +18,12 @@ export interface PayOrderDto {
   facturacionCustomerId?: string;
 }
 
+export interface PayOrderMixedDto {
+  metodosPago: PaymentMethod[];
+  requiereFactura?: boolean;
+  facturacionCustomerId?: string;
+}
+
 export const ordersApi = {
   // Crear nueva orden
   async create(data: CreateOrderDto): Promise<Order> {
@@ -28,6 +34,15 @@ export const ordersApi = {
   // Procesar pago de orden
   async pay(orderId: string, payment: PayOrderDto): Promise<Order> {
     const response = await apiClient.post(`/orders/${orderId}/pay`, payment);
+    return response.data;
+  },
+
+  // Procesar pago mixto (múltiples métodos de pago)
+  async payMixed(orderId: string, payment: PayOrderMixedDto): Promise<{
+    order: Order;
+    cambioTotal: number;
+  }> {
+    const response = await apiClient.post(`/orders/${orderId}/pay-mixed`, payment);
     return response.data;
   },
 

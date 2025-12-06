@@ -22,6 +22,27 @@ export enum MetodoPago {
   MIXTO = 'MIXTO',
 }
 
+export interface PaymentMethod {
+  metodoPago: MetodoPago;
+  monto: number;
+  montoPagado?: number; // Solo para efectivo
+  referencia?: string;
+  notas?: string;
+}
+
+export interface PaymentDetail {
+  id: string;
+  orderId: string;
+  metodoPago: MetodoPago;
+  monto: number;
+  montoPagado?: number;
+  cambio?: number;
+  referencia?: string;
+  notas?: string;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
 export enum EstadoTurno {
   ABIERTO = 'ABIERTO',
   CERRADO = 'CERRADO',
@@ -191,6 +212,9 @@ export interface Order {
   // Items y notas
   items: OrderItem[];
   notas?: string;
+
+  // Payment Details (para pagos mixtos)
+  paymentDetails?: PaymentDetail[];
 
   createdAt?: string | Date;
   updatedAt?: string | Date;

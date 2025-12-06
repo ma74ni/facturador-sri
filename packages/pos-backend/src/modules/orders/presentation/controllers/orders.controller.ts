@@ -15,6 +15,7 @@ import {
   CreateOrderDto,
   AddItemDto,
   PayOrderDto,
+  PayOrderMixedDto,
   UpdateOrderDto,
   EstadoOrden,
 } from '../../application/dto';
@@ -127,6 +128,23 @@ export class OrdersController {
   })
   async pay(@Param('id') id: string, @Body() payOrderDto: PayOrderDto) {
     return this.paymentService.processPayment(id, payOrderDto);
+  }
+
+  @Post(':id/pay-mixed')
+  @ApiOperation({ summary: 'Procesar pago mixto (múltiples métodos de pago)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Pago mixto procesado exitosamente',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'No se puede pagar la orden, suma de montos incorrecta o monto insuficiente',
+  })
+  async payMixed(
+    @Param('id') id: string,
+    @Body() payOrderMixedDto: PayOrderMixedDto,
+  ) {
+    return this.paymentService.processPaymentMixed(id, payOrderMixedDto);
   }
 
   @Post(':id/pay-incremental')

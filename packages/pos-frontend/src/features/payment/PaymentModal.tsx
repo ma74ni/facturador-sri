@@ -6,7 +6,7 @@ import { useCreateOrder, usePayOrder } from '@/lib/hooks/useOrders';
 import { useCreateDelivery } from '@/lib/hooks/useDeliveries';
 import { ordersApi } from '@/lib/api/orders';
 import type { CustomerSearchResult } from '@/lib/api/facturacion';
-import { MetodoPago, TipoOrden } from '@/lib/types';
+import { MetodoPago, TipoOrden, type PaymentMethod } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils/cartCalculations';
 import {
   DeliveryForm,
@@ -27,7 +27,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { FacturaDialog } from './FacturaDialog';
-import { Loader2, CreditCard, Banknote, Smartphone, Plus } from 'lucide-react';
+import { Loader2, CreditCard, Banknote, Smartphone, Plus, Trash2} from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PaymentModalProps {
@@ -60,6 +60,10 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
   const [facturaDialogOpen, setFacturaDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerSearchResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Estado para pago mixto
+  const [useMixedPayment, setUseMixedPayment] = useState(false);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
 
   // Delivery form data
   const [deliveryData, setDeliveryData] = useState<DeliveryFormData>({
@@ -105,6 +109,42 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
 
   const handleQuickAmount = (amount: number) => {
     setMontoPagado(amount.toString());
+  };
+
+  // Funciones para pago mixto
+  const handleAddPaymentMethod = () => {
+    const remainingAmount = totals.total - getTotalPagado();
+
+    if (remainingAmount <= 0) {
+      toast.error('Ya se ha cubierto el total a pagar');
+      return;
+    }
+
+    setPaymentMethods([
+      ...paymentMethods,
+      {
+        metodoPago: MetodoPago.EFECTIVO,
+        monto: remainingAmount,
+      },
+    ]);
+  };
+
+  const handleUpdatePaymentMethod = (index: number, updates: Partial<PaymentMethod>) => {
+    const updated = [...paymentMethods];
+    updated[index] = { ...updated[index], ...updates };
+    setPaymentMethods(updated);
+  };
+
+  const handleRemovePaymentMethod = (index: number) => {
+    setPaymentMethods(paymentMethods.filter((_, i) => i !== index));
+  };
+
+  const getTotalPagado = () => paymentMethods.reduce((sum, p) => sum + p.monto, 0);
+  const getRemainingAmount = () => totals.total - getTotalPagado();
+  const getTotalCambio = () => {
+    return paymentMethods
+      .filter((p) => p.metodoPago === MetodoPago.EFECTIVO && p.montoPagado)
+      .reduce((sum, p) => sum + (p.montoPagado! - p.monto), 0);
   };
 
   const handleProcesarPago = async () => {
@@ -164,18 +204,28 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
 
         const order = await createOrder.mutateAsync(orderData);
 
-        // 2. Process payment
-        const paymentData = {
-          metodoPago,
-          montoPagado: metodoPago === MetodoPago.EFECTIVO ? parseFloat(montoPagado) : totals.total,
-          requiereFactura,
-          facturacionCustomerId: selectedCustomer?.id,
-        };
+        // 2. Process payment (mixto o simple)
+        if (useMixedPayment && paymentMethods.length > 0) {
+          // Pago mixto
+          await ordersApi.payMixed(order.id!, {
+            metodosPago: paymentMethods,
+            requiereFactura,
+            facturacionCustomerId: selectedCustomer?.id,
+          });
+        } else {
+          // Pago simple
+          const paymentData = {
+            metodoPago,
+            montoPagado: metodoPago === MetodoPago.EFECTIVO ? parseFloat(montoPagado) : totals.total,
+            requiereFactura,
+            facturacionCustomerId: selectedCustomer?.id,
+          };
 
-        await payOrder.mutateAsync({
-          orderId: order.id!,
-          payment: paymentData,
-        });
+          await payOrder.mutateAsync({
+            orderId: order.id!,
+            payment: paymentData,
+          });
+        }
 
         // 3. If delivery order, create delivery
         if (tipo === TipoOrden.DELIVERY) {
@@ -214,6 +264,8 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
     setMontoPagado('');
     setRequiereFactura(false);
     setSelectedCustomer(null);
+    setUseMixedPayment(false);
+    setPaymentMethods([]);
     setDeliveryData({
       clienteNombre: '',
       clienteTelefono: '',
@@ -292,38 +344,65 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
               <>
                 <Separator />
 
-                {/* Payment Method */}
-                <div>
-              <Label className="text-base font-semibold mb-3 block">
-                Método de Pago
-              </Label>
-              <RadioGroup
-                value={metodoPago}
-                onValueChange={(value) => setMetodoPago(value as MetodoPago)}
-              >
-                <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-accent cursor-pointer">
-                  <RadioGroupItem value={MetodoPago.EFECTIVO} id="efectivo" />
-                  <Label htmlFor="efectivo" className="flex items-center gap-2 cursor-pointer flex-1">
-                    <Banknote className="h-4 w-4" />
-                    Efectivo
+                {/* Toggle para pago mixto */}
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="mixedPayment"
+                    checked={useMixedPayment}
+                    onCheckedChange={(checked) => {
+                      setUseMixedPayment(!!checked);
+                      if (checked) {
+                        // Inicializar con un método de pago
+                        setPaymentMethods([
+                          {
+                            metodoPago: MetodoPago.EFECTIVO,
+                            monto: totals.total,
+                          },
+                        ]);
+                      } else {
+                        setPaymentMethods([]);
+                      }
+                    }}
+                  />
+                  <Label htmlFor="mixedPayment" className="cursor-pointer">
+                    Pago mixto (múltiples métodos)
                   </Label>
                 </div>
-                <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-accent cursor-pointer">
-                  <RadioGroupItem value={MetodoPago.TARJETA} id="tarjeta" />
-                  <Label htmlFor="tarjeta" className="flex items-center gap-2 cursor-pointer flex-1">
-                    <CreditCard className="h-4 w-4" />
-                    Tarjeta
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-accent cursor-pointer">
-                  <RadioGroupItem value={MetodoPago.TRANSFERENCIA} id="transferencia" />
-                  <Label htmlFor="transferencia" className="flex items-center gap-2 cursor-pointer flex-1">
-                    <Smartphone className="h-4 w-4" />
-                    Transferencia
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
+
+                {/* Payment Method (solo si NO es pago mixto) */}
+                {!useMixedPayment && (
+                  <div>
+                    <Label className="text-base font-semibold mb-3 block">
+                      Método de Pago
+                    </Label>
+                    <RadioGroup
+                      value={metodoPago}
+                      onValueChange={(value) => setMetodoPago(value as MetodoPago)}
+                    >
+                      <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-accent cursor-pointer">
+                        <RadioGroupItem value={MetodoPago.EFECTIVO} id="efectivo" />
+                        <Label htmlFor="efectivo" className="flex items-center gap-2 cursor-pointer flex-1">
+                          <Banknote className="h-4 w-4" />
+                          Efectivo
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-accent cursor-pointer">
+                        <RadioGroupItem value={MetodoPago.TARJETA} id="tarjeta" />
+                        <Label htmlFor="tarjeta" className="flex items-center gap-2 cursor-pointer flex-1">
+                          <CreditCard className="h-4 w-4" />
+                          Tarjeta
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-accent cursor-pointer">
+                        <RadioGroupItem value={MetodoPago.TRANSFERENCIA} id="transferencia" />
+                        <Label htmlFor="transferencia" className="flex items-center gap-2 cursor-pointer flex-1">
+                          <Smartphone className="h-4 w-4" />
+                          Transferencia
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                )}
 
             {/* Cash Calculator */}
             {metodoPago === MetodoPago.EFECTIVO && (
@@ -367,6 +446,153 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
                 )}
               </div>
             )}
+
+                {/* Sección de múltiples métodos de pago */}
+                {useMixedPayment && (
+                  <div className="space-y-3 border rounded-lg p-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-semibold">Métodos de Pago</h3>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleAddPaymentMethod}
+                        disabled={getRemainingAmount() <= 0}
+                        type="button"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Agregar Método
+                      </Button>
+                    </div>
+
+                    {/* Lista de métodos de pago */}
+                    {paymentMethods.map((payment, index) => (
+                      <div key={index} className="border rounded-lg p-3 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">Método #{index + 1}</span>
+                          {paymentMethods.length > 1 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemovePaymentMethod(index)}
+                              type="button"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+
+                        {/* Selector de método */}
+                        <div>
+                          <Label>Método de Pago</Label>
+                          <RadioGroup
+                            value={payment.metodoPago}
+                            onValueChange={(value) =>
+                              handleUpdatePaymentMethod(index, { metodoPago: value as MetodoPago })
+                            }
+                          >
+                            <div className="flex items-center space-x-2 p-2 border rounded hover:bg-accent cursor-pointer">
+                              <RadioGroupItem value={MetodoPago.EFECTIVO} id={`efectivo-${index}`} />
+                              <Label htmlFor={`efectivo-${index}`} className="flex items-center gap-2 cursor-pointer flex-1">
+                                <Banknote className="h-4 w-4" />
+                                Efectivo
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-2 p-2 border rounded hover:bg-accent cursor-pointer">
+                              <RadioGroupItem value={MetodoPago.TARJETA} id={`tarjeta-${index}`} />
+                              <Label htmlFor={`tarjeta-${index}`} className="flex items-center gap-2 cursor-pointer flex-1">
+                                <CreditCard className="h-4 w-4" />
+                                Tarjeta
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-2 p-2 border rounded hover:bg-accent cursor-pointer">
+                              <RadioGroupItem value={MetodoPago.TRANSFERENCIA} id={`transferencia-${index}`} />
+                              <Label htmlFor={`transferencia-${index}`} className="flex items-center gap-2 cursor-pointer flex-1">
+                                <Smartphone className="h-4 w-4" />
+                                Transferencia
+                              </Label>
+                            </div>
+                          </RadioGroup>
+                        </div>
+
+                        {/* Monto */}
+                        <div>
+                          <Label>Monto</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={payment.monto}
+                            onChange={(e) =>
+                              handleUpdatePaymentMethod(index, {
+                                monto: parseFloat(e.target.value) || 0,
+                              })
+                            }
+                          />
+                        </div>
+
+                        {/* Efectivo recibido (solo para efectivo) */}
+                        {payment.metodoPago === MetodoPago.EFECTIVO && (
+                          <div>
+                            <Label>Efectivo Recibido</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={payment.montoPagado || ''}
+                              onChange={(e) =>
+                                handleUpdatePaymentMethod(index, {
+                                  montoPagado: parseFloat(e.target.value) || undefined,
+                                })
+                              }
+                              placeholder="0.00"
+                            />
+                            {payment.montoPagado && payment.montoPagado >= payment.monto && (
+                              <p className="text-sm text-green-600 mt-1">
+                                Cambio: {formatCurrency(payment.montoPagado - payment.monto)}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Referencia (opcional) */}
+                        <div>
+                          <Label>Referencia (opcional)</Label>
+                          <Input
+                            placeholder="Núm. transferencia, últimos 4 dígitos tarjeta..."
+                            value={payment.referencia || ''}
+                            onChange={(e) =>
+                              handleUpdatePaymentMethod(index, { referencia: e.target.value })
+                            }
+                          />
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Resumen de pago mixto */}
+                    <div className="bg-muted p-3 rounded-lg space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span>Total a pagar:</span>
+                        <span className="font-semibold">{formatCurrency(totals.total)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Total pagado:</span>
+                        <span className={getTotalPagado() === totals.total ? 'text-green-600 font-semibold' : ''}>
+                          {formatCurrency(getTotalPagado())}
+                        </span>
+                      </div>
+                      {getRemainingAmount() > 0 && (
+                        <div className="flex justify-between text-orange-600">
+                          <span>Falta por pagar:</span>
+                          <span className="font-semibold">{formatCurrency(getRemainingAmount())}</span>
+                        </div>
+                      )}
+                      {getTotalCambio() > 0 && (
+                        <div className="flex justify-between text-green-600">
+                          <span>Cambio total:</span>
+                          <span className="font-semibold">{formatCurrency(getTotalCambio())}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <Separator />
 
