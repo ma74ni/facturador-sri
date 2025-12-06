@@ -121,7 +121,7 @@ export class OrderPaymentService {
     const { metodosPago, requiereFactura, clienteData, facturacionCustomerId } =
       payOrderMixedDto;
 
-    // Obtener orden con todos sus datos
+    // Obtener orden con todos sus datos (fuera de la transacción para validaciones)
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -192,54 +192,95 @@ export class OrderPaymentService {
     const metodoPagoPrincipal =
       metodosPago.length === 1 ? metodosPago[0].metodoPago : 'MIXTO';
 
-    // Actualizar orden con pago
-    const updatedOrder = await this.prisma.order.update({
-      where: { id: orderId },
-      data: {
-        estado: 'PAID',
-        metodoPago: metodoPagoPrincipal,
-        montoPagado: new Prisma.Decimal(totalPagado),
-        cambio: new Prisma.Decimal(cambioTotal),
-        fechaPago: new Date(),
-        requiereFactura,
-        facturacionCustomerId,
-        clienteNombre,
-        clienteIdentificacion,
-        clienteEmail,
-        clienteTelefono,
-      },
-      include: {
-        items: true,
-        colaborador: true,
-        local: true,
-        turno: true,
-        paymentDetails: true,
-      },
-    });
-
-    // Crear detalles de pago
-    for (const metodo of metodosPago) {
-      await this.prisma.paymentDetail.create({
+    // Ejecutar todo en una transacción atómica
+    const result = await this.prisma.$transaction(async (tx) => {
+      // 1. Actualizar orden con pago
+      const updatedOrder = await tx.order.update({
+        where: { id: orderId },
         data: {
-          orderId,
-          metodoPago: metodo.metodoPago,
-          monto: new Prisma.Decimal(metodo.monto),
-          montoPagado: metodo.montoPagado
-            ? new Prisma.Decimal(metodo.montoPagado)
-            : null,
-          cambio:
-            metodo.montoPagado && metodo.metodoPago === 'EFECTIVO'
-              ? new Prisma.Decimal(metodo.montoPagado - metodo.monto)
-              : null,
-          referencia: metodo.referencia,
-          notas: metodo.notas,
+          estado: 'PAID',
+          metodoPago: metodoPagoPrincipal,
+          montoPagado: new Prisma.Decimal(totalPagado),
+          cambio: new Prisma.Decimal(cambioTotal),
+          fechaPago: new Date(),
+          requiereFactura,
+          facturacionCustomerId,
+          clienteNombre,
+          clienteIdentificacion,
+          clienteEmail,
+          clienteTelefono,
+        },
+        include: {
+          items: true,
+          colaborador: true,
+          local: true,
+          turno: true,
+          paymentDetails: true,
         },
       });
-    }
 
-    // Actualizar totales del turno
-    await this.updateTurnoTotalsMixed(order.turnoId, metodosPago, total);
+      // 2. Crear detalles de pago
+      for (const metodo of metodosPago) {
+        await tx.paymentDetail.create({
+          data: {
+            orderId,
+            metodoPago: metodo.metodoPago,
+            monto: new Prisma.Decimal(metodo.monto),
+            montoPagado: metodo.montoPagado
+              ? new Prisma.Decimal(metodo.montoPagado)
+              : null,
+            cambio:
+              metodo.montoPagado && metodo.metodoPago === 'EFECTIVO'
+                ? new Prisma.Decimal(metodo.montoPagado - metodo.monto)
+                : null,
+            referencia: metodo.referencia,
+            notas: metodo.notas,
+          },
+        });
+      }
 
+      // 3. Actualizar totales del turno
+      const turno = await tx.turno.findUnique({
+        where: { id: order.turnoId },
+      });
+
+      if (turno) {
+        const numeroVentas = turno.numeroVentas + 1;
+        const totalVentas = parseFloat(turno.totalVentas.toString()) + total;
+        let totalEfectivo = parseFloat(turno.totalEfectivo.toString());
+        let totalTarjeta = parseFloat(turno.totalTarjeta.toString());
+        let totalTransferencia = parseFloat(turno.totalTransferencia.toString());
+
+        for (const metodo of metodosPago) {
+          switch (metodo.metodoPago) {
+            case 'EFECTIVO':
+              totalEfectivo += metodo.monto;
+              break;
+            case 'TARJETA':
+              totalTarjeta += metodo.monto;
+              break;
+            case 'TRANSFERENCIA':
+              totalTransferencia += metodo.monto;
+              break;
+          }
+        }
+
+        await tx.turno.update({
+          where: { id: order.turnoId },
+          data: {
+            numeroVentas,
+            totalVentas: new Prisma.Decimal(totalVentas),
+            totalEfectivo: new Prisma.Decimal(totalEfectivo),
+            totalTarjeta: new Prisma.Decimal(totalTarjeta),
+            totalTransferencia: new Prisma.Decimal(totalTransferencia),
+          },
+        });
+      }
+
+      return updatedOrder;
+    });
+
+    // Operaciones post-transacción (no críticas, no necesitan ser atómicas)
     // Si requiere factura, añadir a cola de facturación
     if (requiereFactura) {
       await this.queueInvoice(orderId);
@@ -266,55 +307,6 @@ export class OrderPaymentService {
     };
   }
 
-  /**
-   * Actualizar totales del turno para pagos mixtos
-   */
-  private async updateTurnoTotalsMixed(
-    turnoId: string,
-    metodosPago: PaymentMethodDto[],
-    totalVenta: number,
-  ): Promise<void> {
-    const turno = await this.prisma.turno.findUnique({
-      where: { id: turnoId },
-    });
-
-    if (!turno) return;
-
-    // Incrementar contador de ventas
-    const numeroVentas = turno.numeroVentas + 1;
-
-    // Calcular nuevos totales
-    const totalVentas = parseFloat(turno.totalVentas.toString()) + totalVenta;
-    let totalEfectivo = parseFloat(turno.totalEfectivo.toString());
-    let totalTarjeta = parseFloat(turno.totalTarjeta.toString());
-    let totalTransferencia = parseFloat(turno.totalTransferencia.toString());
-
-    // Sumar cada método de pago al total correspondiente
-    for (const metodo of metodosPago) {
-      switch (metodo.metodoPago) {
-        case 'EFECTIVO':
-          totalEfectivo += metodo.monto;
-          break;
-        case 'TARJETA':
-          totalTarjeta += metodo.monto;
-          break;
-        case 'TRANSFERENCIA':
-          totalTransferencia += metodo.monto;
-          break;
-      }
-    }
-
-    await this.prisma.turno.update({
-      where: { id: turnoId },
-      data: {
-        numeroVentas,
-        totalVentas: new Prisma.Decimal(totalVentas),
-        totalEfectivo: new Prisma.Decimal(totalEfectivo),
-        totalTarjeta: new Prisma.Decimal(totalTarjeta),
-        totalTransferencia: new Prisma.Decimal(totalTransferencia),
-      },
-    });
-  }
 
   /**
    * Actualizar totales del turno

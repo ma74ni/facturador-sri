@@ -22,13 +22,15 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { FacturaDialog } from './FacturaDialog';
-import { Loader2, CreditCard, Banknote, Smartphone, Plus, Trash2} from 'lucide-react';
+import { Loader2, CreditCard, Banknote, Smartphone, Plus, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface PaymentModalProps {
   open: boolean;
@@ -55,7 +57,7 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
   const totals = getTotals();
 
   const [metodoPago, setMetodoPago] = useState<MetodoPago>(MetodoPago.EFECTIVO);
-  const [montoPagado, setMontoPagado] = useState('');
+  const [montoPagado, setMontoPagado] = useState<number>(0);
   const [requiereFactura, setRequiereFactura] = useState(false);
   const [facturaDialogOpen, setFacturaDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerSearchResult | null>(null);
@@ -79,7 +81,7 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
   const createDelivery = useCreateDelivery();
 
   // Calculate change
-  const cambio = montoPagado ? Math.max(0, parseFloat(montoPagado) - totals.total) : 0;
+  const cambio = montoPagado > 0 ? Math.max(0, montoPagado - totals.total) : 0;
 
   const canProceed = () => {
     if (items.length === 0) return false;
@@ -91,9 +93,15 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
     }
 
     // Normal mode: validate payment
-    if (metodoPago === MetodoPago.EFECTIVO) {
-      const monto = parseFloat(montoPagado);
-      if (isNaN(monto) || monto < totals.total) return false;
+    if (useMixedPayment) {
+      // Validar pago mixto
+      const validation = validateMixedPayment();
+      if (!validation.valid) return false;
+    } else {
+      // Validar pago simple
+      if (metodoPago === MetodoPago.EFECTIVO) {
+        if (montoPagado < totals.total) return false;
+      }
     }
 
     if (requiereFactura && !selectedCustomer) return false;
@@ -108,7 +116,7 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
   };
 
   const handleQuickAmount = (amount: number) => {
-    setMontoPagado(amount.toString());
+    setMontoPagado(amount);
   };
 
   // Funciones para pago mixto
@@ -139,12 +147,50 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
     setPaymentMethods(paymentMethods.filter((_, i) => i !== index));
   };
 
-  const getTotalPagado = () => paymentMethods.reduce((sum, p) => sum + p.monto, 0);
+  const getTotalPagado = () => paymentMethods.reduce((sum, p) => sum + (p.monto || 0), 0);
   const getRemainingAmount = () => totals.total - getTotalPagado();
   const getTotalCambio = () => {
     return paymentMethods
       .filter((p) => p.metodoPago === MetodoPago.EFECTIVO && p.montoPagado)
       .reduce((sum, p) => sum + (p.montoPagado! - p.monto), 0);
+  };
+
+  // Validación de pago mixto
+  const validateMixedPayment = () => {
+    if (!useMixedPayment || paymentMethods.length === 0) return { valid: true };
+
+    const totalPagado = getTotalPagado();
+    const difference = Math.abs(totals.total - totalPagado);
+
+    // Permitir diferencia de $0.01 por redondeo
+    if (difference > 0.01) {
+      if (totalPagado < totals.total) {
+        return {
+          valid: false,
+          error: `Falta ${formatCurrency(totals.total - totalPagado)} por pagar`,
+        };
+      } else {
+        return {
+          valid: false,
+          error: `El total pagado excede por ${formatCurrency(totalPagado - totals.total)}`,
+        };
+      }
+    }
+
+    // Validar efectivo recibido
+    for (let i = 0; i < paymentMethods.length; i++) {
+      const payment = paymentMethods[i];
+      if (payment.metodoPago === MetodoPago.EFECTIVO && payment.montoPagado !== undefined) {
+        if (payment.montoPagado < payment.monto) {
+          return {
+            valid: false,
+            error: `Método #${i + 1}: Efectivo recibido insuficiente`,
+          };
+        }
+      }
+    }
+
+    return { valid: true };
   };
 
   const handleProcesarPago = async () => {
@@ -216,7 +262,7 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
           // Pago simple
           const paymentData = {
             metodoPago,
-            montoPagado: metodoPago === MetodoPago.EFECTIVO ? parseFloat(montoPagado) : totals.total,
+            montoPagado: metodoPago === MetodoPago.EFECTIVO ? montoPagado : totals.total,
             requiereFactura,
             facturacionCustomerId: selectedCustomer?.id,
           };
@@ -261,7 +307,7 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
 
   const handleClose = () => {
     setMetodoPago(MetodoPago.EFECTIVO);
-    setMontoPagado('');
+    setMontoPagado(0);
     setRequiereFactura(false);
     setSelectedCustomer(null);
     setUseMixedPayment(false);
@@ -405,17 +451,15 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
                 )}
 
             {/* Cash Calculator */}
-            {metodoPago === MetodoPago.EFECTIVO && (
+            {metodoPago === MetodoPago.EFECTIVO && !useMixedPayment && (
               <div className="space-y-3">
                 <div>
                   <Label htmlFor="montoPagado">Efectivo recibido</Label>
-                  <Input
+                  <CurrencyInput
                     id="montoPagado"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
                     value={montoPagado}
-                    onChange={(e) => setMontoPagado(e.target.value)}
+                    onChange={setMontoPagado}
+                    placeholder="0.00"
                     className="text-lg font-semibold"
                   />
                 </div>
@@ -436,7 +480,7 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
                 </div>
 
                 {/* Change */}
-                {montoPagado && parseFloat(montoPagado) >= totals.total && (
+                {montoPagado > 0 && montoPagado >= totals.total && (
                   <div className="p-3 bg-green-50 dark:bg-green-950 rounded-lg">
                     <div className="text-sm text-muted-foreground">Cambio</div>
                     <div className="text-2xl font-bold text-green-700 dark:text-green-300">
@@ -516,16 +560,33 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
 
                         {/* Monto */}
                         <div>
-                          <Label>Monto</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
+                          <div className="flex justify-between items-center mb-1">
+                            <Label>Monto</Label>
+                            {getRemainingAmount() > 0.01 && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                type="button"
+                                className="h-6 text-xs"
+                                onClick={() => {
+                                  const remaining = getRemainingAmount();
+                                  handleUpdatePaymentMethod(index, {
+                                    monto: parseFloat((payment.monto + remaining).toFixed(2)),
+                                  });
+                                }}
+                              >
+                                + Completar ({formatCurrency(getRemainingAmount())})
+                              </Button>
+                            )}
+                          </div>
+                          <CurrencyInput
                             value={payment.monto}
-                            onChange={(e) =>
+                            onChange={(value) =>
                               handleUpdatePaymentMethod(index, {
-                                monto: parseFloat(e.target.value) || 0,
+                                monto: value,
                               })
                             }
+                            placeholder="0.00"
                           />
                         </div>
 
@@ -533,13 +594,11 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
                         {payment.metodoPago === MetodoPago.EFECTIVO && (
                           <div>
                             <Label>Efectivo Recibido</Label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={payment.montoPagado || ''}
-                              onChange={(e) =>
+                            <CurrencyInput
+                              value={payment.montoPagado || 0}
+                              onChange={(value) =>
                                 handleUpdatePaymentMethod(index, {
-                                  montoPagado: parseFloat(e.target.value) || undefined,
+                                  montoPagado: value > 0 ? value : undefined,
                                 })
                               }
                               placeholder="0.00"
@@ -574,14 +633,20 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
                       </div>
                       <div className="flex justify-between">
                         <span>Total pagado:</span>
-                        <span className={getTotalPagado() === totals.total ? 'text-green-600 font-semibold' : ''}>
+                        <span className={Math.abs(getTotalPagado() - totals.total) <= 0.01 ? 'text-green-600 font-semibold' : ''}>
                           {formatCurrency(getTotalPagado())}
                         </span>
                       </div>
-                      {getRemainingAmount() > 0 && (
+                      {getRemainingAmount() > 0.01 && (
                         <div className="flex justify-between text-orange-600">
                           <span>Falta por pagar:</span>
                           <span className="font-semibold">{formatCurrency(getRemainingAmount())}</span>
+                        </div>
+                      )}
+                      {getTotalPagado() > totals.total + 0.01 && (
+                        <div className="flex justify-between text-red-600">
+                          <span>Excede por:</span>
+                          <span className="font-semibold">{formatCurrency(getTotalPagado() - totals.total)}</span>
                         </div>
                       )}
                       {getTotalCambio() > 0 && (
@@ -591,6 +656,27 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
                         </div>
                       )}
                     </div>
+
+                    {/* Alerta de validación en tiempo real */}
+                    {(() => {
+                      const validation = validateMixedPayment();
+                      if (!validation.valid) {
+                        return (
+                          <Alert variant="destructive">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>{validation.error}</AlertDescription>
+                          </Alert>
+                        );
+                      } else if (Math.abs(getTotalPagado() - totals.total) <= 0.01 && paymentMethods.length > 0) {
+                        return (
+                          <Alert className="border-green-600 text-green-600">
+                            <CheckCircle2 className="h-4 w-4" />
+                            <AlertDescription>Total correcto. Listo para procesar.</AlertDescription>
+                          </Alert>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 )}
 
