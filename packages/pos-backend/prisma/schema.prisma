@@ -3,6 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client-pos"
 }
 
 datasource db {
@@ -58,6 +59,11 @@ model Colaborador {
   localId     String
   local       Local    @relation(fields: [localId], references: [id], onDelete: Cascade)
 
+  // Sincronización con facturacion-core
+  facturacionUserId    String?   @unique  // ID del usuario en facturacion-core
+  facturacionEmail     String?   @unique  // Email del usuario en facturacion-core
+  requiresFacturacionAuth Boolean @default(false) // Si requiere autenticación en facturacion-core
+
   turnos      Turno[]
   ordenes     Order[]
 
@@ -101,6 +107,10 @@ model Turno {
   numeroVentas        Int         @default(0)
 
   estado              EstadoTurno @default(ABIERTO)
+
+  // Autenticación con facturacion-core
+  facturacionToken       String?   // JWT token para este turno
+  facturacionTokenExpiry DateTime? // Fecha de expiración del token
 
   ordenes             Order[]
 

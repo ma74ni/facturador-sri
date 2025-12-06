@@ -236,7 +236,7 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="max-w-md">
+        <DialogContent className={tipo === TipoOrden.DELIVERY && !isIncrementalMode ? "max-w-2xl" : "max-w-md"}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {isIncrementalMode ? (

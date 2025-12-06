@@ -24,9 +24,14 @@ export const facturacionApi = {
   async searchCustomer(identificacion: string): Promise<CustomerSearchResult | null> {
     try {
       const response = await apiClient.get(`/facturacion/customers/search`, {
-        params: { q: identificacion },
+        params: { identificacion },
       });
-      return response.data;
+      // El backend devuelve un array. Si está vacío o es el primer elemento, manejarlo
+      const data = response.data;
+      if (Array.isArray(data)) {
+        return data.length > 0 ? data[0] : null;
+      }
+      return data || null;
     } catch (error: any) {
       if (error.response?.status === 404) {
         return null;

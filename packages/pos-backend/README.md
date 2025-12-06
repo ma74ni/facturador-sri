@@ -27,8 +27,18 @@ pnpm dev
 ```
 
 La aplicación estará disponible en:
-- API: http://localhost:3001
-- Swagger: http://localhost:3001/api/docs
+- API: http://localhost:3003
+- Swagger: http://localhost:3003/api/docs
+
+## ⚠️ Configuración Importante
+
+### Prisma Client Personalizado
+
+Este proyecto usa una ubicación personalizada para el Prisma Client para evitar conflictos con `facturacion-core` en el monorepo. Ver [`PRISMA_CLIENT_SETUP.md`](./PRISMA_CLIENT_SETUP.md) para más detalles.
+
+### Integración con facturacion-core
+
+El sistema requiere integración con `facturacion-core` para gestión de clientes y facturación. Ver [`INTEGRATION_GUIDE.md`](./INTEGRATION_GUIDE.md) para configuración detallada.
 
 ## 📁 Estructura del Proyecto
 
@@ -154,14 +164,27 @@ El esquema de Prisma define las siguientes entidades:
 Copiar `.env.example` a `.env` y configurar:
 
 ```env
-DATABASE_URL="postgresql://..."
-PORT=3001
-FACTURACION_API_URL=http://localhost:3000/api/v1
-FACTURACION_API_TOKEN=your-token
-FACTURACION_COMPANY_ID=uuid-empresa
+# Database (using same DB as facturacion-core but different schema)
+DATABASE_URL="postgresql://user:password@localhost:5432/facturador_db?schema=pos"
+
+# Server
+PORT=3003
+NODE_ENV=development
+
+# Integration with facturacion-core
+FACTURACION_API_URL=http://localhost:3001/api/v1
+FACTURACION_API_TOKEN=your-jwt-token-here
+FACTURACION_COMPANY_ID=your-company-id-here
+
+# Printing
 PRINTER_COMANDA_DEFAULT=tcp://192.168.1.100
 PRINTER_TICKET_DEFAULT=tcp://192.168.1.101
 ```
+
+**Importante**:
+- El `DATABASE_URL` debe usar el schema `pos` para separación de datos
+- El `FACTURACION_API_URL` debe apuntar a facturacion-core en puerto 3001
+- Ver [`INTEGRATION_GUIDE.md`](./INTEGRATION_GUIDE.md) para obtener el JWT token
 
 ### Integración con facturacion-core
 
@@ -228,7 +251,12 @@ El código sigue los principios SOLID:
 
 La documentación completa de la API está disponible en Swagger:
 
-http://localhost:3001/api/docs
+http://localhost:3003/api/docs
+
+## 📚 Documentación Adicional
+
+- [`PRISMA_CLIENT_SETUP.md`](./PRISMA_CLIENT_SETUP.md) - Configuración del Prisma Client personalizado para evitar conflictos en monorepo
+- [`INTEGRATION_GUIDE.md`](./INTEGRATION_GUIDE.md) - Guía completa de integración con facturacion-core
 
 ## 🚦 Estado del Proyecto
 
