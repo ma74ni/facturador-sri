@@ -69,6 +69,24 @@ export class PayOrderDto {
     email?: string;
     telefono?: string;
   };
+
+  @ApiProperty({
+    description: 'Imprimir comanda (cocina)',
+    example: false,
+    default: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  printComanda?: boolean;
+
+  @ApiProperty({
+    description: 'Imprimir ticket (cliente)',
+    example: true,
+    default: true,
+  })
+  @IsBoolean()
+  @IsOptional()
+  printTicket?: boolean;
 }
 
 // ============================================
@@ -174,4 +192,22 @@ export class PayOrderMixedDto {
     email?: string;
     telefono?: string;
   };
+
+  @ApiProperty({
+    description: 'Imprimir comanda (cocina)',
+    example: false,
+    default: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  printComanda?: boolean;
+
+  @ApiProperty({
+    description: 'Imprimir ticket (cliente)',
+    example: true,
+    default: true,
+  })
+  @IsBoolean()
+  @IsOptional()
+  printTicket?: boolean;
 }

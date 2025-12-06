@@ -67,6 +67,10 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
   const [useMixedPayment, setUseMixedPayment] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
 
+  // Estado para control de impresión
+  const [printComanda, setPrintComanda] = useState(false);
+  const [printTicket, setPrintTicket] = useState(true);
+
   // Delivery form data
   const [deliveryData, setDeliveryData] = useState<DeliveryFormData>({
     clienteNombre: '',
@@ -257,6 +261,8 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
             metodosPago: paymentMethods,
             requiereFactura,
             facturacionCustomerId: selectedCustomer?.id,
+            printComanda,
+            printTicket,
           });
         } else {
           // Pago simple
@@ -265,6 +271,8 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
             montoPagado: metodoPago === MetodoPago.EFECTIVO ? montoPagado : totals.total,
             requiereFactura,
             facturacionCustomerId: selectedCustomer?.id,
+            printComanda,
+            printTicket,
           };
 
           await payOrder.mutateAsync({
@@ -312,6 +320,8 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
     setSelectedCustomer(null);
     setUseMixedPayment(false);
     setPaymentMethods([]);
+    setPrintComanda(false);
+    setPrintTicket(true);
     setDeliveryData({
       clienteNombre: '',
       clienteTelefono: '',
@@ -713,6 +723,35 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
                   </div>
                 )}
               </>
+            )}
+
+            {/* Opciones de Impresión */}
+            {!isIncrementalMode && (
+              <div className="border-t pt-4 space-y-2">
+                <Label className="text-sm font-medium">Opciones de Impresión</Label>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="printComanda"
+                      checked={printComanda}
+                      onCheckedChange={(checked) => setPrintComanda(!!checked)}
+                    />
+                    <Label htmlFor="printComanda" className="cursor-pointer text-sm font-normal">
+                      Imprimir comanda (cocina)
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="printTicket"
+                      checked={printTicket}
+                      onCheckedChange={(checked) => setPrintTicket(!!checked)}
+                    />
+                    <Label htmlFor="printTicket" className="cursor-pointer text-sm font-normal">
+                      Imprimir ticket (cliente)
+                    </Label>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* Actions */}

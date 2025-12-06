@@ -100,7 +100,10 @@ export class OrderPaymentService {
     }
 
     // Crear trabajos de impresión
-    await this.createPrintJobs(orderId);
+    await this.createPrintJobs(orderId, {
+      printComanda: payOrderDto.printComanda,
+      printTicket: payOrderDto.printTicket,
+    });
 
     return {
       order: updatedOrder,
@@ -118,7 +121,7 @@ export class OrderPaymentService {
     order: Order;
     cambioTotal: number;
   }> {
-    const { metodosPago, requiereFactura, clienteData, facturacionCustomerId } =
+    const { metodosPago, requiereFactura, clienteData, facturacionCustomerId, printComanda, printTicket } =
       payOrderMixedDto;
 
     // Obtener orden con todos sus datos (fuera de la transacción para validaciones)
@@ -287,7 +290,10 @@ export class OrderPaymentService {
     }
 
     // Crear trabajos de impresión
-    await this.createPrintJobs(orderId);
+    await this.createPrintJobs(orderId, {
+      printComanda,
+      printTicket,
+    });
 
     // Obtener orden actualizada con payment details
     const finalOrder = await this.prisma.order.findUnique({
@@ -379,7 +385,12 @@ export class OrderPaymentService {
   /**
    * Crear trabajos de impresión
    */
-  private async createPrintJobs(orderId: string): Promise<void> {
+  private async createPrintJobs(
+    orderId: string,
+    options: { printComanda?: boolean; printTicket?: boolean } = {},
+  ): Promise<void> {
+    const { printComanda = false, printTicket = true } = options;
+
     try {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
@@ -391,12 +402,12 @@ export class OrderPaymentService {
 
       if (!order) return;
 
-      // Crear job para comanda de cocina (solo si tiene items preparables)
+      // Crear job para comanda de cocina (solo si tiene items preparables y está habilitada)
       const itemsPreparables = order.items.filter(
         (item) => !item.esIncremental,
       );
 
-      if (itemsPreparables.length > 0) {
+      if (printComanda && itemsPreparables.length > 0) {
         await this.prisma.printJob.create({
           data: {
             orderId,
@@ -422,8 +433,9 @@ export class OrderPaymentService {
         });
       }
 
-      // Crear job para ticket de cliente
-      await this.prisma.printJob.create({
+      // Crear job para ticket de cliente (solo si está habilitado)
+      if (printTicket) {
+        await this.prisma.printJob.create({
         data: {
           orderId,
           tipo: 'TICKET',
@@ -454,7 +466,8 @@ export class OrderPaymentService {
             cambio: order.cambio ? parseFloat(order.cambio.toString()) : 0,
           } as any,
         },
-      });
+        });
+      }
     } catch (error) {
       // Log pero no fallar el pago si falla crear print jobs
       console.warn('Error creando trabajos de impresión:', error.message);
