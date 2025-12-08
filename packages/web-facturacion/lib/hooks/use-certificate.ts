@@ -7,12 +7,12 @@ import { useAuth } from '@/lib/context/auth-context';
  * - Filtra por companyId del usuario autenticado
  */
 export function useCertificateStatus() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
 
   return useQuery({
     queryKey: ['certificate-status', user?.companyId],
     queryFn: () => certificatesApi.getStatus(),
-    enabled: !!user?.companyId,
+    enabled: !!user && !authLoading,
     staleTime: 5 * 60 * 1000, // 5 minutos
     retry: 1,
   });

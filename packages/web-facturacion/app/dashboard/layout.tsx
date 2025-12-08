@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { EmailVerificationBanner } from "@/components/shared/email-verification-banner";
+import { CompanyStatusBanners } from "@/components/shared/company-status-banners";
 
 export default function DashboardLayout({
   children,
@@ -167,43 +168,8 @@ export default function DashboardLayout({
           {/* Email Verification Banner */}
           <EmailVerificationBanner />
 
-          {/* Company Status Banner */}
-          {company && company.status === "PENDING" && (
-            <Alert variant="info" className="mb-6">
-              <Clock className="h-4 w-4" />
-              <AlertTitle>Cuenta en revisión</AlertTitle>
-              <AlertDescription>
-                Tu empresa está siendo revisada por nuestro equipo. Mientras
-                tanto, puedes usar el sistema en <strong>modo TEST</strong>.
-                Recibirás un email cuando tu cuenta sea aprobada.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {company &&
-            company.status === "APPROVED" &&
-            company.environment === "TEST" && (
-              <Alert variant="success" className="mb-6">
-                <CheckCircle2 className="h-4 w-4" />
-                <AlertTitle>Cuenta aprobada</AlertTitle>
-                <AlertDescription>
-                  Tu empresa ha sido aprobada. Actualmente estás en{" "}
-                  <strong>modo TEST</strong>. Contacta a soporte para activar el
-                  modo PRODUCCIÓN.
-                </AlertDescription>
-              </Alert>
-            )}
-
-          {company && company.status === "REJECTED" && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Cuenta rechazada</AlertTitle>
-              <AlertDescription>
-                {company.rejectionReason ||
-                  "Tu solicitud ha sido rechazada. Contacta a soporte para más información."}
-              </AlertDescription>
-            </Alert>
-          )}
+          {/* Company Status Banners */}
+          <CompanyStatusBanners />
 
           {children}
         </main>

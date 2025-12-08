@@ -28,11 +28,12 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // No cerrar sesión si es un error de verificación de email
+      // No cerrar sesión si es un error de verificación de email o login
       const isVerifyEmailRequest =
         error.config?.url?.includes("/auth/verify-email");
+      const isLoginRequest = error.config?.url?.includes("/auth/login");
 
-      if (!isVerifyEmailRequest && typeof window !== "undefined") {
+      if (!isVerifyEmailRequest && !isLoginRequest && typeof window !== "undefined") {
         // Token inválido o expirado en otras rutas
         localStorage.removeItem("token");
         localStorage.removeItem("user");

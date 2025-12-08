@@ -5,23 +5,32 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ShieldAlert, ArrowRight, X } from "lucide-react";
 import { useCertificateStatus } from "@/lib/hooks/use-certificate";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export function CertificateAlertBanner() {
   const router = useRouter();
   const { data: certificateStatus, isLoading } = useCertificateStatus();
   const [dismissed, setDismissed] = useState(false);
+  const [hasCheckedStatus, setHasCheckedStatus] = useState(false);
 
-  // No mostrar si está cargando, si no hay datos aún, si tiene certificado, o si fue descartado
-  if (isLoading || !certificateStatus || certificateStatus.hasCertificate || dismissed) {
+  // Esperar a que tengamos datos confirmados del certificado
+  useEffect(() => {
+    if (!isLoading && certificateStatus && certificateStatus.hasCertificate !== undefined) {
+      setHasCheckedStatus(true);
+    }
+  }, [isLoading, certificateStatus]);
+
+  // No mostrar hasta que hayamos confirmado el estado
+  // Solo mostrar si explícitamente hasCertificate es false
+  const shouldHide = !hasCheckedStatus || isLoading || !certificateStatus || certificateStatus.hasCertificate !== false || dismissed;
+
+  if (shouldHide) {
     return null;
   }
 
   const handleGoToConfiguration = () => {
     router.push("/dashboard/configuracion?tab=certificado");
   };
-
-  console.log("certificateStatus:", certificateStatus);
 
   return (
     <Alert className="border-amber-200 bg-amber-50 relative">
