@@ -16,11 +16,12 @@ import { CustomersService } from '../../application/services/customers.service';
 import { CreateCustomerDto } from '../../application/dto/create-customer.dto';
 import { UpdateCustomerDto } from '../../application/dto/update-customer.dto';
 import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
+import { EmailVerifiedGuard } from '../../../auth/infrastructure/guards/email-verified.guard';
 import { PrismaService } from '../../../../shared/database/prisma.service';
 
 @ApiTags('customers')
 @Controller('customers')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmailVerifiedGuard)
 @ApiBearerAuth()
 export class CustomersController {
   constructor(

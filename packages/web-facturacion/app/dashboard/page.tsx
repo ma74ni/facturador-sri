@@ -21,6 +21,7 @@ import {
 import { useInvoices, useInvoiceStats } from '@/lib/hooks/use-invoices';
 import { useCustomers } from '@/lib/hooks/use-customers';
 import { useProducts } from '@/lib/hooks/use-products';
+import { CertificateAlertBanner } from '@/components/shared/certificate-alert-banner';
 
 interface RecentInvoice {
   id: string;
@@ -118,23 +119,26 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 sm:space-y-6 lg:space-y-8">
+      {/* Certificate Alert Banner */}
+      <CertificateAlertBanner />
+
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-start md:items-center md:flex-row flex-col gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
             Bienvenido, {user?.firstName} {user?.lastName}
           </p>
         </div>
-        <Button onClick={() => router.push('/dashboard/facturas')} size="lg">
+        <Button onClick={() => router.push('/dashboard/facturas')} size="lg" className='w-full md:w-auto'>
           <Plus className="h-4 w-4 mr-2" />
           Nueva Factura
         </Button>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         {statsCards.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -157,7 +161,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent Activity */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-7">
         <Card className="col-span-4">
           <CardHeader>
             <CardTitle>Facturas Recientes</CardTitle>
@@ -213,7 +217,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="col-span-3">
+        <Card className="col-span-4 lg:col-span-3">
           <CardHeader>
             <CardTitle>Información de la Empresa</CardTitle>
             <CardDescription>
@@ -263,7 +267,7 @@ export default function DashboardPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
             {[
               {
                 title: 'Gestión de Clientes',

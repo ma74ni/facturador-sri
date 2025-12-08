@@ -1,0 +1,331 @@
+// Enums
+export enum TipoOrden {
+  AQUI = 'AQUI',
+  LLEVAR = 'LLEVAR',
+  DELIVERY = 'DELIVERY',
+}
+
+export enum EstadoOrden {
+  NEW = 'NEW',
+  PAID = 'PAID',
+  PREPARING = 'PREPARING',
+  READY = 'READY',
+  DELIVERING = 'DELIVERING',
+  DELIVERED = 'DELIVERED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum MetodoPago {
+  EFECTIVO = 'EFECTIVO',
+  TARJETA = 'TARJETA',
+  TRANSFERENCIA = 'TRANSFERENCIA',
+  MIXTO = 'MIXTO',
+}
+
+export interface PaymentMethod {
+  metodoPago: MetodoPago;
+  monto: number;
+  montoPagado?: number; // Solo para efectivo
+  referencia?: string;
+  notas?: string;
+}
+
+export interface PaymentDetail {
+  id: string;
+  orderId: string;
+  metodoPago: MetodoPago;
+  monto: number;
+  montoPagado?: number;
+  cambio?: number;
+  referencia?: string;
+  notas?: string;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+export enum EstadoTurno {
+  ABIERTO = 'ABIERTO',
+  CERRADO = 'CERRADO',
+}
+
+// Models
+export interface Local {
+  id: string;
+  nombre: string;
+  codigo: string;
+  direccion: string;
+  telefono?: string;
+  activo: boolean;
+  // Relación con facturacion-core
+  companyId: string;
+  establishmentCode: string;
+  emissionPointCode: string;
+  // Configuración de impresoras
+  printerComanda?: string;
+  printerTicket?: string;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+}
+
+export enum RolColaborador {
+  VENDEDOR = 'VENDEDOR',
+  SUPERVISOR = 'SUPERVISOR',
+  ADMINISTRADOR = 'ADMINISTRADOR',
+}
+
+export interface Colaborador {
+  id: string;
+  nombre: string;
+  apellido?: string;
+  color: string;
+  pin?: string;
+  activo: boolean;
+  rol: RolColaborador;
+  localId: string;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+}
+
+export interface Categoria {
+  id: string;
+  nombre: string;
+  codigo: string;
+  color: string;
+  icono?: string;
+  orden: number;
+  activa: boolean;
+
+  // Configuración de modificadores permitidos
+  permiteSeleccionarSabores: boolean;
+  cantidadSaboresObligatorios?: number;
+  cantidadSaboresMax?: number;
+
+  permiteSeleccionarToppings: boolean;
+  cantidadToppingsMax?: number;
+
+  permiteSeleccionarAderezos: boolean;
+  cantidadAderezosMax?: number;
+
+  permiteSustituciones: boolean;
+
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+}
+
+export interface Producto {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+  sku: string;
+
+  // Sistema de precios múltiples
+  precioBase: number; // DEPRECATED: mantener por compatibilidad
+  precioParaServir: number;
+  precioParaLlevar: number;
+  precioDelivery?: number;
+  precioIncluyeIVA: boolean;
+
+  categoriaId: string;
+  categoria?: Categoria;
+
+  // Facturación
+  facturacionProductId?: string;
+  codigoIVA: string;
+
+  // Imagen
+  imagenUrl?: string;
+  imagenPath?: string;
+
+  activo: boolean;
+  esCombo: boolean;
+
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+}
+
+export interface ProductoLocal {
+  id: string;
+  productoId: string;
+  producto?: Producto;
+  localId: string;
+  local?: Local;
+  disponible: boolean;
+  stock?: number;
+  stockMinimo?: number;
+
+  // Precios diferenciados por local (null = usar precio del catálogo central)
+  precioLocalParaServir?: number;
+  precioLocalParaLlevar?: number;
+  precioLocalDelivery?: number;
+
+  // DEPRECATED: mantener por compatibilidad
+  precioLocal?: number;
+
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+}
+
+export enum TipoModificador {
+  SABOR = 'SABOR',
+  TOPPING = 'TOPPING',
+  ADEREZO = 'ADEREZO',
+  SUSTITUCION = 'SUSTITUCION',
+}
+
+export interface Modificador {
+  id: string;
+  tipo: TipoModificador;
+  nombre: string;
+  descripcion?: string;
+  precioAdicional?: number;
+  disponible: boolean;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+}
+
+export interface OrderItem {
+  id?: string;
+  orderId?: string;
+  productoId: string;
+
+  // Snapshot del producto
+  nombreProducto: string;
+  precioUnitario: number;
+  cantidad: number;
+
+  // Modificadores seleccionados (JSON en Prisma, arrays aquí para facilidad de uso)
+  sabores?: any;
+  toppings?: any;
+  aderezos?: any;
+  sustituciones?: any;
+
+  // Total del item
+  subtotalItem: number;
+
+  // Para pedidos incrementales
+  etiquetaIncremental?: string;
+  esIncremental?: boolean;
+  pagado?: boolean;
+
+  // Notas específicas del item
+  notas?: string;
+
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+}
+
+export interface Order {
+  id?: string;
+  numeroSecuencial: number;
+  numeroMesa?: string;
+
+  localId: string;
+  turnoId: string;
+  colaboradorId: string;
+
+  // Tipo y estado
+  tipo: TipoOrden;
+  estado: EstadoOrden;
+
+  // Montos
+  subtotal: number;
+  recargoPorcentaje: number;
+  recargoMonto: number;
+  deliveryFee: number;
+  total: number;
+
+  // Pago
+  metodoPago?: MetodoPago;
+  montoPagado?: number;
+  montoCambio?: number;
+  cambio?: number;
+  fechaPago?: string | Date;
+
+  // Facturación
+  requiereFactura: boolean;
+  invoiceQueued?: boolean;
+  facturacionCustomerId?: string;
+  clienteNombre?: string;
+  clienteIdentificacion?: string;
+  clienteEmail?: string;
+  clienteTelefono?: string;
+
+  // Items y notas
+  items: OrderItem[];
+  notas?: string;
+
+  // Payment Details (para pagos mixtos)
+  paymentDetails?: PaymentDetail[];
+
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+}
+
+export interface Turno {
+  id: string;
+  numeroSecuencial: number;
+  estado: EstadoTurno;
+  colaboradorId: string;
+  localId: string;
+
+  // Apertura
+  horaApertura: string | Date;
+  efectivoInicial: number;
+
+  // Cierre
+  horaCierre?: string | Date;
+  efectivoEsperado?: number;
+  efectivoReal?: number;
+  diferencia?: number;
+  notasCierre?: string;
+
+  // Totales calculados
+  totalEfectivo: number;
+  totalTarjeta: number;
+  totalTransferencia: number;
+  totalVentas: number;
+  cantidadOrdenes: number;
+  numeroVentas: number;
+
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+
+  // Relaciones opcionales
+  local?: Local;
+  colaborador?: Colaborador;
+}
+
+export enum EstadoDelivery {
+  PENDIENTE = 'PENDIENTE',
+  LISTO = 'LISTO',
+  EN_CAMINO = 'EN_CAMINO',
+  ENTREGADO = 'ENTREGADO',
+  CANCELADO = 'CANCELADO',
+}
+
+export interface Delivery {
+  id: string;
+  orderId: string;
+
+  // Datos del cliente
+  clienteNombre: string;
+  clienteTelefono: string;
+  direccion: string;
+  referencia?: string;
+
+  // Estado y logística
+  estado: EstadoDelivery;
+  repartidor?: string;
+  tiempoEstimado?: number; // minutos
+
+  // Timestamps
+  despachadoAt?: string | Date;
+  retiradoAt?: string | Date;
+  entregadoAt?: string | Date;
+
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+
+  // Relaciones opcionales
+  order?: Order;
+}

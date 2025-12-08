@@ -1,10 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { customersApi, Customer, CreateCustomerDto } from '@/lib/api/customers';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/lib/context/auth-context';
 
 // Query keys
 export const customerKeys = {
-  all: ['customers'] as const,
+  all: (companyId?: string) => ['customers', companyId] as const,
   detail: (id: string) => ['customers', id] as const,
 };
 
@@ -12,14 +13,18 @@ export const customerKeys = {
  * Hook para obtener todos los clientes
  * - Caché de 5 minutos
  * - Revalidación automática en background
+ * - Filtra por companyId del usuario autenticado
  */
 export function useCustomers() {
+  const { user } = useAuth();
+
   return useQuery({
-    queryKey: customerKeys.all,
+    queryKey: customerKeys.all(user?.companyId),
     queryFn: async () => {
       const data = await customersApi.getAll();
       return Array.isArray(data) ? data : [];
     },
+    enabled: !!user?.companyId,
   });
 }
 
@@ -41,12 +46,13 @@ export function useCustomer(id: string) {
 export function useCreateCustomer() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: (data: CreateCustomerDto) => customersApi.create(data),
     onSuccess: () => {
       // Invalidar caché para refrescar la lista
-      queryClient.invalidateQueries({ queryKey: customerKeys.all });
+      queryClient.invalidateQueries({ queryKey: customerKeys.all(user?.companyId) });
       toast({
         title: 'Cliente creado',
         description: 'El cliente se ha creado correctamente',
@@ -69,13 +75,14 @@ export function useCreateCustomer() {
 export function useUpdateCustomer() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: CreateCustomerDto }) =>
       customersApi.update(id, data),
     onSuccess: (_, variables) => {
       // Invalidar caché de la lista y del detalle
-      queryClient.invalidateQueries({ queryKey: customerKeys.all });
+      queryClient.invalidateQueries({ queryKey: customerKeys.all(user?.companyId) });
       queryClient.invalidateQueries({ queryKey: customerKeys.detail(variables.id) });
       toast({
         title: 'Cliente actualizado',
@@ -99,12 +106,13 @@ export function useUpdateCustomer() {
 export function useDeleteCustomer() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: (id: string) => customersApi.delete(id),
     onSuccess: () => {
       // Invalidar caché para refrescar la lista
-      queryClient.invalidateQueries({ queryKey: customerKeys.all });
+      queryClient.invalidateQueries({ queryKey: customerKeys.all(user?.companyId) });
       toast({
         title: 'Cliente eliminado',
         description: 'El cliente se ha eliminado correctamente',

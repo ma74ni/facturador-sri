@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Facturador SRI - Sistema de Facturación Electrónica",
+  title: "Tu Facturador - Sistema de Facturación Electrónica",
   description: "Sistema de facturación electrónica para Ecuador",
 };
 

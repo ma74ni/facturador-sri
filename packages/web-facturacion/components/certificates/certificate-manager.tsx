@@ -185,24 +185,20 @@ export function CertificateManager() {
     <>
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <FileKey className="h-6 w-6 text-primary" />
-              </div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <CardTitle>Certificado Digital</CardTitle>
                 <CardDescription>
                   Gestiona tu certificado digital para firmar documentos electrónicos
                 </CardDescription>
               </div>
-            </div>
             {status?.hasCertificate ? (
               <Button
                 variant="destructive"
                 size="sm"
                 onClick={() => setShowDeleteDialog(true)}
                 disabled={loading}
+                className="w-full sm:w-auto"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Eliminar
@@ -211,6 +207,7 @@ export function CertificateManager() {
               <Button
                 onClick={() => setShowUploadDialog(true)}
                 disabled={loading}
+                className="w-full sm:w-auto"
               >
                 <Upload className="mr-2 h-4 w-4" />
                 Subir Certificado
@@ -292,7 +289,7 @@ export function CertificateManager() {
                   <p className="pt-2">
                     <Button
                       variant="link"
-                      className="h-auto p-0"
+                      className="whitespace-normal break-normal"
                       onClick={() => setShowUploadDialog(true)}
                     >
                       Subir certificado digital (.p12) →

@@ -38,6 +38,8 @@ import { Customer } from '@/lib/api/customers';
 import { Product } from '@/lib/api/products';
 import { Establishment } from '@/lib/api/establishments';
 import { InvoiceDialog } from '@/components/invoices/invoice-dialog';
+import { CertificateRequiredDialog } from '@/components/shared/certificate-required-dialog';
+import { EmailVerificationRequiredDialog } from '@/components/shared/email-verification-required-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useInvoices, useInvoiceStats } from '@/lib/hooks/use-invoices';
 import { useCustomers } from '@/lib/hooks/use-customers';
@@ -64,6 +66,8 @@ export default function FacturasPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
   const [deletingInvoice, setDeletingInvoice] = useState(false);
+  const [certificateDialogOpen, setCertificateDialogOpen] = useState(false);
+  const [emailVerificationDialogOpen, setEmailVerificationDialogOpen] = useState(false);
 
   const facturas = invoices;
 
@@ -91,12 +95,12 @@ export default function FacturasPage() {
           console.error('Error sending to SRI:', sriError);
           const errorMessage = sriError.response?.data?.message || 'La factura se creó pero hubo un error al enviar al SRI';
 
-          // Si el error es por falta de certificado, mostrar mensaje específico
-          if (errorMessage.includes('certificado') || errorMessage.includes('firmada')) {
+          // Si el error es por falta de certificado, mostrar diálogo específico
+          if (errorMessage.includes('certificado') || errorMessage.includes('firmada') || errorMessage.includes('firma')) {
+            setCertificateDialogOpen(true);
             toast({
-              variant: 'destructive',
-              title: 'Certificado requerido',
-              description: 'Debes subir un certificado digital en la configuración de tu empresa para firmar facturas. La factura fue creada pero no enviada.',
+              title: 'Factura creada',
+              description: 'La factura fue creada pero no se pudo enviar al SRI. Se requiere certificado digital.',
             });
           } else {
             toast({
@@ -116,6 +120,13 @@ export default function FacturasPage() {
       await loadData();
     } catch (error: any) {
       console.error('Error creating invoice:', error);
+
+      // Si el error es por email no verificado
+      if (error.isEmailNotVerified) {
+        setEmailVerificationDialogOpen(true);
+        return;
+      }
+
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -268,16 +279,16 @@ export default function FacturasPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Facturas</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Facturas</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Gestiona y emite facturas electrónicas
           </p>
         </div>
-        <Button onClick={() => setInvoiceDialogOpen(true)}>
+        <Button onClick={() => setInvoiceDialogOpen(true)} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
           Nueva Factura
         </Button>
@@ -285,16 +296,16 @@ export default function FacturasPage() {
 
       {/* Stats */}
       {facturas.length > 0 && stats && (
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+              <CardTitle className="text-xs sm:text-sm font-medium">
                 Total Facturas
               </CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
+              <FileText className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.total}</div>
+              <div className="text-xl sm:text-2xl font-bold">{stats.total}</div>
               <p className="text-xs text-muted-foreground">
                 facturas emitidas
               </p>
@@ -303,13 +314,13 @@ export default function FacturasPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+              <CardTitle className="text-xs sm:text-sm font-medium">
                 Autorizadas
               </CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.authorized}</div>
+              <div className="text-xl sm:text-2xl font-bold text-green-600">{stats.authorized}</div>
               <p className="text-xs text-muted-foreground">
                 por el SRI
               </p>
@@ -318,13 +329,13 @@ export default function FacturasPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+              <CardTitle className="text-xs sm:text-sm font-medium">
                 Pendientes
               </CardTitle>
-              <Clock className="h-4 w-4 text-yellow-600" />
+              <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
+              <div className="text-xl sm:text-2xl font-bold text-yellow-600">{stats.pending}</div>
               <p className="text-xs text-muted-foreground">
                 por enviar
               </p>
@@ -333,13 +344,13 @@ export default function FacturasPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+              <CardTitle className="text-xs sm:text-sm font-medium">
                 Monto Total
               </CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${stats.totalAmount.toFixed(2)}</div>
+              <div className="text-xl sm:text-2xl font-bold">${stats.totalAmount.toFixed(2)}</div>
               <p className="text-xs text-muted-foreground">
                 suma de facturas
               </p>
@@ -357,7 +368,7 @@ export default function FacturasPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
@@ -370,7 +381,7 @@ export default function FacturasPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="flex h-10 w-full sm:w-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <option value="all">Todos los estados</option>
               <option value="PENDING">Pendiente</option>
@@ -415,10 +426,10 @@ export default function FacturasPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Secuencial</TableHead>
-                  <TableHead>Fecha</TableHead>
+                  <TableHead className="hidden sm:table-cell">Fecha</TableHead>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>RUC/CI</TableHead>
-                  <TableHead>Estado</TableHead>
+                  <TableHead className="hidden md:table-cell">RUC/CI</TableHead>
+                  <TableHead className="hidden lg:table-cell">Estado</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
@@ -426,27 +437,43 @@ export default function FacturasPage() {
               <TableBody>
                 {filteredFacturas.map((factura) => (
                   <TableRow key={factura.id}>
-                    <TableCell className="font-medium font-mono">
-                      {factura.establishmentCode}-{factura.emissionPointCode}-{factura.sequential}
+                    <TableCell className="font-medium">
+                      <div className="flex flex-col gap-1">
+                        <span className="font-mono text-xs sm:text-sm">
+                          {factura.establishmentCode}-{factura.emissionPointCode}-{factura.sequential}
+                        </span>
+                        {/* Show status badge on mobile */}
+                        <span className="lg:hidden">
+                          {getStatusBadge(factura.status)}
+                        </span>
+                      </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       <div className="flex items-center text-sm">
                         <Calendar className="mr-1 h-3 w-3 text-muted-foreground" />
                         {new Date(factura.issueDate).toLocaleDateString('es-EC')}
                       </div>
                     </TableCell>
-                    <TableCell>{factura.customerName}</TableCell>
-                    <TableCell className="font-mono text-muted-foreground">
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-sm">{factura.customerName}</span>
+                        {/* Show RUC/CI on mobile below name */}
+                        <span className="md:hidden font-mono text-xs text-muted-foreground">
+                          {factura.customerIdentification}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell font-mono text-sm text-muted-foreground">
                       {factura.customerIdentification}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       {getStatusBadge(factura.status)}
                     </TableCell>
-                    <TableCell className="text-right font-medium">
+                    <TableCell className="text-right font-medium text-sm">
                       ${Number(factura.totalAmount).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1 sm:gap-2">
                         {factura.status === 'PENDING' && (
                           <>
                             <Button
@@ -454,16 +481,18 @@ export default function FacturasPage() {
                               size="sm"
                               title="Enviar al SRI"
                               onClick={() => handleSendToSri(factura.id)}
+                              className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                             >
-                              <Send className="h-4 w-4 text-blue-600" />
+                              <Send className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
                               title="Eliminar factura"
                               onClick={() => handleDeleteClick(factura)}
+                              className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                             >
-                              <Trash2 className="h-4 w-4 text-red-600" />
+                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 text-red-600" />
                             </Button>
                           </>
                         )}
@@ -477,8 +506,9 @@ export default function FacturasPage() {
                                 factura.id,
                                 `${factura.establishmentCode}-${factura.emissionPointCode}-${factura.sequential}`
                               )}
+                              className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                             >
-                              <FileDown className="h-4 w-4 text-green-600" />
+                              <FileDown className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
                             </Button>
                             <Button
                               variant="ghost"
@@ -488,16 +518,18 @@ export default function FacturasPage() {
                                 factura.id,
                                 `${factura.establishmentCode}-${factura.emissionPointCode}-${factura.sequential}`
                               )}
+                              className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                             >
-                              <Download className="h-4 w-4 text-green-600" />
+                              <Download className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
                               title="Enviar por email"
                               onClick={() => handleSendEmail(factura.id)}
+                              className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                             >
-                              <Mail className="h-4 w-4 text-purple-600" />
+                              <Mail className="h-3 w-3 sm:h-4 sm:w-4 text-purple-600" />
                             </Button>
                           </>
                         )}
@@ -508,8 +540,9 @@ export default function FacturasPage() {
                             size="sm"
                             title="Eliminar factura"
                             onClick={() => handleDeleteClick(factura)}
+                            className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                           >
-                            <Trash2 className="h-4 w-4 text-red-600" />
+                            <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 text-red-600" />
                           </Button>
                         )}
                       </div>
@@ -539,20 +572,20 @@ export default function FacturasPage() {
                 .map((factura) => (
                   <div
                     key={factura.id}
-                    className="flex items-center justify-between p-3 border rounded-lg bg-green-50/50"
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 border rounded-lg bg-green-50/50"
                   >
-                    <div className="space-y-1">
+                    <div className="space-y-1 flex-1 min-w-0">
                       <p className="text-sm font-medium">
                         {factura.establishmentCode}-{factura.emissionPointCode}-{factura.sequential}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {factura.customerName} • {factura.customerIdentification}
                       </p>
-                      <p className="text-xs font-mono text-green-700">
+                      <p className="text-xs font-mono text-green-700 truncate" title={factura.authorizationNumber}>
                         {factura.authorizationNumber}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-left sm:text-right flex-shrink-0">
                       <p className="text-sm font-medium">${Number(factura.totalAmount).toFixed(2)}</p>
                       <p className="text-xs text-muted-foreground">
                         {factura.authorizationDate &&
@@ -611,6 +644,18 @@ export default function FacturasPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Certificate Required Dialog */}
+      <CertificateRequiredDialog
+        open={certificateDialogOpen}
+        onOpenChange={setCertificateDialogOpen}
+      />
+
+      {/* Email Verification Required Dialog */}
+      <EmailVerificationRequiredDialog
+        open={emailVerificationDialogOpen}
+        onOpenChange={setEmailVerificationDialogOpen}
+      />
     </div>
   );
 }

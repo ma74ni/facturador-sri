@@ -6,12 +6,14 @@ import { LoginDto } from '../dto/login.dto';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '@/shared/database/prisma.service';
+import { EmailService } from '@/shared/email/email.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private emailService: EmailService,
   ) {}
 
   async register(dto: RegisterCompanyDto) {
@@ -39,7 +41,7 @@ export class AuthService {
     // Generar token de verificación de email
     const verificationToken = randomBytes(32).toString('hex');
     const verificationTokenExpiry = new Date();
-    verificationTokenExpiry.setHours(verificationTokenExpiry.getHours() + 24); // 24 horas
+    verificationTokenExpiry.setMinutes(verificationTokenExpiry.getMinutes() + 5); // 5 minutos
 
     // Crear empresa y usuario en una transacción
     const result = await this.prisma.$transaction(async (prisma) => {
@@ -69,6 +71,7 @@ export class AuthService {
           verificationToken,
           verificationTokenExpiry,
           emailVerified: false,
+          lastVerificationEmailSent: new Date(),
         },
       });
 
@@ -94,8 +97,31 @@ export class AuthService {
       return { company, user };
     });
 
-    // TODO: Aquí deberías enviar el email de verificación
-    // await this.mailService.sendVerificationEmail(result.user.email, verificationToken);
+    // Enviar email de verificación
+    const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:3001'}/verify-email?token=${verificationToken}`;
+
+    try {
+      await this.emailService.sendEmail({
+        to: result.user.email,
+        subject: 'Verifica tu email - Sistema de Facturación SRI',
+        template: 'email-verification',
+        context: {
+          userName: `${result.user.firstName} ${result.user.lastName}`,
+          verificationLink,
+          year: new Date().getFullYear(),
+        },
+      });
+
+      console.log('✅ Email de verificación enviado a:', result.user.email);
+    } catch (error) {
+      console.error('❌ Error al enviar email de verificación:', error);
+      // No lanzar error, el usuario fue creado exitosamente
+    }
+
+    // En desarrollo, mostrar el link en consola
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔗 Link de verificación:', verificationLink);
+    }
 
     // Generar token JWT
     const token = this.generateToken(result.user.id);
@@ -235,13 +261,16 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Token de verificación inválido');
+      // Token no encontrado - puede ser inválido, expirado o ya utilizado
+      throw new UnauthorizedException('Token de verificación inválido o ya utilizado. Si ya verificaste tu email, puedes iniciar sesión normalmente.');
     }
 
+    // Verificar si el token está expirado
     if (user.verificationTokenExpiry && user.verificationTokenExpiry < new Date()) {
       throw new UnauthorizedException('El token de verificación ha expirado');
     }
 
+    // Verificar si el email ya fue verificado (caso raro donde el token existe pero ya está verificado)
     if (user.emailVerified) {
       return {
         message: 'El email ya ha sido verificado anteriormente',
@@ -249,7 +278,7 @@ export class AuthService {
       };
     }
 
-    // Actualizar usuario
+    // Actualizar usuario - marcar como verificado y limpiar token
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
@@ -262,6 +291,89 @@ export class AuthService {
     return {
       message: 'Email verificado exitosamente',
       alreadyVerified: false,
+    };
+  }
+
+  /**
+   * Reenviar email de verificación
+   */
+  async resendVerificationEmail(email: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Usuario no encontrado');
+    }
+
+    if (user.emailVerified) {
+      return {
+        message: 'El email ya ha sido verificado',
+        alreadyVerified: true,
+      };
+    }
+
+    // Validar cooldown de 5 minutos
+    if (user.lastVerificationEmailSent) {
+      const now = new Date();
+      const lastSent = new Date(user.lastVerificationEmailSent);
+      const diffInSeconds = Math.floor((now.getTime() - lastSent.getTime()) / 1000);
+      const cooldownSeconds = 300; // 5 minutos
+
+      if (diffInSeconds < cooldownSeconds) {
+        const remainingSeconds = cooldownSeconds - diffInSeconds;
+        throw new UnauthorizedException(
+          `Debes esperar ${Math.ceil(remainingSeconds / 60)} minutos antes de solicitar otro email de verificación`,
+        );
+      }
+    }
+
+    // Generar nuevo token de verificación
+    const verificationToken = randomBytes(32).toString('hex');
+    const verificationTokenExpiry = new Date();
+    verificationTokenExpiry.setMinutes(verificationTokenExpiry.getMinutes() + 5); // 5 minutos
+
+    // Actualizar token y timestamp
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        verificationToken,
+        verificationTokenExpiry,
+        lastVerificationEmailSent: new Date(),
+      },
+    });
+
+    // Construir link de verificación
+    const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:3001'}/verify-email?token=${verificationToken}`;
+
+    // Enviar email de verificación
+    try {
+      await this.emailService.sendEmail({
+        to: user.email,
+        subject: 'Verifica tu email - Sistema de Facturación SRI',
+        template: 'email-verification',
+        context: {
+          userName: `${user.firstName} ${user.lastName}`,
+          verificationLink,
+          year: new Date().getFullYear(),
+        },
+      });
+
+      console.log('✅ Email de verificación enviado a:', user.email);
+    } catch (error) {
+      console.error('❌ Error al enviar email de verificación:', error);
+      // No lanzar error, solo loguear. El token ya fue guardado.
+    }
+
+    // En desarrollo, mostrar el link en consola
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔗 Link de verificación:', verificationLink);
+    }
+
+    return {
+      message: 'Email de verificación enviado exitosamente',
+      // En desarrollo, retornamos el link. En producción, solo el mensaje
+      ...(process.env.NODE_ENV === 'development' && { verificationLink }),
     };
   }
 

@@ -34,7 +34,7 @@ export class SriWebServiceService {
   }
 
   /**
-   * Envía un comprobante electrónico al SRI
+   * Envía un comprobante electrónico al SRI con reintentos
    */
   async sendInvoice(
     xmlContent: string,
@@ -46,56 +46,88 @@ export class SriWebServiceService {
     mensaje?: string;
     comprobantes?: any[];
   }> {
-    try {
-      const url = environment === 'PRODUCTION' 
-        ? this.receptionUrlProd 
-        : this.receptionUrlTest;
+    const maxRetries = 3;
+    const retryDelay = 2000; // 2 segundos entre reintentos
 
-      if (!url) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const url = environment === 'PRODUCTION'
+          ? this.receptionUrlProd
+          : this.receptionUrlTest;
+
+        if (!url) {
+          throw new InternalServerErrorException(
+            `URL del SRI no configurada para ambiente ${environment}`,
+          );
+        }
+
+        // Extraer clave de acceso del XML antes de enviar
+        const claveAcceso = this.extractAccessKeyFromXml(xmlContent);
+
+        this.logger.log(`📤 Intento ${attempt}/${maxRetries} - Enviando comprobante al SRI (clave: ${claveAcceso})`);
+
+        // Crear cliente SOAP
+        const client = await soap.createClientAsync(url, {
+          disableCache: true,
+        });
+
+        // Preparar el XML en Base64
+        const xmlBase64 = Buffer.from(xmlContent, 'utf-8').toString('base64');
+
+        // Preparar request según especificación SRI
+        const args = {
+          xml: xmlBase64,
+        };
+
+        // Llamar al método validarComprobante
+        const [result] = await client.validarComprobanteAsync(args);
+
+        // Procesar respuesta
+        const respuesta = result.RespuestaRecepcionComprobante;
+
+        this.logger.log(`✅ Comprobante enviado exitosamente en intento ${attempt}`);
+
+        return {
+          success: respuesta.estado === 'RECIBIDA',
+          claveAcceso: respuesta.claveAccesoComprobante || claveAcceso,
+          estado: respuesta.estado,
+          mensaje: respuesta.comprobantes?.comprobante?.mensajes?.mensaje?.mensaje,
+          comprobantes: respuesta.comprobantes,
+        };
+
+      } catch (error) {
+        const isLastAttempt = attempt === maxRetries;
+        const isNetworkError = error.message?.includes('ECONNRESET') ||
+                               error.message?.includes('ETIMEDOUT') ||
+                               error.message?.includes('ENOTFOUND');
+
+        if (isNetworkError && !isLastAttempt) {
+          this.logger.warn(`⚠️  Intento ${attempt} falló (${error.message}). Reintentando en ${retryDelay}ms...`);
+          await this.sleep(retryDelay);
+          continue; // Reintentar
+        }
+
+        // Si no es error de red o es el último intento, lanzar error
+        this.logger.error(`❌ Error en intento ${attempt}/${maxRetries}: ${error.message}`);
         throw new InternalServerErrorException(
-          `URL del SRI no configurada para ambiente ${environment}`,
+          `Error al enviar al SRI después de ${attempt} intentos: ${error.message}`,
         );
       }
-
-      // Extraer clave de acceso del XML antes de enviar
-      const claveAcceso = this.extractAccessKeyFromXml(xmlContent);
-
-      // Crear cliente SOAP
-      const client = await soap.createClientAsync(url, {
-        disableCache: true,
-      });
-
-      // Preparar el XML en Base64
-      const xmlBase64 = Buffer.from(xmlContent, 'utf-8').toString('base64');
-
-      // Preparar request según especificación SRI
-      const args = {
-        xml: xmlBase64,
-      };
-
-      // Llamar al método validarComprobante
-      const [result] = await client.validarComprobanteAsync(args);
-
-      // Procesar respuesta
-      const respuesta = result.RespuestaRecepcionComprobante;
-
-      return {
-        success: respuesta.estado === 'RECIBIDA',
-        claveAcceso: respuesta.claveAccesoComprobante || claveAcceso, // Usar la del XML si no viene en respuesta
-        estado: respuesta.estado,
-        mensaje: respuesta.comprobantes?.comprobante?.mensajes?.mensaje?.mensaje,
-        comprobantes: respuesta.comprobantes,
-      };
-
-    } catch (error) {
-      throw new InternalServerErrorException(
-        `Error al enviar al SRI: ${error.message}`,
-      );
     }
+
+    // Este código nunca debería ejecutarse, pero TypeScript lo requiere
+    throw new InternalServerErrorException('Error inesperado al enviar al SRI');
   }
 
   /**
-   * Consulta la autorización de un comprobante en el SRI
+   * Helper para esperar entre reintentos
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Consulta la autorización de un comprobante en el SRI con reintentos
    */
   async checkAuthorization(
     accessKey: string,
@@ -107,66 +139,90 @@ export class SriWebServiceService {
     ambiente: string;
     mensajes?: any[];
   }> {
-    try {
-      const url = environment === 'PRODUCTION'
-        ? this.authorizationUrlProd
-        : this.authorizationUrlTest;
+    const maxRetries = 3;
+    const retryDelay = 2000;
 
-      if (!url) {
-        throw new InternalServerErrorException(
-          `URL de autorización del SRI no configurada para ambiente ${environment}`,
-        );
-      }
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const url = environment === 'PRODUCTION'
+          ? this.authorizationUrlProd
+          : this.authorizationUrlTest;
 
-      if (!accessKey || accessKey.length !== 49) {
-        throw new InternalServerErrorException(
-          `Clave de acceso inválida: '${accessKey}' (longitud: ${accessKey?.length || 0})`,
-        );
-      }
+        if (!url) {
+          throw new InternalServerErrorException(
+            `URL de autorización del SRI no configurada para ambiente ${environment}`,
+          );
+        }
 
-      // Crear cliente SOAP
-      const client = await soap.createClientAsync(url, {
-        disableCache: true,
-      });
+        if (!accessKey || accessKey.length !== 49) {
+          throw new InternalServerErrorException(
+            `Clave de acceso inválida: '${accessKey}' (longitud: ${accessKey?.length || 0})`,
+          );
+        }
 
-      // Preparar request
-      const args = {
-        claveAccesoComprobante: accessKey,
-      };
+        this.logger.log(`🔍 Intento ${attempt}/${maxRetries} - Consultando autorización (clave: ${accessKey})`);
 
-      // Llamar al método autorizacionComprobante
-      const [result] = await client.autorizacionComprobanteAsync(args);
+        // Crear cliente SOAP
+        const client = await soap.createClientAsync(url, {
+          disableCache: true,
+        });
 
-      // Procesar respuesta
-      const autorizaciones = result.RespuestaAutorizacionComprobante?.autorizaciones?.autorizacion;
-
-      if (!autorizaciones || autorizaciones.length === 0) {
-        return {
-          estado: 'NO_AUTORIZADA',
-          ambiente: environment,
-          mensajes: [],
+        // Preparar request
+        const args = {
+          claveAccesoComprobante: accessKey,
         };
+
+        // Llamar al método autorizacionComprobante
+        const [result] = await client.autorizacionComprobanteAsync(args);
+
+        // Procesar respuesta
+        const autorizaciones = result.RespuestaAutorizacionComprobante?.autorizaciones?.autorizacion;
+
+        if (!autorizaciones || autorizaciones.length === 0) {
+          return {
+            estado: 'NO_AUTORIZADA',
+            ambiente: environment,
+            mensajes: [],
+          };
+        }
+
+        const autorizacion = Array.isArray(autorizaciones)
+          ? autorizaciones[0]
+          : autorizaciones;
+
+        this.logger.log(`✅ Autorización consultada exitosamente en intento ${attempt}`);
+
+        return {
+          estado: autorizacion.estado,
+          numeroAutorizacion: autorizacion.numeroAutorizacion,
+          fechaAutorizacion: autorizacion.fechaAutorizacion
+            ? new Date(autorizacion.fechaAutorizacion)
+            : undefined,
+          ambiente: autorizacion.ambiente,
+          mensajes: autorizacion.mensajes?.mensaje || [],
+        };
+
+      } catch (error) {
+        const isLastAttempt = attempt === maxRetries;
+        const isNetworkError = error.message?.includes('ECONNRESET') ||
+                               error.message?.includes('ETIMEDOUT') ||
+                               error.message?.includes('ENOTFOUND');
+
+        if (isNetworkError && !isLastAttempt) {
+          this.logger.warn(`⚠️  Intento ${attempt} falló (${error.message}). Reintentando en ${retryDelay}ms...`);
+          await this.sleep(retryDelay);
+          continue;
+        }
+
+        this.logger.error(`❌ Error en intento ${attempt}/${maxRetries}: ${error.message}`);
+        throw new InternalServerErrorException(
+          `Error al consultar autorización después de ${attempt} intentos: ${error.message}`,
+        );
       }
-
-      const autorizacion = Array.isArray(autorizaciones) 
-        ? autorizaciones[0] 
-        : autorizaciones;
-
-      return {
-        estado: autorizacion.estado,
-        numeroAutorizacion: autorizacion.numeroAutorizacion,
-        fechaAutorizacion: autorizacion.fechaAutorizacion 
-          ? new Date(autorizacion.fechaAutorizacion) 
-          : undefined,
-        ambiente: autorizacion.ambiente,
-        mensajes: autorizacion.mensajes?.mensaje || [],
-      };
-
-    } catch (error) {
-      throw new InternalServerErrorException(
-        `Error al consultar autorización: ${error.message}`,
-      );
     }
+
+    // Este código nunca debería ejecutarse, pero TypeScript lo requiere
+    throw new InternalServerErrorException('Error inesperado al consultar autorización');
   }
 
   /**
@@ -267,9 +323,5 @@ export class SriWebServiceService {
         errors,
       };
     }
-  }
-
-  private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }

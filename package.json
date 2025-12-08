@@ -8,7 +8,8 @@
   ],
   "scripts": {
     "dev:core": "pnpm --filter facturacion-core dev",
-    "dev:pos": "pnpm --filter pos-heladeria dev",
+    "dev:pos": "pnpm --filter pos-backend dev",
+    "dev:pos-frontend": "pnpm --filter pos-frontend dev",
     "build:all": "pnpm -r build",
     "test:all": "pnpm -r test",
     "lint:all": "pnpm -r lint"

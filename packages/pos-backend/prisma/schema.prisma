@@ -1,0 +1,562 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client-pos"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// LOCALES - Puntos de venta
+// ============================================
+
+model Local {
+  id                String   @id @default(uuid())
+  nombre            String
+  codigo            String   @unique
+  direccion         String
+  telefono          String?
+  activo            Boolean  @default(true)
+
+  // Relación con facturacion-core
+  companyId         String
+  establishmentCode String
+  emissionPointCode String
+
+  // Configuración de impresoras
+  printerComanda    String?
+  printerTicket     String?
+
+  // Relaciones
+  colaboradores     Colaborador[]
+  turnos            Turno[]
+  ordenes           Order[]
+  productosLocales  ProductoLocal[]
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("locales")
+}
+
+// ============================================
+// COLABORADORES - Empleados por local
+// ============================================
+
+model Colaborador {
+  id          String   @id @default(uuid())
+  nombre      String
+  apellido    String?
+  color       String   @default("#3B82F6")
+  pin         String?
+  activo      Boolean  @default(true)
+
+  // Sistema de roles y permisos
+  rol         RolColaborador @default(VENDEDOR)
+
+  localId     String
+  local       Local    @relation(fields: [localId], references: [id], onDelete: Cascade)
+
+  // Sincronización con facturacion-core
+  facturacionUserId    String?   @unique  // ID del usuario en facturacion-core
+  facturacionEmail     String?   @unique  // Email del usuario en facturacion-core
+  requiresFacturacionAuth Boolean @default(false) // Si requiere autenticación en facturacion-core
+
+  turnos      Turno[]
+  ordenes     Order[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("colaboradores")
+}
+
+// ============================================
+// ROLES - Roles de colaboradores
+// ============================================
+
+enum RolColaborador {
+  VENDEDOR      // Solo vende, ve productos disponibles en su local
+  SUPERVISOR    // Gestiona stock local, disponibilidad, precios locales de su local
+  ADMINISTRADOR // Gestiona catálogo central, crea/edita productos, ve todos los locales
+}
+
+// ============================================
+// TURNOS - Caja por colaborador
+// ============================================
+
+model Turno {
+  id                  String      @id @default(uuid())
+  numeroSecuencial    Int
+
+  colaboradorId       String
+  colaborador         Colaborador @relation(fields: [colaboradorId], references: [id])
+
+  localId             String
+  local               Local       @relation(fields: [localId], references: [id], onDelete: Cascade)
+
+  // Apertura
+  horaApertura        DateTime    @default(now())
+  efectivoInicial     Decimal     @db.Decimal(10, 2)
+
+  // Cierre
+  horaCierre          DateTime?
+  efectivoEsperado    Decimal?    @db.Decimal(10, 2)
+  efectivoReal        Decimal?    @db.Decimal(10, 2)
+  diferencia          Decimal?    @db.Decimal(10, 2)
+  notasCierre         String?
+
+  // Totales calculados
+  totalEfectivo       Decimal     @default(0) @db.Decimal(10, 2)
+  totalTarjeta        Decimal     @default(0) @db.Decimal(10, 2)
+  totalTransferencia  Decimal     @default(0) @db.Decimal(10, 2)
+  totalVentas         Decimal     @default(0) @db.Decimal(10, 2)
+  cantidadOrdenes     Int         @default(0)
+  numeroVentas        Int         @default(0)
+
+  estado              EstadoTurno @default(ABIERTO)
+
+  // Autenticación con facturacion-core
+  facturacionToken       String?   // JWT token para este turno
+  facturacionTokenExpiry DateTime? // Fecha de expiración del token
+
+  ordenes             Order[]
+
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  @@unique([localId, numeroSecuencial])
+  @@map("turnos")
+}
+
+enum EstadoTurno {
+  ABIERTO
+  CERRADO
+}
+
+// ============================================
+// CATEGORÍAS - Categorías de productos
+// ============================================
+
+model Categoria {
+  id                            String    @id @default(uuid())
+  nombre                        String
+  codigo                        String    @unique
+  color                         String    @default("#6366F1")
+  icono                         String?
+  orden                         Int       @default(0)
+  activa                        Boolean   @default(true)
+
+  // Configuración de modificadores permitidos
+  permiteSeleccionarSabores     Boolean   @default(false)
+  cantidadSaboresObligatorios   Int?
+  cantidadSaboresMax            Int?
+
+  permiteSeleccionarToppings    Boolean   @default(false)
+  cantidadToppingsMax           Int?
+
+  permiteSeleccionarAderezos    Boolean   @default(false)
+  cantidadAderezosMax           Int?
+
+  permiteSustituciones          Boolean   @default(false)
+
+  productos                     Producto[]
+
+  createdAt                     DateTime  @default(now())
+  updatedAt                     DateTime  @updatedAt
+
+  @@map("categorias")
+}
+
+// ============================================
+// PRODUCTOS - Producto base
+// ============================================
+
+model Producto {
+  id                   String          @id @default(uuid())
+  nombre               String
+  descripcion          String?
+  sku                  String          @unique
+
+  // Sistema de precios múltiples
+  precioBase           Decimal         @db.Decimal(10, 2) // DEPRECATED: Mantener por compatibilidad temporal
+  precioParaServir     Decimal         @db.Decimal(10, 2) // Precio para consumir en local
+  precioParaLlevar     Decimal         @db.Decimal(10, 2) // Precio para llevar
+  precioDelivery       Decimal?        @db.Decimal(10, 2) // Precio delivery (opcional)
+  precioIncluyeIVA     Boolean         @default(false)    // Indica si precios incluyen IVA
+
+  categoriaId          String
+  categoria            Categoria       @relation(fields: [categoriaId], references: [id])
+
+  // Facturación
+  facturacionProductId String?
+  codigoIVA            String          @default("2")
+
+  // Imagen
+  imagenUrl            String?
+  imagenPath           String?
+
+  activo               Boolean         @default(true)
+  esCombo              Boolean         @default(false)    // Indica si es un producto combo
+
+  // Disponibilidad por local
+  locales              ProductoLocal[]
+  items                OrderItem[]
+
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  @@map("productos")
+}
+
+// ============================================
+// PRODUCTO POR LOCAL - Control de inventario y precios
+// ============================================
+
+model ProductoLocal {
+  id                String   @id @default(uuid())
+
+  productoId        String
+  producto          Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+
+  localId           String
+  local             Local    @relation(fields: [localId], references: [id], onDelete: Cascade)
+
+  disponible        Boolean  @default(true)
+  stock             Int?
+  stockMinimo       Int?
+
+  // Precios diferenciados por local (null = usar precio del catálogo central)
+  // Estos precios sobrescriben los precios del modelo Producto para este local específico
+  precioLocalParaServir   Decimal? @db.Decimal(10, 2) // Sobrescribe Producto.precioParaServir
+  precioLocalParaLlevar   Decimal? @db.Decimal(10, 2) // Sobrescribe Producto.precioParaLlevar
+  precioLocalDelivery     Decimal? @db.Decimal(10, 2) // Sobrescribe Producto.precioDelivery
+
+  // DEPRECATED: Mantener temporalmente para migración gradual
+  precioLocal       Decimal? @db.Decimal(10, 2)
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([productoId, localId])
+  @@map("productos_locales")
+}
+
+// ============================================
+// MODIFICADORES - Sabores, Toppings, Aderezos
+// ============================================
+
+model Modificador {
+  id                String          @id @default(uuid())
+  tipo              TipoModificador
+  nombre            String
+  descripcion       String?
+
+  precioAdicional   Decimal?        @db.Decimal(10, 2)
+  disponible        Boolean         @default(true)
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@map("modificadores")
+}
+
+enum TipoModificador {
+  SABOR
+  TOPPING
+  ADEREZO
+  SUSTITUCION
+}
+
+// ============================================
+// ORDERS - Órdenes/Cuentas
+// ============================================
+
+model Order {
+  id                      String      @id @default(uuid())
+  numeroSecuencial        Int
+  numeroMesa              String?
+
+  localId                 String
+  local                   Local       @relation(fields: [localId], references: [id])
+
+  turnoId                 String
+  turno                   Turno       @relation(fields: [turnoId], references: [id])
+
+  colaboradorId           String
+  colaborador             Colaborador @relation(fields: [colaboradorId], references: [id])
+
+  // Tipo y estado
+  tipo                    TipoOrden   @default(AQUI)
+  estado                  EstadoOrden @default(NEW)
+
+  // Montos
+  subtotal                Decimal     @db.Decimal(10, 2)
+  recargoPorcentaje       Decimal     @default(0) @db.Decimal(5, 2)
+  recargoMonto            Decimal     @default(0) @db.Decimal(10, 2)
+  deliveryFee             Decimal     @default(0) @db.Decimal(10, 2)
+  total                   Decimal     @db.Decimal(10, 2)
+
+  // Pago
+  metodoPago              MetodoPago?
+  montoPagado             Decimal?    @db.Decimal(10, 2)
+  montoCambio             Decimal?    @db.Decimal(10, 2)
+  cambio                  Decimal?    @db.Decimal(10, 2)
+  fechaPago               DateTime?
+
+  // Facturación
+  requiereFactura         Boolean     @default(false)
+  invoiceQueued           Boolean     @default(false)
+  facturacionCustomerId   String?
+  clienteNombre           String?
+  clienteIdentificacion   String?
+  clienteEmail            String?
+  clienteTelefono         String?
+
+  // Delivery
+  delivery                Delivery?
+
+  // Items
+  items                   OrderItem[]
+
+  // Payment Details (para pagos mixtos)
+  paymentDetails          PaymentDetail[]
+
+  // Notas
+  notas                   String?
+
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  @@unique([localId, numeroSecuencial])
+  @@index([turnoId])
+  @@index([estado])
+  @@index([tipo])
+  @@map("orders")
+}
+
+enum TipoOrden {
+  AQUI
+  LLEVAR
+  DELIVERY
+}
+
+enum EstadoOrden {
+  NEW
+  PAID
+  PREPARING
+  READY
+  DELIVERING
+  DELIVERED
+  CANCELLED
+}
+
+enum MetodoPago {
+  EFECTIVO
+  TARJETA
+  TRANSFERENCIA
+  MIXTO
+}
+
+// ============================================
+// PAYMENT DETAILS - Detalles de pago (para pagos mixtos)
+// ============================================
+
+model PaymentDetail {
+  id              String      @id @default(uuid())
+
+  orderId         String
+  order           Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  metodoPago      MetodoPago
+  monto           Decimal     @db.Decimal(10, 2)
+
+  // Solo para efectivo
+  montoPagado     Decimal?    @db.Decimal(10, 2)
+  cambio          Decimal?    @db.Decimal(10, 2)
+
+  // Metadata
+  referencia      String?     // Número de transferencia, últimos 4 dígitos de tarjeta, etc.
+  notas           String?
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@map("payment_details")
+}
+
+// ============================================
+// ORDER ITEMS - Items del pedido
+// ============================================
+
+model OrderItem {
+  id                String   @id @default(uuid())
+
+  orderId           String
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productoId        String
+  producto          Producto @relation(fields: [productoId], references: [id])
+
+  // Snapshot del producto
+  nombreProducto    String
+  precioUnitario    Decimal  @db.Decimal(10, 2)
+  cantidad          Int      @default(1)
+
+  // Modificadores seleccionados (JSON)
+  sabores           Json?
+  toppings          Json?
+  aderezos          Json?
+  sustituciones     Json?
+
+  // Total del item
+  subtotalItem      Decimal  @db.Decimal(10, 2)
+
+  // Para pedidos incrementales
+  etiquetaIncremental String?
+  esIncremental     Boolean  @default(false)
+  pagado            Boolean  @default(false)
+
+  // Notas específicas del item
+  notas             String?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("order_items")
+}
+
+// ============================================
+// DELIVERY - Datos de entrega
+// ============================================
+
+model Delivery {
+  id                String         @id @default(uuid())
+
+  orderId           String         @unique
+  order             Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // Datos de entrega
+  direccion         String
+  referencia        String?
+  telefono          String
+  nombreCliente     String
+
+  // Estado y seguimiento
+  estado            EstadoDelivery @default(PENDIENTE)
+  repartidor        String?
+  tiempoEstimado    Int?
+  horaDespacho      DateTime?
+  horaEntrega       DateTime?
+  asignadoAt        DateTime?
+  retiradoAt        DateTime?
+  entregadoAt       DateTime?
+  canceladoAt       DateTime?
+
+  // Método de envío
+  metodoEnvio       String?
+
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@map("deliveries")
+}
+
+enum EstadoDelivery {
+  PENDIENTE
+  ASIGNADO
+  RECOGIDO
+  EN_RUTA
+  ENTREGADO
+  CANCELADO
+}
+
+// ============================================
+// INVOICE QUEUE - Cola de facturación
+// ============================================
+
+model InvoiceQueue {
+  id                      String             @id @default(uuid())
+
+  orderId                 String             @unique
+  localId                 String
+
+  // Datos del cliente
+  facturacionCustomerId   String
+
+  // Payload completo para enviar a facturacion-core
+  payload                 Json
+
+  // Estado
+  estado                  EstadoInvoiceQueue @default(PENDIENTE)
+  intentos                Int                @default(0)
+  ultimoIntento           DateTime?
+  mensajeError            String?
+
+  // Respuesta del SRI
+  claveAcceso             String?
+  numeroAutorizacion      String?
+  fechaAutorizacion       DateTime?
+
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  @@index([estado])
+  @@map("invoice_queue")
+}
+
+enum EstadoInvoiceQueue {
+  PENDIENTE
+  PROCESANDO
+  COMPLETADA
+  ERROR
+  RECHAZADA
+}
+
+// ============================================
+// PRINT JOB - Cola de impresión
+// ============================================
+
+model PrintJob {
+  id            String      @id @default(uuid())
+
+  tipo          TipoPrint
+  orderId       String?
+  turnoId       String?
+
+  // Datos de impresora
+  printerName   String
+
+  // Contenido
+  contenido     Json
+
+  // Estado
+  estado        EstadoPrint @default(PENDIENTE)
+  intentos      Int         @default(0)
+  ultimoIntento DateTime?
+  mensajeError  String?
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([estado])
+  @@map("print_jobs")
+}
+
+enum TipoPrint {
+  COMANDA
+  TICKET
+  CIERRE_CAJA
+}
+
+enum EstadoPrint {
+  PENDIENTE
+  PROCESANDO
+  COMPLETADO
+  ERROR
+}

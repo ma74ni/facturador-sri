@@ -172,31 +172,33 @@ export default function ConfiguracionPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Configuración</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Configuración</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">
           Administra establecimientos, puntos de emisión y usuarios
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b">
+      <div className="flex gap-1 border-b overflow-x-auto pb-px scrollbar-hide px-2">
         {tabs.map((tab) => {
           const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors ${
-                activeTab === tab.id
+              className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors min-w-[70px] sm:min-w-0 ${
+                isActive
                   ? 'border-primary text-primary font-medium'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
+              title={tab.label}
             >
-              <Icon className="h-4 w-4" />
-              {tab.label}
+              <Icon className="h-4 w-4 flex-shrink-0" />
+              <span className="text-[10px] sm:text-sm whitespace-normal break-normal">{tab.label}</span>
             </button>
           );
         })}
@@ -204,7 +206,7 @@ export default function ConfiguracionPage() {
 
       {/* Establishments Tab */}
       {activeTab === 'establishments' && (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <Alert variant="info">
             <Info className="h-4 w-4" />
             <AlertTitle>Establecimientos y Puntos de Emisión</AlertTitle>
@@ -216,14 +218,14 @@ export default function ConfiguracionPage() {
 
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <CardTitle>Establecimientos</CardTitle>
                   <CardDescription>
                     Administra las ubicaciones de tu empresa
                   </CardDescription>
                 </div>
-                <Button onClick={handleCreateEstablishment}>
+                <Button onClick={handleCreateEstablishment} className="w-full sm:w-auto">
                   <Plus className="mr-2 h-4 w-4" />
                   Nuevo Establecimiento
                 </Button>
@@ -247,82 +249,84 @@ export default function ConfiguracionPage() {
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   {establishments.map((establishment) => (
-                    <div key={establishment.id} className="border rounded-lg p-4">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="font-mono">
+                    <div key={establishment.id} className="border rounded-lg p-3 sm:p-4">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+                        <div className="space-y-1 flex-1 min-w-0">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                            <Badge variant="outline" className="font-mono text-xs w-fit">
                               {establishment.code}
                             </Badge>
-                            <h3 className="text-lg font-semibold">{establishment.name}</h3>
+                            <h3 className="text-base sm:text-lg font-semibold truncate">{establishment.name}</h3>
                           </div>
-                          <div className="flex items-center text-sm text-muted-foreground">
-                            <MapPin className="mr-1 h-3 w-3" />
-                            {establishment.address}
+                          <div className="flex items-start text-xs sm:text-sm text-muted-foreground">
+                            <MapPin className="mr-1 h-3 w-3 flex-shrink-0 mt-0.5" />
+                            <span className="break-words">{establishment.address}</span>
                           </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 sm:flex-shrink-0">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleEditEstablishment(establishment)}
+                            className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                           >
-                            <Edit className="h-4 w-4" />
+                            <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => setDeleteEstablishmentId(establishment.id)}
+                            className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                           >
-                            <Trash2 className="h-4 w-4 text-destructive" />
+                            <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-destructive" />
                           </Button>
                         </div>
                       </div>
 
                       {/* Emission Points */}
                       <div className="mt-4 pt-4 border-t">
-                        <div className="flex items-center justify-between mb-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
                           <h4 className="text-sm font-medium">Puntos de Emisión</h4>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleCreateEmissionPoint(establishment.id, establishment.name)}
+                            className="w-full sm:w-auto"
                           >
                             <Plus className="mr-1 h-3 w-3" />
-                            Agregar Punto
+                            <span className="text-xs sm:text-sm">Agregar Punto</span>
                           </Button>
                         </div>
                         {establishment.emissionPoints.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-xs sm:text-sm text-muted-foreground">
                             No hay puntos de emisión configurados
                           </p>
                         ) : (
-                          <div className="grid gap-2 md:grid-cols-2">
+                          <div className="grid gap-2 grid-cols-1 md:grid-cols-2">
                             {establishment.emissionPoints.map((point) => (
                               <div
                                 key={point.id}
-                                className="flex items-center justify-between p-3 border rounded-lg bg-slate-50"
+                                className="flex items-center justify-between p-2 sm:p-3 border rounded-lg bg-slate-50"
                               >
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="secondary" className="font-mono">
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                  <Badge variant="secondary" className="font-mono text-xs flex-shrink-0">
                                     {point.code}
                                   </Badge>
-                                  <span className="text-sm">Punto de Emisión {point.code}</span>
+                                  <span className="text-xs sm:text-sm truncate">Punto de Emisión {point.code}</span>
                                 </div>
-                                <div className="flex gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setDeleteEmissionPoint({
-                                      establishmentId: establishment.id,
-                                      emissionPointId: point.id,
-                                    })}
-                                  >
-                                    <Trash2 className="h-3 w-3 text-destructive" />
-                                  </Button>
-                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setDeleteEmissionPoint({
+                                    establishmentId: establishment.id,
+                                    emissionPointId: point.id,
+                                  })}
+                                  className="h-7 w-7 p-0 sm:h-8 sm:w-8 flex-shrink-0"
+                                >
+                                  <Trash2 className="h-3 w-3 text-destructive" />
+                                </Button>
                               </div>
                             ))}
                           </div>
@@ -362,14 +366,14 @@ export default function ConfiguracionPage() {
 
       {/* Certificate Tab */}
       {activeTab === 'certificate' && (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <CertificateManager />
         </div>
       )}
 
       {/* Users Tab */}
       {activeTab === 'users' && (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <Alert variant="info">
             <Info className="h-4 w-4" />
             <AlertTitle>Gestión de Usuarios</AlertTitle>
@@ -381,7 +385,7 @@ export default function ConfiguracionPage() {
 
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <CardTitle>Usuarios del Sistema</CardTitle>
                   <CardDescription>
@@ -501,7 +505,7 @@ export default function ConfiguracionPage() {
 
       {/* Security Tab */}
       {activeTab === 'security' && (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <Alert variant="info">
             <Info className="h-4 w-4" />
             <AlertTitle>Seguridad de la Cuenta</AlertTitle>

@@ -1,10 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsApi, Product, CreateProductDto } from '@/lib/api/products';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/lib/context/auth-context';
 
 // Query keys
 export const productKeys = {
-  all: ['products'] as const,
+  all: (companyId?: string) => ['products', companyId] as const,
   detail: (id: string) => ['products', id] as const,
 };
 
@@ -12,14 +13,18 @@ export const productKeys = {
  * Hook para obtener todos los productos
  * - Caché de 5 minutos
  * - Revalidación automática en background
+ * - Filtra por companyId del usuario autenticado
  */
 export function useProducts() {
+  const { user } = useAuth();
+
   return useQuery({
-    queryKey: productKeys.all,
+    queryKey: productKeys.all(user?.companyId),
     queryFn: async () => {
       const data = await productsApi.getAll();
       return Array.isArray(data) ? data : [];
     },
+    enabled: !!user?.companyId,
   });
 }
 
@@ -41,11 +46,12 @@ export function useProduct(id: string) {
 export function useCreateProduct() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: (data: CreateProductDto) => productsApi.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: productKeys.all });
+      queryClient.invalidateQueries({ queryKey: productKeys.all(user?.companyId) });
       toast({
         title: 'Producto creado',
         description: 'El producto se ha creado correctamente',
@@ -68,12 +74,13 @@ export function useCreateProduct() {
 export function useUpdateProduct() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: CreateProductDto }) =>
       productsApi.update(id, data),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: productKeys.all });
+      queryClient.invalidateQueries({ queryKey: productKeys.all(user?.companyId) });
       queryClient.invalidateQueries({ queryKey: productKeys.detail(variables.id) });
       toast({
         title: 'Producto actualizado',
@@ -97,11 +104,12 @@ export function useUpdateProduct() {
 export function useDeleteProduct() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: (id: string) => productsApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: productKeys.all });
+      queryClient.invalidateQueries({ queryKey: productKeys.all(user?.companyId) });
       toast({
         title: 'Producto eliminado',
         description: 'El producto se ha eliminado correctamente',
