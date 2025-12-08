@@ -56,6 +56,9 @@ model Colaborador {
   pin         String?
   activo      Boolean  @default(true)
 
+  // Sistema de roles y permisos
+  rol         RolColaborador @default(VENDEDOR)
+
   localId     String
   local       Local    @relation(fields: [localId], references: [id], onDelete: Cascade)
 
@@ -71,6 +74,16 @@ model Colaborador {
   updatedAt   DateTime @updatedAt
 
   @@map("colaboradores")
+}
+
+// ============================================
+// ROLES - Roles de colaboradores
+// ============================================
+
+enum RolColaborador {
+  VENDEDOR      // Solo vende, ve productos disponibles en su local
+  SUPERVISOR    // Gestiona stock local, disponibilidad, precios locales de su local
+  ADMINISTRADOR // Gestiona catálogo central, crea/edita productos, ve todos los locales
 }
 
 // ============================================
@@ -169,7 +182,13 @@ model Producto {
   nombre               String
   descripcion          String?
   sku                  String          @unique
-  precioBase           Decimal         @db.Decimal(10, 2)
+
+  // Sistema de precios múltiples
+  precioBase           Decimal         @db.Decimal(10, 2) // DEPRECATED: Mantener por compatibilidad temporal
+  precioParaServir     Decimal         @db.Decimal(10, 2) // Precio para consumir en local
+  precioParaLlevar     Decimal         @db.Decimal(10, 2) // Precio para llevar
+  precioDelivery       Decimal?        @db.Decimal(10, 2) // Precio delivery (opcional)
+  precioIncluyeIVA     Boolean         @default(false)    // Indica si precios incluyen IVA
 
   categoriaId          String
   categoria            Categoria       @relation(fields: [categoriaId], references: [id])
@@ -178,7 +197,12 @@ model Producto {
   facturacionProductId String?
   codigoIVA            String          @default("2")
 
+  // Imagen
+  imagenUrl            String?
+  imagenPath           String?
+
   activo               Boolean         @default(true)
+  esCombo              Boolean         @default(false)    // Indica si es un producto combo
 
   // Disponibilidad por local
   locales              ProductoLocal[]
@@ -191,7 +215,7 @@ model Producto {
 }
 
 // ============================================
-// PRODUCTO POR LOCAL - Control de inventario
+// PRODUCTO POR LOCAL - Control de inventario y precios
 // ============================================
 
 model ProductoLocal {
@@ -207,7 +231,13 @@ model ProductoLocal {
   stock             Int?
   stockMinimo       Int?
 
-  // Sobrescribir precio por local (opcional)
+  // Precios diferenciados por local (null = usar precio del catálogo central)
+  // Estos precios sobrescriben los precios del modelo Producto para este local específico
+  precioLocalParaServir   Decimal? @db.Decimal(10, 2) // Sobrescribe Producto.precioParaServir
+  precioLocalParaLlevar   Decimal? @db.Decimal(10, 2) // Sobrescribe Producto.precioParaLlevar
+  precioLocalDelivery     Decimal? @db.Decimal(10, 2) // Sobrescribe Producto.precioDelivery
+
+  // DEPRECATED: Mantener temporalmente para migración gradual
   precioLocal       Decimal? @db.Decimal(10, 2)
 
   createdAt         DateTime @default(now())

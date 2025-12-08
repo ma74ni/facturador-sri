@@ -35,13 +35,52 @@ export class CreateProductoDto {
   sku: string;
 
   @ApiProperty({
-    description: 'Precio base del producto',
+    description: 'Precio base del producto (DEPRECATED: usar precioParaServir)',
     example: 2.50,
     minimum: 0,
   })
   @IsNumber()
   @Min(0)
   precioBase: number;
+
+  @ApiProperty({
+    description: 'Precio para consumir en local',
+    example: 2.50,
+    minimum: 0,
+  })
+  @IsNumber()
+  @Min(0)
+  precioParaServir: number;
+
+  @ApiProperty({
+    description: 'Precio para llevar',
+    example: 2.50,
+    minimum: 0,
+  })
+  @IsNumber()
+  @Min(0)
+  precioParaLlevar: number;
+
+  @ApiProperty({
+    description: 'Precio para delivery (opcional)',
+    example: 3.00,
+    minimum: 0,
+    required: false,
+  })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  precioDelivery?: number;
+
+  @ApiProperty({
+    description: 'Indica si los precios incluyen IVA',
+    example: false,
+    default: false,
+    required: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  precioIncluyeIVA?: boolean;
 
   @ApiProperty({
     description: 'ID de la categoría',
@@ -71,6 +110,24 @@ export class CreateProductoDto {
   codigoIVA?: string;
 
   @ApiProperty({
+    description: 'URL de la imagen del producto',
+    example: 'https://example.com/images/helado-doble.jpg',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  imagenUrl?: string;
+
+  @ApiProperty({
+    description: 'Path de la imagen en el storage',
+    example: 'productos/helado-doble.jpg',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  imagenPath?: string;
+
+  @ApiProperty({
     description: 'Estado activo',
     example: true,
     required: false,
@@ -79,4 +136,14 @@ export class CreateProductoDto {
   @IsBoolean()
   @IsOptional()
   activo?: boolean;
+
+  @ApiProperty({
+    description: 'Indica si el producto es un combo',
+    example: false,
+    required: false,
+    default: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  esCombo?: boolean;
 }

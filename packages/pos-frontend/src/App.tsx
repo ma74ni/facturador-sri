@@ -6,6 +6,7 @@ import { AbrirTurnoScreen } from '@/features/turnos/AbrirTurnoScreen';
 import { POSScreen } from '@/features/pos/POSScreen';
 import { OrdersPage } from '@/features/orders/OrdersPage';
 import { DeliveriesPage } from '@/features/deliveries/DeliveriesPage';
+import { ProductsPage } from '@/features/products/ProductsPage';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
 
@@ -51,15 +52,7 @@ function App() {
             <Route path="pos" element={<POSScreen />} />
             <Route path="ordenes" element={<OrdersPage />} />
             <Route path="deliveries" element={<DeliveriesPage />} />
-            <Route
-              path="productos"
-              element={
-                <div className="p-8">
-                  <h2 className="text-2xl font-bold">Productos</h2>
-                  <p className="text-muted-foreground">Próximamente...</p>
-                </div>
-              }
-            />
+            <Route path="productos" element={<ProductsPage />} />
             <Route
               path="reportes"
               element={

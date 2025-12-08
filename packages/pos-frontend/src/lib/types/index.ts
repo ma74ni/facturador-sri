@@ -67,6 +67,12 @@ export interface Local {
   updatedAt?: string | Date;
 }
 
+export enum RolColaborador {
+  VENDEDOR = 'VENDEDOR',
+  SUPERVISOR = 'SUPERVISOR',
+  ADMINISTRADOR = 'ADMINISTRADOR',
+}
+
 export interface Colaborador {
   id: string;
   nombre: string;
@@ -74,6 +80,7 @@ export interface Colaborador {
   color: string;
   pin?: string;
   activo: boolean;
+  rol: RolColaborador;
   localId: string;
   createdAt?: string | Date;
   updatedAt?: string | Date;
@@ -110,7 +117,14 @@ export interface Producto {
   nombre: string;
   descripcion?: string;
   sku: string;
-  precioBase: number;
+
+  // Sistema de precios múltiples
+  precioBase: number; // DEPRECATED: mantener por compatibilidad
+  precioParaServir: number;
+  precioParaLlevar: number;
+  precioDelivery?: number;
+  precioIncluyeIVA: boolean;
+
   categoriaId: string;
   categoria?: Categoria;
 
@@ -118,7 +132,34 @@ export interface Producto {
   facturacionProductId?: string;
   codigoIVA: string;
 
+  // Imagen
+  imagenUrl?: string;
+  imagenPath?: string;
+
   activo: boolean;
+  esCombo: boolean;
+
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+}
+
+export interface ProductoLocal {
+  id: string;
+  productoId: string;
+  producto?: Producto;
+  localId: string;
+  local?: Local;
+  disponible: boolean;
+  stock?: number;
+  stockMinimo?: number;
+
+  // Precios diferenciados por local (null = usar precio del catálogo central)
+  precioLocalParaServir?: number;
+  precioLocalParaLlevar?: number;
+  precioLocalDelivery?: number;
+
+  // DEPRECATED: mantener por compatibilidad
+  precioLocal?: number;
 
   createdAt?: string | Date;
   updatedAt?: string | Date;

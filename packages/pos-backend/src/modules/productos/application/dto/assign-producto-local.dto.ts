@@ -56,10 +56,50 @@ export class AssignProductoLocalDto {
   @IsOptional()
   stockMinimo?: number;
 
+  // ============================================
+  // Precios Locales Diferenciados
+  // ============================================
+
   @ApiProperty({
-    description: 'Precio específico para este local (sobrescribe precioBase)',
+    description:
+      'Precio para servir en local (sobrescribe Producto.precioParaServir)',
+    example: 3.50,
+    required: false,
+  })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  precioLocalParaServir?: number;
+
+  @ApiProperty({
+    description:
+      'Precio para llevar en local (sobrescribe Producto.precioParaLlevar)',
+    example: 3.00,
+    required: false,
+  })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  precioLocalParaLlevar?: number;
+
+  @ApiProperty({
+    description:
+      'Precio delivery en local (sobrescribe Producto.precioDelivery)',
+    example: 3.50,
+    required: false,
+  })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  precioLocalDelivery?: number;
+
+  // DEPRECATED: Mantener por compatibilidad con código legacy
+  @ApiProperty({
+    description:
+      '[DEPRECATED] Precio específico para este local - usar precioLocalParaServir, precioLocalParaLlevar, precioLocalDelivery',
     example: 2.80,
     required: false,
+    deprecated: true,
   })
   @IsNumber()
   @Min(0)

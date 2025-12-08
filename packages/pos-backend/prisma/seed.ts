@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient, Prisma, RolColaborador } from '../node_modules/.prisma/client-pos';
 
 const prisma = new PrismaClient();
 
@@ -42,39 +42,158 @@ async function main() {
     },
   });
 
-  console.log(`✓ Locales creados: ${local1.nombre}, ${local2.nombre}`);
+  const local3 = await prisma.local.upsert({
+    where: { codigo: 'LOC003' },
+    update: {},
+    create: {
+      codigo: 'LOC003',
+      nombre: 'Heladería Sur',
+      direccion: 'Av. Quitumbe Ñan y Moraspungo',
+      telefono: '022-567-890',
+      activo: true,
+      companyId: COMPANY_ID,
+      establishmentCode: ESTABLISHMENT_CODE,
+      emissionPointCode: '003',
+    },
+  });
 
-  // 2. Crear Colaboradores
-  console.log('Creando colaboradores...');
-  const colaborador1 = await prisma.colaborador.upsert({
+  console.log(`✓ Locales creados: ${local1.nombre}, ${local2.nombre}, ${local3.nombre}`);
+
+  // 2. Crear Colaboradores con Roles
+  console.log('Creando colaboradores con roles...');
+
+  // ADMINISTRADOR - Gestiona todo el sistema
+  const adminCarlos = await prisma.colaborador.upsert({
     where: { id: '00000000-0000-0000-0000-000000000011' },
     update: {},
     create: {
       id: '00000000-0000-0000-0000-000000000011',
-      nombre: 'Juan Pérez',
-      apellido: null,
-      color: '#3B82F6',
-      pin: '1234',
+      nombre: 'Carlos',
+      apellido: 'Admin',
+      color: '#EF4444',
+      pin: '1111',
       localId: local1.id,
+      rol: RolColaborador.ADMINISTRADOR,
       activo: true,
     },
   });
 
-  const colaborador2 = await prisma.colaborador.upsert({
+  // SUPERVISOR - Local Centro
+  const supervisorMaria = await prisma.colaborador.upsert({
     where: { id: '00000000-0000-0000-0000-000000000012' },
     update: {},
     create: {
       id: '00000000-0000-0000-0000-000000000012',
-      nombre: 'María González',
-      apellido: null,
-      color: '#EC4899',
-      pin: '5678',
-      localId: local2.id,
+      nombre: 'María',
+      apellido: 'López',
+      color: '#F59E0B',
+      pin: '2222',
+      localId: local1.id,
+      rol: RolColaborador.SUPERVISOR,
       activo: true,
     },
   });
 
-  console.log(`✓ Colaboradores creados: ${colaborador1.nombre}, ${colaborador2.nombre}`);
+  // VENDEDOR - Local Centro
+  const vendedorJuan = await prisma.colaborador.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000013' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000013',
+      nombre: 'Juan',
+      apellido: 'Pérez',
+      color: '#3B82F6',
+      pin: '3333',
+      localId: local1.id,
+      rol: RolColaborador.VENDEDOR,
+      activo: true,
+    },
+  });
+
+  // VENDEDOR - Local Centro
+  const vendedorAna = await prisma.colaborador.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000014' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000014',
+      nombre: 'Ana',
+      apellido: 'García',
+      color: '#8B5CF6',
+      pin: '4444',
+      localId: local1.id,
+      rol: RolColaborador.VENDEDOR,
+      activo: true,
+    },
+  });
+
+  // SUPERVISOR - Local Norte
+  const supervisorPedro = await prisma.colaborador.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000015' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000015',
+      nombre: 'Pedro',
+      apellido: 'Ramírez',
+      color: '#F59E0B',
+      pin: '5555',
+      localId: local2.id,
+      rol: RolColaborador.SUPERVISOR,
+      activo: true,
+    },
+  });
+
+  // VENDEDOR - Local Norte
+  const vendedorLucia = await prisma.colaborador.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000016' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000016',
+      nombre: 'Lucía',
+      apellido: 'Martínez',
+      color: '#EC4899',
+      pin: '6666',
+      localId: local2.id,
+      rol: RolColaborador.VENDEDOR,
+      activo: true,
+    },
+  });
+
+  // SUPERVISOR - Local Sur
+  const supervisorDiego = await prisma.colaborador.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000017' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000017',
+      nombre: 'Diego',
+      apellido: 'Torres',
+      color: '#F59E0B',
+      pin: '7777',
+      localId: local3.id,
+      rol: RolColaborador.SUPERVISOR,
+      activo: true,
+    },
+  });
+
+  // VENDEDOR - Local Sur
+  const vendedorSofia = await prisma.colaborador.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000018' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000018',
+      nombre: 'Sofía',
+      apellido: 'Herrera',
+      color: '#10B981',
+      pin: '8888',
+      localId: local3.id,
+      rol: RolColaborador.VENDEDOR,
+      activo: true,
+    },
+  });
+
+  console.log('✓ Colaboradores creados:');
+  console.log(`   - 1 ADMINISTRADOR (${adminCarlos.nombre} ${adminCarlos.apellido})`);
+  console.log(`   - 3 SUPERVISORES (${supervisorMaria.nombre}, ${supervisorPedro.nombre}, ${supervisorDiego.nombre})`);
+  console.log(`   - 4 VENDEDORES (${vendedorJuan.nombre}, ${vendedorAna.nombre}, ${vendedorLucia.nombre}, ${vendedorSofia.nombre})`);
 
   // 3. Crear Categorías
   console.log('Creando categorías...');
@@ -256,7 +375,7 @@ async function main() {
 
   console.log('✓ Modificadores creados');
 
-  // 8. Crear Productos - Helados
+  // 8. Crear Productos - Helados con Precios Diferenciados
   console.log('Creando productos de helados...');
   const heladoSimple = await prisma.producto.upsert({
     where: { sku: 'HEL-SIM' },
@@ -266,7 +385,10 @@ async function main() {
       nombre: 'Helado Simple',
       descripcion: 'Helado de un sabor',
       categoriaId: categoriaHelados.id,
-      precioBase: new Prisma.Decimal(2.50),
+      precioBase: new Prisma.Decimal(2.00),
+      precioParaServir: new Prisma.Decimal(2.00),
+      precioParaLlevar: new Prisma.Decimal(1.80),
+      precioDelivery: new Prisma.Decimal(2.20),
       codigoIVA: '2',
       activo: true,
     },
@@ -280,7 +402,10 @@ async function main() {
       nombre: 'Helado Doble',
       descripcion: 'Helado de dos sabores',
       categoriaId: categoriaHelados.id,
-      precioBase: new Prisma.Decimal(3.50),
+      precioBase: new Prisma.Decimal(2.50),
+      precioParaServir: new Prisma.Decimal(2.50),
+      precioParaLlevar: new Prisma.Decimal(2.30),
+      precioDelivery: new Prisma.Decimal(2.80),
       codigoIVA: '2',
       activo: true,
     },
@@ -294,7 +419,10 @@ async function main() {
       nombre: 'Helado Triple',
       descripcion: 'Helado de tres sabores',
       categoriaId: categoriaHelados.id,
-      precioBase: new Prisma.Decimal(4.50),
+      precioBase: new Prisma.Decimal(3.50),
+      precioParaServir: new Prisma.Decimal(3.50),
+      precioParaLlevar: new Prisma.Decimal(3.30),
+      precioDelivery: new Prisma.Decimal(3.80),
       codigoIVA: '2',
       activo: true,
     },
@@ -311,6 +439,9 @@ async function main() {
       descripcion: 'Salpicón de frutas con helado - tamaño pequeño',
       categoriaId: categoriaSalpicones.id,
       precioBase: new Prisma.Decimal(4.00),
+      precioParaServir: new Prisma.Decimal(4.00),
+      precioParaLlevar: new Prisma.Decimal(3.80),
+      precioDelivery: new Prisma.Decimal(4.50),
       codigoIVA: '2',
       activo: true,
     },
@@ -325,6 +456,9 @@ async function main() {
       descripcion: 'Salpicón de frutas con helado - tamaño grande',
       categoriaId: categoriaSalpicones.id,
       precioBase: new Prisma.Decimal(6.00),
+      precioParaServir: new Prisma.Decimal(6.00),
+      precioParaLlevar: new Prisma.Decimal(5.80),
+      precioDelivery: new Prisma.Decimal(6.50),
       codigoIVA: '2',
       activo: true,
     },
@@ -341,6 +475,9 @@ async function main() {
       descripcion: 'Waffle con dos bolas de helado',
       categoriaId: categoriaWaffles.id,
       precioBase: new Prisma.Decimal(5.50),
+      precioParaServir: new Prisma.Decimal(5.50),
+      precioParaLlevar: new Prisma.Decimal(5.30),
+      precioDelivery: new Prisma.Decimal(6.00),
       codigoIVA: '2',
       activo: true,
     },
@@ -355,6 +492,9 @@ async function main() {
       descripcion: 'Waffle con tres bolas de helado y toppings',
       categoriaId: categoriaWaffles.id,
       precioBase: new Prisma.Decimal(7.50),
+      precioParaServir: new Prisma.Decimal(7.50),
+      precioParaLlevar: new Prisma.Decimal(7.30),
+      precioDelivery: new Prisma.Decimal(8.00),
       codigoIVA: '2',
       activo: true,
     },
@@ -370,7 +510,10 @@ async function main() {
       nombre: 'Cono Simple',
       descripcion: 'Cono de helado de un sabor',
       categoriaId: categoriaConos.id,
-      precioBase: new Prisma.Decimal(2.00),
+      precioBase: new Prisma.Decimal(1.50),
+      precioParaServir: new Prisma.Decimal(1.50),
+      precioParaLlevar: new Prisma.Decimal(1.50),
+      precioDelivery: new Prisma.Decimal(1.80),
       codigoIVA: '2',
       activo: true,
     },
@@ -384,7 +527,10 @@ async function main() {
       nombre: 'Cono Doble',
       descripcion: 'Cono de helado de dos sabores',
       categoriaId: categoriaConos.id,
-      precioBase: new Prisma.Decimal(3.00),
+      precioBase: new Prisma.Decimal(2.20),
+      precioParaServir: new Prisma.Decimal(2.20),
+      precioParaLlevar: new Prisma.Decimal(2.20),
+      precioDelivery: new Prisma.Decimal(2.50),
       codigoIVA: '2',
       activo: true,
     },
@@ -392,8 +538,8 @@ async function main() {
 
   console.log('✓ Productos creados');
 
-  // 12. Asignar productos a locales
-  console.log('Asignando productos a locales...');
+  // 12. Asignar productos a locales con precios diferenciados
+  console.log('Asignando productos a locales con precios diferenciados...');
   const productos = [
     heladoSimple,
     heladoDoble,
@@ -407,7 +553,7 @@ async function main() {
   ];
 
   for (const producto of productos) {
-    // Local 1
+    // LOCAL CENTRO - Usa precios centrales (sin sobrescritura)
     await prisma.productoLocal.upsert({
       where: {
         productoId_localId: {
@@ -422,12 +568,27 @@ async function main() {
         disponible: true,
         stock: null, // Sin control de stock
         stockMinimo: null,
-        precioLocal: null, // Usa precioBase
+        precioLocalParaServir: null, // Usa precio central
+        precioLocalParaLlevar: null,
+        precioLocalDelivery: null,
       },
     });
 
-    // Local 2 - con algunos precios diferentes
-    const precioLocal = producto.sku === 'WAF-ESP' ? 8.00 : null; // Waffle especial más caro en local 2
+    // LOCAL NORTE - Zona exclusiva, precios más altos
+    let precioNorteServir: number | null = null;
+    let precioNorteLlevar: number | null = null;
+    let precioNorteDelivery: number | null = null;
+
+    if (producto.sku === 'HEL-DOB') {
+      // Helado Doble más caro en zona exclusiva
+      precioNorteServir = 3.00;
+      precioNorteLlevar = 2.80;
+    } else if (producto.sku === 'WAF-ESP') {
+      // Waffle Especial premium en zona exclusiva
+      precioNorteServir = 8.50;
+      precioNorteLlevar = 8.30;
+      precioNorteDelivery = 9.00;
+    }
 
     await prisma.productoLocal.upsert({
       where: {
@@ -443,25 +604,70 @@ async function main() {
         disponible: true,
         stock: null,
         stockMinimo: null,
-        precioLocal: precioLocal ? new Prisma.Decimal(precioLocal) : null,
+        precioLocalParaServir: precioNorteServir ? new Prisma.Decimal(precioNorteServir) : null,
+        precioLocalParaLlevar: precioNorteLlevar ? new Prisma.Decimal(precioNorteLlevar) : null,
+        precioLocalDelivery: precioNorteDelivery ? new Prisma.Decimal(precioNorteDelivery) : null,
+      },
+    });
+
+    // LOCAL SUR - Zona popular, precios más económicos
+    let precioSurServir: number | null = null;
+    let precioSurLlevar: number | null = null;
+    let precioSurDelivery: number | null = null;
+
+    if (producto.sku === 'HEL-DOB') {
+      // Helado Doble más económico en zona popular
+      precioSurServir = 2.20;
+      precioSurLlevar = 2.00;
+    } else if (producto.sku === 'SAL-PEQ') {
+      // Salpicón Pequeño con descuento
+      precioSurServir = 3.50;
+      precioSurLlevar = 3.30;
+      precioSurDelivery = 4.00;
+    }
+
+    await prisma.productoLocal.upsert({
+      where: {
+        productoId_localId: {
+          productoId: producto.id,
+          localId: local3.id,
+        },
+      },
+      update: {},
+      create: {
+        productoId: producto.id,
+        localId: local3.id,
+        disponible: true,
+        stock: null,
+        stockMinimo: null,
+        precioLocalParaServir: precioSurServir ? new Prisma.Decimal(precioSurServir) : null,
+        precioLocalParaLlevar: precioSurLlevar ? new Prisma.Decimal(precioSurLlevar) : null,
+        precioLocalDelivery: precioSurDelivery ? new Prisma.Decimal(precioSurDelivery) : null,
       },
     });
   }
 
-  console.log('✓ Productos asignados a locales');
+  console.log('✓ Productos asignados a locales con precios diferenciados:');
+  console.log('   - Local Centro: Usa precios centrales');
+  console.log('   - Local Norte: Helado Doble ($3.00/$2.80), Waffle Especial ($8.50/$8.30/$9.00)');
+  console.log('   - Local Sur: Helado Doble ($2.20/$2.00), Salpicón Pequeño ($3.50/$3.30/$4.00)');
 
+  console.log('');
   console.log('✅ Seed completado exitosamente!');
   console.log('');
   console.log('📊 Resumen:');
-  console.log(`   - 2 Locales`);
-  console.log(`   - 2 Colaboradores`);
+  console.log(`   - 3 Locales (Centro, Norte, Sur)`);
+  console.log(`   - 8 Colaboradores:`);
+  console.log(`     • 1 ADMINISTRADOR (Carlos Admin)`);
+  console.log(`     • 3 SUPERVISORES (María López, Pedro Ramírez, Diego Torres)`);
+  console.log(`     • 4 VENDEDORES (Juan, Ana, Lucía, Sofía)`);
   console.log(`   - 4 Categorías`);
   console.log(`   - ${sabores.length} Sabores`);
   console.log(`   - ${toppings.length} Toppings`);
   console.log(`   - ${aderezos.length} Aderezos`);
   console.log(`   - ${sustituciones.length} Sustituciones`);
-  console.log(`   - ${productos.length} Productos`);
-  console.log(`   - ${productos.length * 2} Asignaciones Producto-Local`);
+  console.log(`   - ${productos.length} Productos con precios diferenciados`);
+  console.log(`   - ${productos.length * 3} Asignaciones Producto-Local`);
 }
 
 main()
