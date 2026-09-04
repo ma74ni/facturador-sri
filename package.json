@@ -23,6 +23,7 @@
   ],
   "author": "Your Name",
   "license": "MIT",
+  "packageManager": "pnpm@10.19.0",
   "devDependencies": {
     "typescript": "^5.0.0"
   },

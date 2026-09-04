@@ -3,10 +3,10 @@ set -e
 
 echo "🚀 Starting Render build for facturacion-core..."
 
-# Habilitar corepack y pnpm
+# Habilitar corepack y pnpm (versión fijada en package.json -> packageManager)
 echo "📦 Enabling pnpm via corepack..."
 corepack enable
-corepack prepare pnpm@latest --activate
+corepack prepare pnpm@10.19.0 --activate
 
 # Ir a la raíz del monorepo
 echo "📂 Navigating to monorepo root..."
