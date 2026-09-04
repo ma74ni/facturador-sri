@@ -31,4 +31,7 @@ END $$;
 -- AlterTable - Add new columns
 ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "cancelReason" TEXT;
 ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "cancelledAt" TIMESTAMP(3);
-ALTER TABLE "invoices" ALTER COLUMN "sriStatus" SET DEFAULT 'DRAFT';
+
+-- NOTE: `ALTER COLUMN "sriStatus" SET DEFAULT 'DRAFT'` moved to migration
+-- 20251030231046_set_sristatus_default_draft. Postgres does not allow using a
+-- newly added enum value in the same transaction that adds it.
