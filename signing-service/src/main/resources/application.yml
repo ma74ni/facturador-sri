@@ -1,5 +1,6 @@
 server:
-  port: 8081
+  # En local usa 8081; en Render/Railway toma el $PORT que inyecta la plataforma.
+  port: ${PORT:8081}
   servlet:
     context-path: /
   compression:

@@ -38,7 +38,7 @@ export class DigitalSignatureService {
 
     this.client = axios.create({
       baseURL: baseUrl.replace(/\/$/, ''),
-      timeout: 30000, // 30 segundos
+      timeout: 90000, // 90s: cubre el warm-up de la JVM del signing-service tras un deploy/idle
       headers: { 'Content-Type': 'application/json' },
     });
   }

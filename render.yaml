@@ -1,0 +1,84 @@
+# Render Blueprint - staging (todo en una sola cuenta)
+#
+# Crea dos servicios web:
+#   - facturador-core-staging     (NestJS / Node)   packages/facturacion-core
+#   - facturador-signing-staging  (Java / Docker)   signing-service/
+#
+# Las variables con `sync: false` NO se versionan: Render las pide en el
+# dashboard al crear el Blueprint. Copialas del servicio viejo.
+#
+# La base de datos (Neon) es externa: no se define acá.
+
+services:
+  # ─────────────────────────────────────────────────────────────
+  # Backend principal - facturacion-core
+  # ─────────────────────────────────────────────────────────────
+  - type: web
+    name: facturador-core-staging
+    runtime: node
+    region: oregon
+    plan: starter
+    branch: dev
+    rootDir: packages/facturacion-core
+    buildCommand: ./render-build.sh
+    startCommand: ./render-start.sh
+    # facturacion-core no expone /health -> sin healthCheckPath
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_EXPIRATION
+        value: 7d
+      - key: FRONTEND_URL
+        value: https://boisterous-griffin-ebe677.netlify.app
+      - key: SIGNING_SERVICE_URL
+        value: https://facturador-signing-staging.onrender.com
+      - key: SRI_RECEPTION_URL_TEST
+        value: https://celcer.sri.gob.ec/comprobantes-electronicos-ws/RecepcionComprobantesOffline?wsdl
+      - key: SRI_AUTHORIZATION_URL_TEST
+        value: https://celcer.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline?wsdl
+      - key: SRI_RECEPTION_URL_PROD
+        value: https://cel.sri.gob.ec/comprobantes-electronicos-ws/RecepcionComprobantesOffline?wsdl
+      - key: SRI_AUTHORIZATION_URL_PROD
+        value: https://cel.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline?wsdl
+      # --- secrets: cargar en el dashboard ---
+      - key: DATABASE_URL          # Neon, connection string POOLED (?pgbouncer=true&connection_limit=1)
+        sync: false
+      - key: DIRECT_URL            # Neon, connection string DIRECTA (sin -pooler) -> la usa migrate deploy
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: MAILJET_API_KEY
+        sync: false
+      - key: MAILJET_SECRET_KEY
+        sync: false
+      - key: MAILJET_FROM_EMAIL
+        sync: false
+      - key: MAILJET_FROM_NAME
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+
+  # ─────────────────────────────────────────────────────────────
+  # Microservicio de firma XAdES - signing-service (Java 17)
+  # ─────────────────────────────────────────────────────────────
+  - type: web
+    name: facturador-signing-staging
+    runtime: docker
+    region: oregon
+    plan: starter
+    branch: dev
+    rootDir: signing-service
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/v1/signature/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: production
+      # 512 MB de RAM: heap y metaspace acotados + SerialGC
+      - key: JAVA_OPTS
+        value: -Xmx256m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -XX:+UseContainerSupport
