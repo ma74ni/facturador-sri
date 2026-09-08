@@ -9,6 +9,14 @@ export class XmlGeneratorService {
    * Mapea el tipo de identificación del cliente al código del SRI
    */
   private mapIdentificationType(type: string): string {
+    // Ya viene como código del catálogo SRI (04/05/06/07/08): usarlo tal cual.
+    // Sin esto, un cliente creado con identificationType "05" caía al default
+    // '07' y el SRI rechazaba con error 69 (tipo 07 exige identificación
+    // 9999999999999).
+    if (['04', '05', '06', '07', '08'].includes(type)) {
+      return type;
+    }
+
     const mapping: Record<string, string> = {
       'CEDULA': '05',
       'RUC': '04',
