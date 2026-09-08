@@ -231,8 +231,11 @@ export class SriWebServiceService {
   async sendAndAuthorize(
     xmlPath: string,
     environment: 'TEST' | 'PRODUCTION',
-    maxRetries: number = 5,
-    retryDelay: number = 3000,
+    // ~28s de sondeo de autorización (antes 15s): celcer (ambiente PRUEBAS)
+    // suele tardar más. Se mantiene por debajo de ~50s totales para no chocar
+    // con el timeout del cliente que llama a /send-to-sri.
+    maxRetries: number = 7,
+    retryDelay: number = 4000,
   ): Promise<{
     sent: boolean;
     authorized: boolean;
