@@ -1,9 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { create } from 'xmlbuilder2';
-import * as dayjs from 'dayjs';
 
 @Injectable()
 export class CreditNoteXmlGeneratorService {
+  /**
+   * Formatea una fecha a DD/MM/YYYY en UTC (issueDate se guarda normalizado
+   * a medianoche UTC). Usar dayjs/Date sin fijar UTC toma la hora LOCAL del
+   * proceso y en un servidor detrás de UTC (Ecuador es UTC-5) retrocede un día.
+   */
+  private formatDateUtc(date: Date): string {
+    const day = date.getUTCDate().toString().padStart(2, '0');
+    const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+    const year = date.getUTCFullYear().toString();
+    return `${day}/${month}/${year}`;
+  }
+
   /**
    * Genera el XML de una nota de crédito según esquema SRI
    * Código de documento: 04
@@ -33,7 +44,10 @@ export class CreditNoteXmlGeneratorService {
     // ==================== INFO NOTA DE CREDITO ====================
     const infoNotaCredito = root.ele('infoNotaCredito');
 
-    infoNotaCredito.ele('fechaEmision').txt(dayjs(creditNote.issueDate).format('DD/MM/YYYY'));
+    // dayjs().format() usa la hora LOCAL del proceso — en un servidor detrás
+    // de UTC (Ecuador es UTC-5) esto retrocede un día porque issueDate se
+    // guarda normalizado a medianoche UTC. Se formatea en UTC a mano.
+    infoNotaCredito.ele('fechaEmision').txt(this.formatDateUtc(creditNote.issueDate));
 
     // Dirección del establecimiento
     if (company.address) {
@@ -66,7 +80,7 @@ export class CreditNoteXmlGeneratorService {
       : creditNote.issueDate;
     infoNotaCredito
       .ele('fechaEmisionDocSustento')
-      .txt(dayjs(fechaSustento).format('DD/MM/YYYY'));
+      .txt(this.formatDateUtc(fechaSustento));
 
     // ==================== TOTALES ====================
     // ORDEN CORRECTO SEGÚN ESQUEMA SRI:

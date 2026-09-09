@@ -745,6 +745,7 @@ export class CreditNotesService {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
+        timeZone: 'UTC',
       }),
       authorizationDate: creditNote.authorizationDate
         ? new Date(creditNote.authorizationDate).toLocaleString('es-EC')

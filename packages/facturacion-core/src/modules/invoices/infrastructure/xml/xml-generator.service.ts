@@ -1,10 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { create } from 'xmlbuilder2';
-import * as dayjs from 'dayjs';
 
 @Injectable()
 export class XmlGeneratorService {
   private readonly logger = new Logger(XmlGeneratorService.name);
+
+  /**
+   * Formatea una fecha a DD/MM/YYYY en UTC (issueDate se guarda normalizado
+   * a medianoche UTC). Usar dayjs/Date sin fijar UTC toma la hora LOCAL del
+   * proceso y en un servidor detrás de UTC (Ecuador es UTC-5) retrocede un día.
+   */
+  private formatDateUtc(date: Date): string {
+    const day = date.getUTCDate().toString().padStart(2, '0');
+    const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+    const year = date.getUTCFullYear().toString();
+    return `${day}/${month}/${year}`;
+  }
+
   /**
    * Mapea el tipo de identificación del cliente al código del SRI
    */
@@ -70,7 +82,10 @@ export class XmlGeneratorService {
     const infoFactura = root.ele('infoFactura');
 
     // Orden según XSD del SRI
-    infoFactura.ele('fechaEmision').txt(dayjs(invoice.issueDate).format('DD/MM/YYYY'));
+    // dayjs().format() usa la hora LOCAL del proceso — en un servidor detrás
+    // de UTC (Ecuador es UTC-5) esto retrocede un día porque issueDate se
+    // guarda normalizado a medianoche UTC. Se formatea en UTC a mano.
+    infoFactura.ele('fechaEmision').txt(this.formatDateUtc(invoice.issueDate));
     infoFactura.ele('dirEstablecimiento').txt(company.address);
 
     // Obligado a llevar contabilidad

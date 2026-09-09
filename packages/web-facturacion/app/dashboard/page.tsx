@@ -55,7 +55,7 @@ export default function DashboardPage() {
         id: inv.id,
         sequential: `${inv.establishmentCode}-${inv.emissionPointCode}-${inv.sequential}`,
         customerName: inv.customerName,
-        issueDate: new Date(inv.issueDate).toLocaleDateString('es-EC'),
+        issueDate: new Date(inv.issueDate).toLocaleDateString('es-EC', { timeZone: 'UTC' }),
         totalAmount: inv.totalAmount,
         status: inv.status,
       }));

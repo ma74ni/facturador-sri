@@ -365,7 +365,7 @@ export class RideGeneratorService {
     doc.font('Helvetica-Bold').text('Fecha de Emisión:', 40, y + 24);
     doc
       .font('Helvetica')
-      .text(new Date(invoice.issueDate).toLocaleDateString('es-EC'), 200, y + 24);
+      .text(new Date(invoice.issueDate).toLocaleDateString('es-EC', { timeZone: 'UTC' }), 200, y + 24);
 
     return y + 36;
   }

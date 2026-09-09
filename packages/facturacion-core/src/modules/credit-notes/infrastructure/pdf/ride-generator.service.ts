@@ -365,7 +365,7 @@ export class CreditNoteRideGeneratorService {
     doc.font('Helvetica-Bold').text('Fecha de Emisión:', 40, y + 24);
     doc
       .font('Helvetica')
-      .text(new Date(creditNote.issueDate).toLocaleDateString('es-EC'), 200, y + 24);
+      .text(new Date(creditNote.issueDate).toLocaleDateString('es-EC', { timeZone: 'UTC' }), 200, y + 24);
 
     // Comprobante que se modifica
     doc.font('Helvetica-Bold').text('Comprobante que se modifica:', 40, y + 36);

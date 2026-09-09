@@ -15,10 +15,14 @@ export class AccessKeyService {
     emissionPoint: string,
     sequential: string,
   ): string {
-    // Fecha (DDMMAAAA)
-    const day = issueDate.getDate().toString().padStart(2, '0');
-    const month = (issueDate.getMonth() + 1).toString().padStart(2, '0');
-    const year = issueDate.getFullYear().toString();
+    // Fecha (DDMMAAAA) — en UTC: issueDate se guarda como "YYYY-MM-DD" normalizado
+    // a medianoche UTC (ver invoices.service.ts), así que usar los getters
+    // locales (getDate/getMonth/getFullYear) corre el riesgo de retroceder un
+    // día si el proceso corre en una zona horaria detrás de UTC (todo Ecuador
+    // lo está, UTC-5) — eso corrompería la clave de acceso real reportada al SRI.
+    const day = issueDate.getUTCDate().toString().padStart(2, '0');
+    const month = (issueDate.getUTCMonth() + 1).toString().padStart(2, '0');
+    const year = issueDate.getUTCFullYear().toString();
     const dateStr = day + month + year;
 
     // Tipo de comprobante (TC) - 01=Factura

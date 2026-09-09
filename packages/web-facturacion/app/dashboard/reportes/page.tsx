@@ -50,12 +50,16 @@ export default function ReportesPage() {
     const currentYear = now.getFullYear();
 
     return invoices.filter(inv => {
+      // issueDate llega como "YYYY-MM-DD" (medianoche UTC) — comparar con
+      // getMonth/getFullYear (locales) puede correr la fecha un día hacia
+      // atrás en un navegador en Ecuador (UTC-5), sacando facturas del mes/año
+      // correcto. Se usan los getters UTC para leer el calendario tal cual se guardó.
       const invoiceDate = new Date(inv.issueDate);
 
       if (selectedPeriod === 'month') {
-        return invoiceDate.getMonth() === currentMonth && invoiceDate.getFullYear() === currentYear;
+        return invoiceDate.getUTCMonth() === currentMonth && invoiceDate.getUTCFullYear() === currentYear;
       } else if (selectedPeriod === 'year') {
-        return invoiceDate.getFullYear() === currentYear;
+        return invoiceDate.getUTCFullYear() === currentYear;
       }
       return true; // 'all'
     });
@@ -141,7 +145,7 @@ export default function ReportesPage() {
     const headers = ['Número', 'Fecha', 'Cliente', 'Subtotal', 'IVA', 'Total', 'Estado'];
     const rows = filteredInvoices.map(inv => [
       `${inv.establishmentCode}-${inv.emissionPointCode}-${inv.sequential}`,
-      new Date(inv.issueDate).toLocaleDateString('es-EC'),
+      new Date(inv.issueDate).toLocaleDateString('es-EC', { timeZone: 'UTC' }),
       inv.customerName,
       inv.subtotalBeforeTax.toFixed(2),
       inv.totalTax.toFixed(2),

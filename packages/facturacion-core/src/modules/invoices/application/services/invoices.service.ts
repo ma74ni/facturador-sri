@@ -606,6 +606,7 @@ async sendInvoiceByEmail(invoiceId: string, companyId: string, recipientEmail?: 
       year: 'numeric',
       month: 'long',
       day: 'numeric',
+      timeZone: 'UTC',
     }),
     authorizationDate: invoice.authorizationDate
       ? new Date(invoice.authorizationDate).toLocaleString('es-EC')

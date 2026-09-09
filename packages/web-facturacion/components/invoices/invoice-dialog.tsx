@@ -98,6 +98,17 @@ const PAYMENT_METHODS = [
   { code: "21", label: "Endoso de Títulos", description: "Endoso" },
 ];
 
+// Fecha LOCAL del navegador (asumido Ecuador) en formato YYYY-MM-DD — NO
+// new Date().toISOString() (UTC): después de las 19:00 hora Ecuador (UTC-5)
+// toISOString() ya cayó en el día siguiente y precargaba mal la fecha.
+const getTodayLocalDateString = (): string => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = (now.getMonth() + 1).toString().padStart(2, "0");
+  const day = now.getDate().toString().padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 // Helper function to get customer display name
 const getCustomerDisplayName = (customer: Customer): string => {
   if (customer.businessName) {
@@ -136,9 +147,7 @@ export function InvoiceDialog({
     useState<string>("");
   const [selectedEmissionPoint, setSelectedEmissionPoint] =
     useState<string>("");
-  const [issueDate, setIssueDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
-  );
+  const [issueDate, setIssueDate] = useState<string>(getTodayLocalDateString);
   const [items, setItems] = useState<InvoiceItemWithCalc[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<string>("01");
   const [isRimpe, setIsRimpe] = useState<boolean>(false);
@@ -197,7 +206,7 @@ export function InvoiceDialog({
       setSelectedCustomer("");
       setSelectedEstablishment("");
       setSelectedEmissionPoint("");
-      setIssueDate(new Date().toISOString().split("T")[0]);
+      setIssueDate(getTodayLocalDateString());
       setItems([]);
       setPaymentMethod("01");
       setIsRimpe(false);

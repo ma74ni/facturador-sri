@@ -451,7 +451,7 @@ export default function FacturasPage() {
                     <TableCell className="hidden sm:table-cell">
                       <div className="flex items-center text-sm">
                         <Calendar className="mr-1 h-3 w-3 text-muted-foreground" />
-                        {new Date(factura.issueDate).toLocaleDateString('es-EC')}
+                        {new Date(factura.issueDate).toLocaleDateString('es-EC', { timeZone: 'UTC' })}
                       </div>
                     </TableCell>
                     <TableCell>
