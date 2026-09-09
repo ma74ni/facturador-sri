@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, Matches, Length } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, Matches, Length } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateEstablishmentDto {
@@ -20,6 +20,7 @@ export class CreateEstablishmentDto {
   address: string;
 
   @ApiProperty({ example: '0987654321', required: false })
+  @IsOptional()
   @IsString()
   phone?: string;
 }
