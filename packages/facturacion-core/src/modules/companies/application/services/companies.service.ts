@@ -211,6 +211,20 @@ export class CompaniesService {
     throw new NotFoundException('Empresa no encontrada');
   }
 
+  if (environment === 'PRODUCTION') {
+    if (!company.hasCertificate || !company.certificatePath) {
+      throw new BadRequestException(
+        'Debes cargar un certificado digital válido antes de activar producción',
+      );
+    }
+
+    if (company.certificateExpiry && new Date() > company.certificateExpiry) {
+      throw new BadRequestException(
+        'El certificado digital cargado está expirado. Sube uno vigente antes de activar producción',
+      );
+    }
+  }
+
   const updated = await this.prisma.company.update({
     where: { id: companyId },
     data: { environment },

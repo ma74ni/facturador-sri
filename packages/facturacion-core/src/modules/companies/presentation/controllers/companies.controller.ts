@@ -18,6 +18,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody } from '@nes
 import { CompaniesService } from '../../application/services/companies.service';
 import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
 import { EmailVerifiedGuard } from '../../../auth/infrastructure/guards/email-verified.guard';
+import { AdminGuard } from '../../../auth/infrastructure/guards/admin.guard';
 import { PrismaService } from '../../../../shared/database/prisma.service';
 import { Response } from 'express';
 import { EmailService } from '@/shared/email/email.service';
@@ -118,7 +119,8 @@ export class CompaniesController {
   }
 
   @Put('environment')
-  @ApiOperation({ summary: 'Cambiar ambiente (TEST/PRODUCTION)' })
+  @UseGuards(EmailVerifiedGuard, AdminGuard)
+  @ApiOperation({ summary: 'Cambiar ambiente (TEST/PRODUCTION) - Solo administradores' })
   @ApiBody({
     schema: {
       type: 'object',
