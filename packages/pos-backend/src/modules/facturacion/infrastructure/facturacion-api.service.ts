@@ -14,6 +14,14 @@ export class FacturacionApiService {
   // In-memory storage for development mode
   private customers: Map<string, any> = new Map();
 
+  // Caché del establecimiento/punto de emisión resuelto (ver resolveEstablishment)
+  private establishmentCache: {
+    establishmentId: string;
+    emissionPointId: string;
+    fetchedAt: number;
+  } | null = null;
+  private readonly ESTABLISHMENT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
+
   constructor(private readonly configService: ConfigService) {
     this.apiUrl = this.configService.get<string>('facturacion.apiUrl', '');
     this.serviceAccountToken = this.configService.get<string>('facturacion.apiToken', '');
@@ -285,6 +293,73 @@ export class FacturacionApiService {
       const errorDetails = error.response?.data || error.message;
       this.logger.error('Error obteniendo cliente:', errorDetails);
       throw new Error(`Error obteniendo cliente: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Resolver el establecimiento/punto de emisión al que SIEMPRE se factura,
+   * sin importar el Local (POS) que originó la orden. El código se toma de
+   * `FACTURACION_ESTABLISHMENT_CODE` / `FACTURACION_EMISSION_POINT_CODE`
+   * (default "001") y se resuelve contra facturacion-core, que solo acepta
+   * el establishmentId/emissionPointId (UUID), no el código.
+   *
+   * Resultado cacheado en memoria por ESTABLISHMENT_CACHE_TTL_MS para no
+   * pegarle a /establishments en cada factura.
+   */
+  async resolveEstablishment(): Promise<{ establishmentId: string; emissionPointId: string }> {
+    const establishmentCode = this.configService.get<string>('facturacion.establishmentCode', '001');
+    const emissionPointCode = this.configService.get<string>('facturacion.emissionPointCode', '001');
+
+    if (this.isDevelopmentMode) {
+      this.logger.warn(
+        `⚠️  Resolviendo establecimiento en modo DESARROLLO: usando IDs simulados para código ${establishmentCode}/${emissionPointCode}`,
+      );
+      return { establishmentId: `dev-establishment-${establishmentCode}`, emissionPointId: `dev-emission-point-${emissionPointCode}` };
+    }
+
+    if (
+      this.establishmentCache &&
+      Date.now() - this.establishmentCache.fetchedAt < this.ESTABLISHMENT_CACHE_TTL_MS
+    ) {
+      return this.establishmentCache;
+    }
+
+    try {
+      const response = await this.httpClient.get('/establishments');
+      const establishments = response.data?.establishments || [];
+      const establishment = establishments.find((e: any) => e.code === establishmentCode);
+
+      if (!establishment) {
+        throw new Error(
+          `No existe un establecimiento con código "${establishmentCode}" en facturacion-core. ` +
+            `Creá el establecimiento (y su punto de emisión "${emissionPointCode}") desde web-facturacion antes de facturar.`,
+        );
+      }
+
+      const emissionPoint = (establishment.emissionPoints || []).find(
+        (ep: any) => ep.code === emissionPointCode,
+      );
+
+      if (!emissionPoint) {
+        throw new Error(
+          `El establecimiento "${establishmentCode}" no tiene un punto de emisión con código "${emissionPointCode}".`,
+        );
+      }
+
+      const resolved = {
+        establishmentId: establishment.id,
+        emissionPointId: emissionPoint.id,
+        fetchedAt: Date.now(),
+      };
+      this.establishmentCache = resolved;
+      return resolved;
+    } catch (error) {
+      if (error.message?.startsWith('No existe un establecimiento') || error.message?.includes('no tiene un punto de emisión')) {
+        throw error;
+      }
+      const errorMessage = error.response?.data?.message || error.message || 'Error desconocido';
+      this.logger.error('Error resolviendo establecimiento/punto de emisión:', error.response?.data || error.message);
+      throw new Error(`Error resolviendo establecimiento/punto de emisión: ${errorMessage}`);
     }
   }
 

@@ -8,6 +8,11 @@ export default () => ({
     apiUrl: process.env.FACTURACION_API_URL || 'http://localhost:3000/api/v1',
     apiToken: process.env.FACTURACION_API_TOKEN,
     companyId: process.env.FACTURACION_COMPANY_ID,
+    // Establecimiento/punto de emisión al que se factura TODA orden,
+    // sin importar el Local (locales.establishmentCode/emissionPointCode)
+    // desde el que se originó. Hoy es el de Rivermall.
+    establishmentCode: process.env.FACTURACION_ESTABLISHMENT_CODE || '001',
+    emissionPointCode: process.env.FACTURACION_EMISSION_POINT_CODE || '001',
   },
   printer: {
     type: (process.env.PRINTER_TYPE as 'epson' | 'star') || 'epson',

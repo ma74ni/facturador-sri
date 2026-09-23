@@ -71,8 +71,14 @@ export class InvoiceQueueService {
         throw new Error('Orden no encontrada');
       }
 
+      // Establecimiento/punto de emisión al que se factura SIEMPRE (hoy: Rivermall),
+      // sin importar el Local desde el que se originó la orden.
+      const { establishmentId, emissionPointId } = await this.facturacionApi.resolveEstablishment();
+
       // Construir datos de factura
       const invoiceData = {
+        establishmentId,
+        emissionPointId,
         customerId: null, // Se debe buscar/crear el cliente primero
         customerData: {
           tipoIdentificacion: order.clienteIdentificacion ? '05' : '07', // RUC o Cédula
