@@ -28,6 +28,7 @@ interface Company {
   rejectionReason?: string;
   approvedAt?: string;
   rejectedAt?: string;
+  enabledModules?: string[];
 }
 
 interface AuthContextType {

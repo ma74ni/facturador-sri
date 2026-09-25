@@ -20,6 +20,7 @@ import {
   BarChart3,
   Menu,
   X,
+  Wallet,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { EmailVerificationBanner } from "@/components/shared/email-verification-banner";
@@ -66,6 +67,9 @@ export default function DashboardLayout({
     { name: "Facturas", href: "/dashboard/facturas", icon: FileText },
     { name: "Clientes", href: "/dashboard/clientes", icon: Users },
     { name: "Productos", href: "/dashboard/productos", icon: Package },
+    ...(company?.enabledModules?.includes("cobranza")
+      ? [{ name: "Cobranza", href: "/dashboard/cobranza", icon: Wallet }]
+      : []),
     { name: "Reportes", href: "/dashboard/reportes", icon: BarChart3 },
     { name: "Empresa", href: "/dashboard/empresa", icon: Building2 },
     { name: "Configuración", href: "/dashboard/configuracion", icon: Settings },

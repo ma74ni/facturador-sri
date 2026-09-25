@@ -10,6 +10,7 @@ export interface Customer {
   email?: string;
   phone?: string;
   address?: string;
+  retentionPercentage?: number | null;
   companyId: string;
   createdAt: string;
   updatedAt: string;
@@ -24,6 +25,7 @@ export interface CreateCustomerDto {
   email?: string;
   phone?: string;
   address?: string;
+  retentionPercentage?: number;
 }
 
 export interface UpdateCustomerDto extends Partial<CreateCustomerDto> {}
