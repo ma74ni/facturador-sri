@@ -91,7 +91,13 @@ DialogContent.displayName = DialogPrimitive.Content.displayName
  * visibles. No hace falta en dialogs size="default" (esos scrollean enteros).
  */
 const DialogBody = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex-1 overflow-y-auto min-h-0", className)} {...props} />
+  // min-w-0: sin esto, un ítem flex conserva min-width:auto y crece para
+  // hacerle lugar a cualquier contenido interno que no pueda achicarse
+  // (texto sin espacios, un Select largo, etc.), empujando el ancho de todo
+  // el diálogo. overflow-x-hidden explícito por la regla de CSS que, al fijar
+  // overflow-y a algo distinto de "visible", computa el overflow-x en "auto"
+  // (habilitando scroll horizontal) si no se lo fija a mano.
+  <div className={cn("flex-1 min-w-0 overflow-y-auto overflow-x-hidden min-h-0", className)} {...props} />
 )
 DialogBody.displayName = "DialogBody"
 

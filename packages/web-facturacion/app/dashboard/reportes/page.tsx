@@ -173,21 +173,21 @@ export default function ReportesPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Reportes</h1>
           <p className="text-muted-foreground">
             Análisis de ventas y facturación
           </p>
         </div>
-        <Button onClick={exportToCSV} variant="outline">
+        <Button onClick={exportToCSV} variant="outline" className="w-full sm:w-auto">
           <Download className="h-4 w-4 mr-2" />
           Exportar CSV
         </Button>
       </div>
 
       {/* Period Filter */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button
           variant={selectedPeriod === 'month' ? 'default' : 'outline'}
           onClick={() => setSelectedPeriod('month')}
@@ -285,24 +285,44 @@ export default function ReportesPage() {
                 No hay datos disponibles
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead className="text-right">Facturas</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                {/* Vista mobile: ranking en lista */}
+                <ol className="md:hidden divide-y">
                   {topCustomers.map((customer, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{customer.name}</TableCell>
-                      <TableCell className="text-right">{customer.count}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(customer.total)}</TableCell>
-                    </TableRow>
+                    <li key={index} className="flex items-center gap-3 py-3">
+                      <span className="w-5 text-sm text-muted-foreground tabular-nums">{index + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium break-words">{customer.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {customer.count} {customer.count === 1 ? 'factura' : 'facturas'}
+                        </p>
+                      </div>
+                      <p className="text-sm font-semibold flex-shrink-0">{formatCurrency(customer.total)}</p>
+                    </li>
                   ))}
-                </TableBody>
-              </Table>
+                </ol>
+
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Cliente</TableHead>
+                        <TableHead className="text-right">Facturas</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {topCustomers.map((customer, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="font-medium">{customer.name}</TableCell>
+                          <TableCell className="text-right">{customer.count}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(customer.total)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -319,24 +339,42 @@ export default function ReportesPage() {
                 No hay datos disponibles
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Producto</TableHead>
-                    <TableHead className="text-right">Cantidad</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                {/* Vista mobile: ranking en lista */}
+                <ol className="md:hidden divide-y">
                   {topProducts.map((product, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{product.description}</TableCell>
-                      <TableCell className="text-right">{product.quantity}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(product.total)}</TableCell>
-                    </TableRow>
+                    <li key={index} className="flex items-center gap-3 py-3">
+                      <span className="w-5 text-sm text-muted-foreground tabular-nums">{index + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium break-words">{product.description}</p>
+                        <p className="text-xs text-muted-foreground">Cantidad: {product.quantity}</p>
+                      </div>
+                      <p className="text-sm font-semibold flex-shrink-0">{formatCurrency(product.total)}</p>
+                    </li>
                   ))}
-                </TableBody>
-              </Table>
+                </ol>
+
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Producto</TableHead>
+                        <TableHead className="text-right">Cantidad</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {topProducts.map((product, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="font-medium">{product.description}</TableCell>
+                          <TableCell className="text-right">{product.quantity}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(product.total)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

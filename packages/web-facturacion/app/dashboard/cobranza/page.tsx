@@ -3,11 +3,13 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { FilterBar } from '@/components/ui/filter-bar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Search, Loader2, ChevronRight, UploadCloud } from 'lucide-react';
+import { Loader2, ChevronRight, UploadCloud } from 'lucide-react';
 import { useCustomers } from '@/lib/hooks/use-customers';
+import { usePagination } from '@/lib/hooks/use-pagination';
+import { Pagination } from '@/components/ui/pagination';
 
 export default function CobranzaPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -20,6 +22,8 @@ export default function CobranzaPage() {
       customer.identification.includes(searchTerm)
     );
   });
+
+  const pagination = usePagination(filtered, 10, searchTerm);
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -44,57 +48,74 @@ export default function CobranzaPage() {
           <CardDescription>Elegí un cliente para ver su estado de cuenta</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nombre o RUC/CI..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+          <FilterBar
+            search={searchTerm}
+            onSearchChange={setSearchTerm}
+            searchPlaceholder="Buscar por nombre o RUC/CI..."
+          />
 
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
+          ) : filtered.length === 0 ? (
+            <p className="text-center text-muted-foreground py-6 text-sm">No se encontraron clientes</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead className="hidden md:table-cell">Identificación</TableHead>
-                  <TableHead className="text-right"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((customer) => (
-                  <TableRow key={customer.id}>
-                    <TableCell className="font-medium">
-                      {customer.businessName || `${customer.firstName} ${customer.lastName}`}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell font-mono text-xs text-muted-foreground">
-                      {customer.identification}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/dashboard/cobranza/${customer.id}`}>
-                          Ver estado de cuenta
-                          <ChevronRight className="ml-1 h-4 w-4" />
-                        </Link>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+            <>
+              {/* Vista mobile: toda la card es el link al estado de cuenta */}
+              <div className="md:hidden space-y-2">
+                {pagination.pageItems.map((customer) => (
+                  <Link
+                    key={customer.id}
+                    href={`/dashboard/cobranza/${customer.id}`}
+                    className="flex items-center justify-between gap-2 border rounded-lg p-4 hover:bg-slate-50 active:bg-slate-100"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm break-words">
+                        {customer.businessName || `${customer.firstName} ${customer.lastName}`}
+                      </p>
+                      <p className="font-mono text-xs text-muted-foreground">{customer.identification}</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  </Link>
                 ))}
-                {filtered.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={3} className="text-center text-muted-foreground py-6">
-                      No se encontraron clientes
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+              </div>
+
+              {/* Vista desktop: tabla */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Identificación</TableHead>
+                      <TableHead className="text-right"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pagination.pageItems.map((customer) => (
+                      <TableRow key={customer.id}>
+                        <TableCell className="font-medium">
+                          {customer.businessName || `${customer.firstName} ${customer.lastName}`}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          {customer.identification}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link href={`/dashboard/cobranza/${customer.id}`}>
+                              Ver estado de cuenta
+                              <ChevronRight className="ml-1 h-4 w-4" />
+                            </Link>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <Pagination {...pagination} onPageChange={pagination.setPage} />
+            </>
           )}
         </CardContent>
       </Card>

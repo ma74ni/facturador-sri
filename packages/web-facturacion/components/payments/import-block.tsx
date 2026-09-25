@@ -7,6 +7,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle2, UploadCloud, Loader2 } from 'lucide-react';
 import { ImportReport } from '@/lib/api/historical-import';
 import { useToast } from '@/hooks/use-toast';
+import { usePagination } from '@/lib/hooks/use-pagination';
+import { Pagination } from '@/components/ui/pagination';
 
 interface ImportBlockProps {
   title: string;
@@ -30,6 +32,8 @@ export function ImportBlock({
   const [confirmed, setConfirmed] = useState(false);
   const [loading, setLoading] = useState<'preview' | 'confirm' | null>(null);
   const { toast } = useToast();
+  // resetKey = report: cada previsualización/importación nueva vuelve a la página 1
+  const errorsPage = usePagination(report?.errors ?? [], 10, report);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFile(e.target.files?.[0] ?? null);
@@ -125,22 +129,39 @@ export function ImportBlock({
           </Alert>
 
           {report.errors.length > 0 && (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-20">Fila</TableHead>
-                  <TableHead>Motivo</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {report.errors.map((e, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell>{e.row}</TableCell>
-                    <TableCell className="text-sm">{e.message}</TableCell>
-                  </TableRow>
+            <>
+              {/* Vista mobile: una card por error */}
+              <div className="md:hidden space-y-2">
+                {errorsPage.pageItems.map((e) => (
+                  <div key={`${e.row}-${e.message}`} className="border rounded-md p-3">
+                    <p className="text-xs font-medium text-muted-foreground">Fila {e.row}</p>
+                    <p className="text-sm break-words">{e.message}</p>
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+
+              {/* Vista desktop: tabla */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-20">Fila</TableHead>
+                      <TableHead>Motivo</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {errorsPage.pageItems.map((e) => (
+                      <TableRow key={`${e.row}-${e.message}`}>
+                        <TableCell>{e.row}</TableCell>
+                        <TableCell className="text-sm">{e.message}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <Pagination {...errorsPage} onPageChange={errorsPage.setPage} />
+            </>
           )}
         </div>
       )}

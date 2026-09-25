@@ -12,6 +12,11 @@ import { InvoicePaymentStatus } from '@/lib/api/payments';
 import { RegisterPaymentDialog } from '@/components/payments/register-payment-dialog';
 import { AddHistoricalInvoiceDialog } from '@/components/payments/add-historical-invoice-dialog';
 import { EditRetentionDialog } from '@/components/payments/edit-retention-dialog';
+import { usePagination } from '@/lib/hooks/use-pagination';
+import { Pagination } from '@/components/ui/pagination';
+import { NativeSelect } from '@/components/ui/native-select';
+
+type PaymentFilter = 'all' | 'withBalance' | InvoicePaymentStatus;
 
 const STATUS_LABEL: Record<InvoicePaymentStatus, string> = {
   PENDING: 'Pendiente',
@@ -32,6 +37,24 @@ export default function CobranzaClientePage({ params }: { params: { customerId: 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [addInvoiceOpen, setAddInvoiceOpen] = useState(false);
   const [retentionDialogOpen, setRetentionDialogOpen] = useState(false);
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
+
+  const allInvoices = statement?.invoices ?? [];
+  const filteredInvoices = allInvoices.filter((invoice) =>
+    paymentFilter === 'all'
+      ? true
+      : paymentFilter === 'withBalance'
+        ? invoice.balance > 0
+        : invoice.paymentStatus === paymentFilter
+  );
+  const emptyInvoicesMessage =
+    allInvoices.length === 0
+      ? 'Este cliente no tiene facturas registradas'
+      : 'Ninguna factura en este estado';
+
+  // Antes del early return: los hooks no pueden quedar detrás de un return condicional
+  const invoicesPage = usePagination(filteredInvoices, 10, paymentFilter);
+  const paymentsPage = usePagination(statement?.payments ?? [], 10);
 
   if (isLoading || !statement) {
     return (
@@ -89,48 +112,113 @@ export default function CobranzaClientePage({ params }: { params: { customerId: 
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Facturas</CardTitle>
-          <CardDescription>Estado de cobro de cada factura emitida a este cliente</CardDescription>
+        <CardHeader className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 space-y-0">
+          <div className="space-y-1.5">
+            <CardTitle>
+              Facturas (
+              {filteredInvoices.length === allInvoices.length
+                ? allInvoices.length
+                : `${filteredInvoices.length} de ${allInvoices.length}`}
+              )
+            </CardTitle>
+            <CardDescription>Estado de cobro de cada factura emitida a este cliente</CardDescription>
+          </div>
+          {allInvoices.length > 0 && (
+            <NativeSelect
+              value={paymentFilter}
+              onChange={(e) => setPaymentFilter(e.target.value as PaymentFilter)}
+              className="sm:w-44"
+              aria-label="Filtrar por estado de pago"
+            >
+              <option value="all">Todas</option>
+              <option value="withBalance">Con saldo</option>
+              <option value="PENDING">Pendientes</option>
+              <option value="PARTIALLY_PAID">Pago parcial</option>
+              <option value="PAID">Pagadas</option>
+            </NativeSelect>
+          )}
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Factura</TableHead>
-                <TableHead>Emisión</TableHead>
-                <TableHead>Total</TableHead>
-                <TableHead>Retenido</TableHead>
-                <TableHead>Saldo</TableHead>
-                <TableHead>Estado</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {statement.invoices.map((invoice) => (
-                <TableRow key={invoice.id}>
-                  <TableCell className="font-mono text-xs">{invoice.sequential}</TableCell>
-                  <TableCell>{new Date(invoice.issueDate).toLocaleDateString('es-EC')}</TableCell>
-                  <TableCell>${invoice.total.toFixed(2)}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {invoice.retainedAmount > 0 ? `$${invoice.retainedAmount.toFixed(2)}` : '—'}
-                  </TableCell>
-                  <TableCell>${invoice.balance.toFixed(2)}</TableCell>
-                  <TableCell>
-                    <Badge variant={STATUS_VARIANT[invoice.paymentStatus]}>
-                      {STATUS_LABEL[invoice.paymentStatus]}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {statement.invoices.length === 0 && (
+          {/* Vista mobile: una card por factura */}
+          <div className="md:hidden space-y-3">
+            {invoicesPage.pageItems.map((invoice) => (
+              <div key={invoice.id} className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-mono text-sm">{invoice.sequential}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(invoice.issueDate).toLocaleDateString('es-EC')}
+                    </p>
+                  </div>
+                  <Badge variant={STATUS_VARIANT[invoice.paymentStatus]}>
+                    {STATUS_LABEL[invoice.paymentStatus]}
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-sm">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total</p>
+                    <p>${invoice.total.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Retenido</p>
+                    <p>{invoice.retainedAmount > 0 ? `$${invoice.retainedAmount.toFixed(2)}` : '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Saldo</p>
+                    <p className="font-medium">${invoice.balance.toFixed(2)}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {filteredInvoices.length === 0 && (
+              <p className="text-center text-muted-foreground py-6 text-sm">
+                {emptyInvoicesMessage}
+              </p>
+            )}
+          </div>
+
+          {/* Vista desktop: tabla */}
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
-                    Este cliente no tiene facturas registradas
-                  </TableCell>
+                  <TableHead>Factura</TableHead>
+                  <TableHead>Emisión</TableHead>
+                  <TableHead>Total</TableHead>
+                  <TableHead>Retenido</TableHead>
+                  <TableHead>Saldo</TableHead>
+                  <TableHead>Estado</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {invoicesPage.pageItems.map((invoice) => (
+                  <TableRow key={invoice.id}>
+                    <TableCell className="font-mono text-xs">{invoice.sequential}</TableCell>
+                    <TableCell>{new Date(invoice.issueDate).toLocaleDateString('es-EC')}</TableCell>
+                    <TableCell>${invoice.total.toFixed(2)}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {invoice.retainedAmount > 0 ? `$${invoice.retainedAmount.toFixed(2)}` : '—'}
+                    </TableCell>
+                    <TableCell>${invoice.balance.toFixed(2)}</TableCell>
+                    <TableCell>
+                      <Badge variant={STATUS_VARIANT[invoice.paymentStatus]}>
+                        {STATUS_LABEL[invoice.paymentStatus]}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredInvoices.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
+                      {emptyInvoicesMessage}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <Pagination {...invoicesPage} onPageChange={invoicesPage.setPage} />
         </CardContent>
       </Card>
 
@@ -140,53 +228,102 @@ export default function CobranzaClientePage({ params }: { params: { customerId: 
           <CardDescription>Historial de pagos y a qué facturas se aplicaron</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Referencia</TableHead>
-                <TableHead>Monto</TableHead>
-                <TableHead>Facturas aplicadas</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {statement.payments.map((payment) => (
-                <TableRow key={payment.id}>
-                  <TableCell>{new Date(payment.paymentDate).toLocaleDateString('es-EC')}</TableCell>
-                  <TableCell>{payment.reference || '—'}</TableCell>
-                  <TableCell>${payment.totalAmount.toFixed(2)}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {payment.allocations
-                      .map((a) => {
-                        const label = `${a.invoice?.sequential ?? a.invoiceId} ($${a.amount.toFixed(2)})`;
-                        return a.retentionAmount > 0
-                          ? `${label} + $${a.retentionAmount.toFixed(2)} ret.`
-                          : label;
-                      })
-                      .join(', ')}
-                  </TableCell>
-                  <TableCell className="text-right">
+          {/* Vista mobile: una card por pago */}
+          <div className="md:hidden space-y-3">
+            {paymentsPage.pageItems.map((payment) => (
+              <div key={payment.id} className="border rounded-lg p-4 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium">
+                      {new Date(payment.paymentDate).toLocaleDateString('es-EC')}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{payment.reference || 'Sin referencia'}</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <p className="text-sm font-semibold">${payment.totalAmount.toFixed(2)}</p>
                     <Button
                       variant="ghost"
                       size="sm"
                       className="h-8 w-8 p-0"
                       onClick={() => deletePayment.mutate(payment.id)}
+                      aria-label="Eliminar pago"
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {statement.payments.length === 0 && (
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {payment.allocations
+                    .map((a) => {
+                      const label = `${a.invoice?.sequential ?? a.invoiceId} ($${a.amount.toFixed(2)})`;
+                      return a.retentionAmount > 0
+                        ? `${label} + $${a.retentionAmount.toFixed(2)} ret.`
+                        : label;
+                    })
+                    .join(', ')}
+                </p>
+              </div>
+            ))}
+            {statement.payments.length === 0 && (
+              <p className="text-center text-muted-foreground py-6 text-sm">
+                Todavía no se registró ningún pago
+              </p>
+            )}
+          </div>
+
+          {/* Vista desktop: tabla */}
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
-                    Todavía no se registró ningún pago
-                  </TableCell>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Referencia</TableHead>
+                  <TableHead>Monto</TableHead>
+                  <TableHead>Facturas aplicadas</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {paymentsPage.pageItems.map((payment) => (
+                  <TableRow key={payment.id}>
+                    <TableCell>{new Date(payment.paymentDate).toLocaleDateString('es-EC')}</TableCell>
+                    <TableCell>{payment.reference || '—'}</TableCell>
+                    <TableCell>${payment.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {payment.allocations
+                        .map((a) => {
+                          const label = `${a.invoice?.sequential ?? a.invoiceId} ($${a.amount.toFixed(2)})`;
+                          return a.retentionAmount > 0
+                            ? `${label} + $${a.retentionAmount.toFixed(2)} ret.`
+                            : label;
+                        })
+                        .join(', ')}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => deletePayment.mutate(payment.id)}
+                        aria-label="Eliminar pago"
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {statement.payments.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
+                      Todavía no se registró ningún pago
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <Pagination {...paymentsPage} onPageChange={paymentsPage.setPage} />
         </CardContent>
       </Card>
 

@@ -37,23 +37,23 @@ export function CustomerInfoCard({ customer, onEdit, onClose, compact = false }:
             </div>
 
             <div className="space-y-1.5 text-sm">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0">
                 <FileText className="h-3.5 w-3.5 text-slate-500 flex-shrink-0" />
-                <span className="text-slate-600">{identificationLabel}:</span>
-                <span className="font-mono font-medium text-slate-900">{customer.identification}</span>
+                <span className="text-slate-600 flex-shrink-0">{identificationLabel}:</span>
+                <span className="font-mono font-medium text-slate-900 truncate">{customer.identification}</span>
               </div>
 
               {customer.email && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <Mail className="h-3.5 w-3.5 text-slate-500 flex-shrink-0" />
                   <span className="text-slate-700 truncate">{customer.email}</span>
                 </div>
               )}
 
               {customer.phone && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <Phone className="h-3.5 w-3.5 text-slate-500 flex-shrink-0" />
-                  <span className="text-slate-700">{customer.phone}</span>
+                  <span className="text-slate-700 truncate">{customer.phone}</span>
                 </div>
               )}
 

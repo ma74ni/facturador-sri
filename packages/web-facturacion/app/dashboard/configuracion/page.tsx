@@ -54,6 +54,8 @@ import {
   useCreateEmissionPoint,
   useDeleteEmissionPoint,
 } from '@/lib/hooks/use-establishments';
+import { usePagination } from '@/lib/hooks/use-pagination';
+import { Pagination } from '@/components/ui/pagination';
 
 interface UserData {
   id: string;
@@ -93,6 +95,7 @@ export default function ConfiguracionPage() {
   const users: UserData[] = [
     // Lista vacía por ahora - pendiente implementar
   ];
+  const usersPage = usePagination(users, 10);
 
   // Establishment handlers
   const handleCreateEstablishment = () => {
@@ -416,56 +419,100 @@ export default function ConfiguracionPage() {
                   </Button>
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Usuario</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Rol</TableHead>
-                      <TableHead className="text-right">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.map((userData) => (
-                      <TableRow key={userData.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">
-                              {userData.firstName} {userData.lastName}
-                            </span>
-                            {userData.id === user?.id && (
-                              <Badge variant="outline" className="text-xs">Tú</Badge>
-                            )}
+                <>
+                  {/* Vista mobile: una card por usuario */}
+                  <div className="md:hidden space-y-3">
+                    {usersPage.pageItems.map((userData) => (
+                      <div key={userData.id} className="border rounded-lg p-4 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-sm">
+                                {userData.firstName} {userData.lastName}
+                              </span>
+                              {userData.id === user?.id && (
+                                <Badge variant="outline" className="text-xs">Tú</Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
+                              <Mail className="h-3 w-3 flex-shrink-0" />
+                              <span className="truncate">{userData.email}</span>
+                            </div>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center text-sm text-muted-foreground">
-                            <Mail className="mr-1 h-3 w-3" />
-                            {userData.email}
-                          </div>
-                        </TableCell>
-                        <TableCell>
                           <Badge variant={userData.role === 'ADMIN' ? 'default' : 'secondary'}>
                             {userData.role}
                           </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button variant="ghost" size="sm">
-                              <Edit className="h-4 w-4" />
+                        </div>
+                        <div className="flex items-center justify-end gap-1 border-t pt-2">
+                          <Button variant="ghost" size="sm" className="h-9 w-9 p-0" aria-label="Editar usuario">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          {userData.id !== user?.id && (
+                            <Button variant="ghost" size="sm" className="h-9 w-9 p-0" aria-label="Eliminar usuario">
+                              <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
-                            {userData.id !== user?.id && (
-                              <Button variant="ghost" size="sm">
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                          )}
+                        </div>
+                      </div>
                     ))}
-                  </TableBody>
-                </Table>
+                  </div>
+
+                  {/* Vista desktop: tabla */}
+                  <div className="hidden md:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Usuario</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Rol</TableHead>
+                          <TableHead className="text-right">Acciones</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {usersPage.pageItems.map((userData) => (
+                          <TableRow key={userData.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <User className="h-4 w-4 text-muted-foreground" />
+                                <span className="font-medium">
+                                  {userData.firstName} {userData.lastName}
+                                </span>
+                                {userData.id === user?.id && (
+                                  <Badge variant="outline" className="text-xs">Tú</Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center text-sm text-muted-foreground">
+                                <Mail className="mr-1 h-3 w-3" />
+                                {userData.email}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={userData.role === 'ADMIN' ? 'default' : 'secondary'}>
+                                {userData.role}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button variant="ghost" size="sm">
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                {userData.id !== user?.id && (
+                                  <Button variant="ghost" size="sm">
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  <Pagination {...usersPage} onPageChange={usersPage.setPage} />
+                </>
               )}
             </CardContent>
           </Card>

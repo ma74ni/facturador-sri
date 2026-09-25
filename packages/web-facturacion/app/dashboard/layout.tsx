@@ -158,7 +158,8 @@ export default function DashboardLayout({
         <header className="lg:hidden sticky top-0 z-30 flex items-center h-16 px-4 bg-white border-b border-slate-200">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-md text-slate-500 hover:bg-slate-100"
+            className="p-2.5 -m-0.5 rounded-md text-slate-500 hover:bg-slate-100"
+            aria-label="Abrir menú"
           >
             <Menu className="h-6 w-6" />
           </button>

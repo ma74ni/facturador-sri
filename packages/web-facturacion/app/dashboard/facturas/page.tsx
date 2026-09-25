@@ -18,7 +18,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import {
   Plus,
-  Search,
   Eye,
   Download,
   Mail,
@@ -45,11 +44,28 @@ import { useInvoices, useInvoiceStats } from '@/lib/hooks/use-invoices';
 import { useCustomers } from '@/lib/hooks/use-customers';
 import { useProducts } from '@/lib/hooks/use-products';
 import { useEstablishments } from '@/lib/hooks/use-establishments';
+import { usePagination } from '@/lib/hooks/use-pagination';
+import { Pagination } from '@/components/ui/pagination';
+import { FilterBar, FilterField } from '@/components/ui/filter-bar';
+import { NativeSelect } from '@/components/ui/native-select';
+import {
+  PERIOD_OPTIONS,
+  PeriodPreset,
+  DateRange,
+  getPeriodRange,
+  isInRange,
+} from '@/lib/utils/date-range';
+
+type InvoiceSort = 'recent' | 'oldest' | 'amountDesc' | 'amountAsc';
 
 export default function FacturasPage() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [period, setPeriod] = useState<PeriodPreset>('all');
+  const [customRange, setCustomRange] = useState<DateRange>({});
+  const [sortBy, setSortBy] = useState<InvoiceSort>('recent');
+  const dateRange = getPeriodRange(period, customRange);
 
   // React Query hooks - Se ejecutan en paralelo y usan caché
   const { data: invoices = [], isLoading: loadingInvoices, refetch: refetchInvoices } = useInvoices();
@@ -255,8 +271,103 @@ export default function FacturasPage() {
 
     const matchesStatus = statusFilter === 'all' || factura.status === statusFilter;
 
-    return matchesSearch && matchesStatus;
+    return matchesSearch && matchesStatus && isInRange(factura.issueDate, dateRange);
+  }).sort((a, b) => {
+    switch (sortBy) {
+      case 'amountDesc':
+        return Number(b.totalAmount) - Number(a.totalAmount);
+      case 'amountAsc':
+        return Number(a.totalAmount) - Number(b.totalAmount);
+      case 'oldest':
+        return a.issueDate.localeCompare(b.issueDate) || a.sequential.localeCompare(b.sequential);
+      default:
+        return b.issueDate.localeCompare(a.issueDate) || b.sequential.localeCompare(a.sequential);
+    }
   });
+
+  // El orden no cuenta como filtro: no oculta nada
+  const activeFilterCount = (statusFilter !== 'all' ? 1 : 0) + (period !== 'all' ? 1 : 0);
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setPeriod('all');
+    setCustomRange({});
+  };
+
+  const pagination = usePagination(
+    filteredFacturas,
+    10,
+    `${searchTerm}|${statusFilter}|${dateRange.from}|${dateRange.to}|${sortBy}`
+  );
+
+  // Botones de acción según estado — compartidos entre la card mobile y la tabla
+  const renderActions = (factura: Invoice) => {
+    const numero = `${factura.establishmentCode}-${factura.emissionPointCode}-${factura.sequential}`;
+    return (
+      <>
+        {factura.status === 'PENDING' && (
+          <Button
+            variant="ghost"
+            size="sm"
+            title="Enviar al SRI"
+            aria-label="Enviar al SRI"
+            onClick={() => handleSendToSri(factura.id)}
+            className="h-9 w-9 p-0"
+          >
+            <Send className="h-4 w-4 text-blue-600" />
+          </Button>
+        )}
+        {factura.status === 'AUTHORIZED' && (
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              title="Descargar XML"
+              aria-label="Descargar XML"
+              onClick={() => handleDownloadXml(factura.id, numero)}
+              className="h-9 w-9 p-0"
+            >
+              <FileDown className="h-4 w-4 text-green-600" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              title="Descargar PDF"
+              aria-label="Descargar PDF"
+              onClick={() => handleDownloadPdf(factura.id, numero)}
+              className="h-9 w-9 p-0"
+            >
+              <Download className="h-4 w-4 text-green-600" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              title="Enviar por email"
+              aria-label="Enviar por email"
+              onClick={() => handleSendEmail(factura.id)}
+              className="h-9 w-9 p-0"
+            >
+              <Mail className="h-4 w-4 text-purple-600" />
+            </Button>
+          </>
+        )}
+        {/* Las autorizadas no se pueden eliminar */}
+        {factura.status !== 'AUTHORIZED' && (
+          <Button
+            variant="ghost"
+            size="sm"
+            title="Eliminar factura"
+            aria-label="Eliminar factura"
+            onClick={() => handleDeleteClick(factura)}
+            className="h-9 w-9 p-0"
+          >
+            <Trash2 className="h-4 w-4 text-red-600" />
+          </Button>
+        )}
+      </>
+    );
+  };
 
   const getStatusBadge = (status: Invoice['status']) => {
     const statusConfig = {
@@ -359,53 +470,88 @@ export default function FacturasPage() {
         </div>
       )}
 
-      {/* Search & Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Buscar Facturas</CardTitle>
-          <CardDescription>
-            Encuentra facturas por número, cliente o identificación
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por secuencial, cliente o RUC/CI..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="flex h-10 w-full sm:w-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <option value="all">Todos los estados</option>
-              <option value="PENDING">Pendiente</option>
-              <option value="SENT">Enviada</option>
-              <option value="AUTHORIZED">Autorizada</option>
-              <option value="REJECTED">Rechazada</option>
-              <option value="ERROR">Error</option>
-            </select>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Facturas Table */}
       <Card>
         <CardHeader>
           <CardTitle>
-            Lista de Facturas ({filteredFacturas.length})
+            Lista de Facturas (
+            {filteredFacturas.length === facturas.length
+              ? facturas.length
+              : `${filteredFacturas.length} de ${facturas.length}`}
+            )
           </CardTitle>
           <CardDescription>
             Todas las facturas electrónicas emitidas
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          {filteredFacturas.length === 0 ? (
+        <CardContent className="space-y-4">
+          {facturas.length > 0 && (
+            <FilterBar
+              search={searchTerm}
+              onSearchChange={setSearchTerm}
+              searchPlaceholder="Buscar por secuencial, cliente o RUC/CI..."
+              activeCount={activeFilterCount}
+              onClear={clearFilters}
+            >
+              <FilterField label="Estado">
+                <NativeSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                  <option value="all">Todos</option>
+                  <option value="PENDING">Pendiente</option>
+                  <option value="SENT">Enviada</option>
+                  <option value="AUTHORIZED">Autorizada</option>
+                  <option value="REJECTED">Rechazada</option>
+                  <option value="ERROR">Error</option>
+                </NativeSelect>
+              </FilterField>
+              <FilterField label="Período">
+                <NativeSelect value={period} onChange={(e) => setPeriod(e.target.value as PeriodPreset)}>
+                  {PERIOD_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </NativeSelect>
+              </FilterField>
+              {period === 'custom' && (
+                <>
+                  <FilterField label="Desde">
+                    <Input
+                      type="date"
+                      value={customRange.from ?? ''}
+                      max={customRange.to || undefined}
+                      onChange={(e) => setCustomRange((r) => ({ ...r, from: e.target.value }))}
+                    />
+                  </FilterField>
+                  <FilterField label="Hasta">
+                    <Input
+                      type="date"
+                      value={customRange.to ?? ''}
+                      min={customRange.from || undefined}
+                      onChange={(e) => setCustomRange((r) => ({ ...r, to: e.target.value }))}
+                    />
+                  </FilterField>
+                </>
+              )}
+              <FilterField label="Ordenar por">
+                <NativeSelect value={sortBy} onChange={(e) => setSortBy(e.target.value as InvoiceSort)}>
+                  <option value="recent">Más recientes</option>
+                  <option value="oldest">Más antiguas</option>
+                  <option value="amountDesc">Mayor monto</option>
+                  <option value="amountAsc">Menor monto</option>
+                </NativeSelect>
+              </FilterField>
+            </FilterBar>
+          )}
+
+          {facturas.length > 0 && filteredFacturas.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <h3 className="text-lg font-semibold mb-2">No se encontraron resultados</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Ninguna factura coincide con la búsqueda o los filtros
+              </p>
+              <Button variant="outline" onClick={clearFilters}>
+                Limpiar filtros
+              </Button>
+            </div>
+          ) : filteredFacturas.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <div className="rounded-full bg-slate-100 p-6 mb-4">
                 <FileText className="h-12 w-12 text-slate-400" />
@@ -422,135 +568,104 @@ export default function FacturasPage() {
               </Button>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Secuencial</TableHead>
-                  <TableHead className="hidden sm:table-cell">Fecha</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead className="hidden md:table-cell">RUC/CI</TableHead>
-                  <TableHead className="hidden lg:table-cell">Estado</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredFacturas.map((factura) => (
-                  <TableRow key={factura.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex flex-col gap-1">
-                        <span className="font-mono text-xs sm:text-sm">
+            <>
+              {/* Vista mobile: una card por factura */}
+              <div className="md:hidden space-y-3">
+                {pagination.pageItems.map((factura) => (
+                  <div key={factura.id} className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-mono text-sm">
                           {factura.establishmentCode}-{factura.emissionPointCode}-{factura.sequential}
-                        </span>
-                        {/* Show status badge on mobile */}
-                        <span className="lg:hidden">
-                          {getStatusBadge(factura.status)}
-                        </span>
+                        </p>
+                        <p className="flex items-center text-xs text-muted-foreground">
+                          <Calendar className="mr-1 h-3 w-3" />
+                          {new Date(factura.issueDate).toLocaleDateString('es-EC', { timeZone: 'UTC' })}
+                        </p>
                       </div>
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      <div className="flex items-center text-sm">
-                        <Calendar className="mr-1 h-3 w-3 text-muted-foreground" />
-                        {new Date(factura.issueDate).toLocaleDateString('es-EC', { timeZone: 'UTC' })}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <span className="text-sm">{factura.customerName}</span>
-                        {/* Show RUC/CI on mobile below name */}
-                        <span className="md:hidden font-mono text-xs text-muted-foreground">
-                          {factura.customerIdentification}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell font-mono text-sm text-muted-foreground">
-                      {factura.customerIdentification}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
                       {getStatusBadge(factura.status)}
-                    </TableCell>
-                    <TableCell className="text-right font-medium text-sm">
-                      ${Number(factura.totalAmount).toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1 sm:gap-2">
-                        {factura.status === 'PENDING' && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              title="Enviar al SRI"
-                              onClick={() => handleSendToSri(factura.id)}
-                              className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-                            >
-                              <Send className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              title="Eliminar factura"
-                              onClick={() => handleDeleteClick(factura)}
-                              className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-                            >
-                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 text-red-600" />
-                            </Button>
-                          </>
-                        )}
-                        {factura.status === 'AUTHORIZED' && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              title="Descargar XML"
-                              onClick={() => handleDownloadXml(
-                                factura.id,
-                                `${factura.establishmentCode}-${factura.emissionPointCode}-${factura.sequential}`
-                              )}
-                              className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-                            >
-                              <FileDown className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              title="Descargar PDF"
-                              onClick={() => handleDownloadPdf(
-                                factura.id,
-                                `${factura.establishmentCode}-${factura.emissionPointCode}-${factura.sequential}`
-                              )}
-                              className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-                            >
-                              <Download className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              title="Enviar por email"
-                              onClick={() => handleSendEmail(factura.id)}
-                              className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-                            >
-                              <Mail className="h-3 w-3 sm:h-4 sm:w-4 text-purple-600" />
-                            </Button>
-                          </>
-                        )}
-                        {/* Botón eliminar para estados diferentes a AUTHORIZED */}
-                        {factura.status !== 'AUTHORIZED' && factura.status !== 'PENDING' && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            title="Eliminar factura"
-                            onClick={() => handleDeleteClick(factura)}
-                            className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-                          >
-                            <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 text-red-600" />
-                          </Button>
-                        )}
+                    </div>
+                    <div className="flex items-end justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm break-words">{factura.customerName}</p>
+                        <p className="font-mono text-xs text-muted-foreground">{factura.customerIdentification}</p>
                       </div>
-                    </TableCell>
-                  </TableRow>
+                      <p className="font-semibold text-sm flex-shrink-0">
+                        ${Number(factura.totalAmount).toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-end gap-1 border-t pt-2">
+                      {renderActions(factura)}
+                    </div>
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+
+              {/* Vista desktop: tabla */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Secuencial</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead className="hidden lg:table-cell">RUC/CI</TableHead>
+                      <TableHead className="hidden lg:table-cell">Estado</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pagination.pageItems.map((factura) => (
+                      <TableRow key={factura.id}>
+                        <TableCell className="font-medium">
+                          <div className="flex flex-col gap-1">
+                            <span className="font-mono text-sm">
+                              {factura.establishmentCode}-{factura.emissionPointCode}-{factura.sequential}
+                            </span>
+                            {/* Estado debajo del secuencial cuando no hay columna Estado */}
+                            <span className="lg:hidden">
+                              {getStatusBadge(factura.status)}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center text-sm">
+                            <Calendar className="mr-1 h-3 w-3 text-muted-foreground" />
+                            {new Date(factura.issueDate).toLocaleDateString('es-EC', { timeZone: 'UTC' })}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-sm">{factura.customerName}</span>
+                            {/* RUC/CI debajo del nombre cuando no hay columna RUC/CI */}
+                            <span className="lg:hidden font-mono text-xs text-muted-foreground">
+                              {factura.customerIdentification}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell font-mono text-sm text-muted-foreground">
+                          {factura.customerIdentification}
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          {getStatusBadge(factura.status)}
+                        </TableCell>
+                        <TableCell className="text-right font-medium text-sm">
+                          ${Number(factura.totalAmount).toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {renderActions(factura)}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <Pagination {...pagination} onPageChange={pagination.setPage} />
+            </>
           )}
         </CardContent>
       </Card>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
 import { Label } from "@/components/ui/label";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   Select,
   SelectContent,
@@ -33,15 +34,7 @@ import { CreateInvoiceDto, InvoiceItemDto } from "@/lib/api/invoices";
 import { Customer, CreateCustomerDto } from "@/lib/api/customers";
 import { Product, CreateProductDto } from "@/lib/api/products";
 import { Establishment } from "@/lib/api/establishments";
-import {
-  AlertCircle,
-  Plus,
-  Trash2,
-  UserPlus,
-  PackagePlus,
-  Search,
-  Check,
-} from "lucide-react";
+import { AlertCircle, Plus, Trash2 } from "lucide-react";
 import { CustomerDialog } from "@/components/customers/customer-dialog";
 import { CustomerInfoCard } from "@/components/customers/customer-info-card";
 import { ProductDialog } from "@/components/products/product-dialog";
@@ -164,42 +157,13 @@ export function InvoiceDialog({
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [showCertificateDialog, setShowCertificateDialog] = useState(false);
 
-  // Customer search/combobox state
-  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
-  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
-
   const selectedEstablishmentData = establishments.find(
     (e) => e.id === selectedEstablishment
   );
   const emissionPoints = selectedEstablishmentData?.emissionPoints || [];
 
-  // Filter customers based on search query
-  const filteredCustomers = useMemo(() => {
-    if (!customerSearchQuery.trim()) {
-      return customers;
-    }
-
-    const query = customerSearchQuery.toLowerCase();
-    return customers.filter((customer) => {
-      const displayName = getCustomerDisplayName(customer).toLowerCase();
-      const identification = customer.identification.toLowerCase();
-      const firstName = customer.firstName?.toLowerCase() || "";
-      const lastName = customer.lastName?.toLowerCase() || "";
-
-      return (
-        displayName.includes(query) ||
-        identification.includes(query) ||
-        firstName.includes(query) ||
-        lastName.includes(query)
-      );
-    });
-  }, [customers, customerSearchQuery]);
-
-  // Get selected customer display name
+  // Get selected customer
   const selectedCustomerData = customers.find((c) => c.id === selectedCustomer);
-  const selectedCustomerDisplay = selectedCustomerData
-    ? getCustomerDisplayName(selectedCustomerData)
-    : "";
 
   useEffect(() => {
     if (!open) {
@@ -215,27 +179,9 @@ export function InvoiceDialog({
       setQuantity(1);
       setDiscount(0);
       setErrors({});
-      setCustomerSearchQuery("");
-      setShowCustomerDropdown(false);
       setEditingCustomer(null);
     }
   }, [open]);
-
-  // Close customer dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest("#customer-combobox-container")) {
-        setShowCustomerDropdown(false);
-      }
-    };
-
-    if (showCustomerDropdown) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () =>
-        document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [showCustomerDropdown]);
 
   const calculateItemTotals = (
     unitPrice: number,
@@ -446,103 +392,27 @@ export function InvoiceDialog({
                 1. Datos Generales
               </h3>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {/* Cliente - Searchable Combobox */}
+                {/* Cliente - Select con búsqueda */}
                 <div className="space-y-2 md:col-span-2">
-                  <div className="flex justify-between items-center">
-                    <Label htmlFor="customer">Cliente *</Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowCustomerDialog(true)}
-                      className="h-7 text-xs"
-                    >
-                      <UserPlus className="h-3 w-3 mr-1" />
-                      Nuevo Cliente
-                    </Button>
-                  </div>
-                  <div id="customer-combobox-container" className="relative">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                      <Input
-                        id="customer"
-                        placeholder={
-                          selectedCustomerDisplay ||
-                          "Buscar por nombre, apellido o identificación..."
-                        }
-                        value={customerSearchQuery}
-                        onChange={(e) => {
-                          setCustomerSearchQuery(e.target.value);
-                          setShowCustomerDropdown(true);
-                        }}
-                        onFocus={() => setShowCustomerDropdown(true)}
-                        className={`pl-9 ${
-                          errors.customer ? "border-red-500" : ""
-                        }`}
-                      />
-                      {selectedCustomer && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedCustomer("");
-                            setCustomerSearchQuery("");
-                            setErrors({ ...errors, customer: "" });
-                          }}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 p-0 hover:bg-slate-100"
-                        >
-                          ×
-                        </Button>
-                      )}
-                    </div>
-                    {showCustomerDropdown &&
-                      (customerSearchQuery || !selectedCustomer) && (
-                        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                          {filteredCustomers.length > 0 ? (
-                            <div className="py-1">
-                              {filteredCustomers.map((customer) => {
-                                const displayName =
-                                  getCustomerDisplayName(customer);
-                                const isSelected =
-                                  selectedCustomer === customer.id;
-                                return (
-                                  <button
-                                    key={customer.id}
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedCustomer(customer.id);
-                                      setCustomerSearchQuery("");
-                                      setShowCustomerDropdown(false);
-                                      setErrors({ ...errors, customer: "" });
-                                    }}
-                                    className={`w-full px-3 py-2 text-left hover:bg-slate-100 flex items-center justify-between ${
-                                      isSelected ? "bg-primary/5" : ""
-                                    }`}
-                                  >
-                                    <div className="flex-1">
-                                      <div className="font-medium text-sm">
-                                        {displayName}
-                                      </div>
-                                      <div className="text-xs text-slate-500">
-                                        {customer.identification}
-                                      </div>
-                                    </div>
-                                    {isSelected && (
-                                      <Check className="h-4 w-4 text-primary" />
-                                    )}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <div className="px-3 py-6 text-center text-sm text-slate-500">
-                              No se encontraron clientes
-                            </div>
-                          )}
-                        </div>
-                      )}
-                  </div>
+                  <Label htmlFor="customer">Cliente *</Label>
+                  <SearchableSelect
+                    id="customer"
+                    items={customers}
+                    value={selectedCustomer}
+                    onChange={(id) => {
+                      setSelectedCustomer(id);
+                      setErrors({ ...errors, customer: "" });
+                    }}
+                    getId={(c) => c.id}
+                    getLabel={getCustomerDisplayName}
+                    getSubLabel={(c) => c.identification}
+                    placeholder="Seleccionar cliente..."
+                    searchPlaceholder="Buscar por nombre, apellido o identificación..."
+                    emptyMessage="No se encontraron clientes"
+                    onAddNew={() => setShowCustomerDialog(true)}
+                    addNewLabel="Nuevo Cliente"
+                    error={!!errors.customer}
+                  />
                   {errors.customer && (
                     <div className="flex items-center gap-1 text-sm text-red-500">
                       <AlertCircle className="h-4 w-4" />
@@ -558,7 +428,6 @@ export function InvoiceDialog({
                       onEdit={handleEditCustomer}
                       onClose={() => {
                         setSelectedCustomer("");
-                        setCustomerSearchQuery("");
                         setErrors({ ...errors, customer: "" });
                       }}
                       compact={true}
@@ -656,35 +525,22 @@ export function InvoiceDialog({
                 </h4>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
                   <div className="md:col-span-2 lg:col-span-3 space-y-2">
-                    <div className="flex justify-between items-center">
-                      <Label htmlFor="product">Producto</Label>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowProductDialog(true)}
-                        className="h-7 text-xs"
-                      >
-                        <PackagePlus className="h-3 w-3 mr-1" />
-                        Nuevo Producto
-                      </Button>
-                    </div>
-                    <Select
+                    <Label htmlFor="product">Producto</Label>
+                    <SearchableSelect
+                      id="product"
+                      items={products}
                       value={selectedProduct}
-                      onValueChange={setSelectedProduct}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar producto" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products.map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.name} - $
-                            {Number(product.unitPrice).toFixed(2)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onChange={setSelectedProduct}
+                      getId={(p) => p.id}
+                      getLabel={(p) => p.name}
+                      getSubLabel={(p) => `$${Number(p.unitPrice).toFixed(2)}`}
+                      placeholder="Seleccionar producto..."
+                      searchPlaceholder="Buscar producto..."
+                      emptyMessage="No se encontraron productos"
+                      onAddNew={() => setShowProductDialog(true)}
+                      addNewLabel="Nuevo Producto"
+                      error={!!errors.product}
+                    />
                   </div>
 
                   <div className="space-y-2 md:col-span-1 lg:col-span-1">
@@ -733,8 +589,8 @@ export function InvoiceDialog({
                         className="border rounded-lg p-4 bg-white shadow-sm"
                       >
                         <div className="flex items-start justify-between mb-3">
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-slate-900 mb-1">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-slate-900 mb-1 truncate">
                               {item.description}
                             </h4>
                             <p className="text-sm text-slate-500">

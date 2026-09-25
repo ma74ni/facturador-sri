@@ -72,7 +72,7 @@ export function AddHistoricalInvoiceDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1">
             <Label>N° de factura</Label>
             <Input
@@ -108,7 +108,7 @@ export function AddHistoricalInvoiceDialog({
             Más opciones (establecimiento / punto de emisión)
           </button>
         ) : (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label>Establecimiento</Label>
               <Input

@@ -13,7 +13,7 @@ export interface NumberInputProps extends Omit<React.InputHTMLAttributes<HTMLInp
 }
 
 const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
-  ({ className, value, onChange, allowDecimals = false, min, max, decimalPlaces = 2, ...props }, ref) => {
+  ({ className, value, onChange, allowDecimals = false, min, max, decimalPlaces = 2, onFocus, onBlur, onKeyDown, ...props }, ref) => {
     const [internalValue, setInternalValue] = React.useState<string>(value.toString());
 
     // Sincronizar el valor interno cuando cambia el valor externo
@@ -69,10 +69,20 @@ const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
       }
     };
 
+    const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+      // Si vale 0, vaciar el campo para escribir directo sin tener que
+      // borrar el 0 primero. Si se sale sin escribir, handleBlur lo repone.
+      if (parseFloat(internalValue) === 0) {
+        setInternalValue('');
+      }
+
+      onFocus?.(e);
+    };
+
     const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
       // Al perder el foco, formatear el número correctamente
       if (internalValue === '' || internalValue === '-') {
-        setInternalValue('0');
+        setInternalValue(allowDecimals ? (0).toFixed(decimalPlaces) : '0');
         onChange(0);
       } else {
         const numValue = parseFloat(internalValue);
@@ -98,9 +108,7 @@ const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
       }
 
       // Llamar al onBlur original si existe
-      if (props.onBlur) {
-        props.onBlur(e);
-      }
+      onBlur?.(e);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -117,9 +125,7 @@ const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
       }
 
       // Llamar al onKeyDown original si existe
-      if (props.onKeyDown) {
-        props.onKeyDown(e);
-      }
+      onKeyDown?.(e);
     };
 
     return (
@@ -127,15 +133,16 @@ const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
         type="text"
         inputMode={allowDecimals ? 'decimal' : 'numeric'}
         className={cn(
-          'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+          'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
           className
         )}
         ref={ref}
         value={internalValue}
+        {...props}
         onChange={handleChange}
+        onFocus={handleFocus}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
-        {...props}
       />
     );
   }

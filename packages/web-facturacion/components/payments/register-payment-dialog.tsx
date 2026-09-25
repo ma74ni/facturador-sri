@@ -178,7 +178,7 @@ export function RegisterPaymentDialog({
         </DialogHeader>
 
         <DialogBody className="space-y-4 pr-1">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1">
             <Label>Fecha del pago</Label>
             <Input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
@@ -236,64 +236,120 @@ export function RegisterPaymentDialog({
           </div>
         </div>
 
-        <div className="border rounded-md">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Factura</TableHead>
-                <TableHead>Saldo</TableHead>
-                <TableHead className="w-32">Monto a aplicar</TableHead>
-                <TableHead className="w-28">Retención</TableHead>
-                <TableHead className="w-10"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+        {selectedInvoices.length === 0 ? (
+          <div className="border rounded-md">
+            <p className="text-center text-muted-foreground py-6 text-sm">
+              Buscá arriba las facturas que cubre este pago
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Vista mobile: una card por factura, con los mismos inputs
+                apilados — en una tabla, editar Monto/Retención obligaría a
+                scrollear de costado mientras se completa el dato. */}
+            <div className="md:hidden space-y-3">
               {selectedInvoices.map((invoice) => {
                 const entry = allocations[invoice.id] ?? { amount: 0, retentionAmount: 0 };
                 return (
-                  <TableRow key={invoice.id}>
-                    <TableCell className="font-mono text-xs">{invoice.sequential}</TableCell>
-                    <TableCell>${invoice.balance.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <NumberInput
-                        value={entry.amount}
-                        onChange={(v) => handleAmountChange(invoice.id, v)}
-                        allowDecimals
-                        min={0}
-                        max={Math.max(0, invoice.balance - entry.retentionAmount)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <NumberInput
-                        value={entry.retentionAmount}
-                        onChange={(v) => handleRetentionChange(invoice.id, v)}
-                        allowDecimals
-                        min={0}
-                        max={Math.max(0, invoice.balance - entry.amount)}
-                      />
-                    </TableCell>
-                    <TableCell>
+                  <div key={invoice.id} className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-mono text-sm">{invoice.sequential}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Saldo ${invoice.balance.toFixed(2)}
+                        </p>
+                      </div>
                       <button
                         type="button"
                         onClick={() => handleRemoveInvoice(invoice.id)}
-                        className="text-muted-foreground hover:text-destructive"
+                        className="text-muted-foreground hover:text-destructive p-1 -m-1"
+                        aria-label={`Quitar factura ${invoice.sequential}`}
                       >
                         <X className="h-4 w-4" />
                       </button>
-                    </TableCell>
-                  </TableRow>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Monto a aplicar</Label>
+                        <NumberInput
+                          value={entry.amount}
+                          onChange={(v) => handleAmountChange(invoice.id, v)}
+                          allowDecimals
+                          min={0}
+                          max={Math.max(0, invoice.balance - entry.retentionAmount)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Retención</Label>
+                        <NumberInput
+                          value={entry.retentionAmount}
+                          onChange={(v) => handleRetentionChange(invoice.id, v)}
+                          allowDecimals
+                          min={0}
+                          max={Math.max(0, invoice.balance - entry.amount)}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 );
               })}
-              {selectedInvoices.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
-                    Buscá arriba las facturas que cubre este pago
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+            </div>
+
+            {/* Vista desktop: tabla */}
+            <div className="hidden md:block border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Factura</TableHead>
+                    <TableHead>Saldo</TableHead>
+                    <TableHead className="w-32">Monto a aplicar</TableHead>
+                    <TableHead className="w-28">Retención</TableHead>
+                    <TableHead className="w-10"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {selectedInvoices.map((invoice) => {
+                    const entry = allocations[invoice.id] ?? { amount: 0, retentionAmount: 0 };
+                    return (
+                      <TableRow key={invoice.id}>
+                        <TableCell className="font-mono text-xs">{invoice.sequential}</TableCell>
+                        <TableCell>${invoice.balance.toFixed(2)}</TableCell>
+                        <TableCell>
+                          <NumberInput
+                            value={entry.amount}
+                            onChange={(v) => handleAmountChange(invoice.id, v)}
+                            allowDecimals
+                            min={0}
+                            max={Math.max(0, invoice.balance - entry.retentionAmount)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <NumberInput
+                            value={entry.retentionAmount}
+                            onChange={(v) => handleRetentionChange(invoice.id, v)}
+                            allowDecimals
+                            min={0}
+                            max={Math.max(0, invoice.balance - entry.amount)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveInvoice(invoice.id)}
+                            className="text-muted-foreground hover:text-destructive"
+                            aria-label={`Quitar factura ${invoice.sequential}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </>
+        )}
 
         {selectedInvoices.length > 0 && (
           <p className="text-xs text-muted-foreground">

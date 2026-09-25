@@ -10,6 +10,12 @@ const config = {
 	],
   prefix: "",
   theme: {
+    // container no se usa en ningún componente hoy (se dejó tal cual, no rompe nada).
+    //
+    // Convención de grillas: siempre mobile-first — `grid-cols-1 md:grid-cols-N`
+    // (o directamente sin `grid-cols-1`, que ya es el default de Tailwind). Nunca
+    // un `grid-cols-N≥2` suelto sin `md:`/`sm:` antes: fuerza esa cantidad de
+    // columnas incluso a 320px y rompe el layout.
     container: {
       center: true,
       padding: "2rem",

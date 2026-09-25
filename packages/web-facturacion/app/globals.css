@@ -22,7 +22,11 @@
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    /* Antes usaba el mismo tono que --foreground (casi negro): con
+       ring-2 + ring-offset-2 se veía como un marco negro grueso al enfocar
+       cualquier input. Un azul es el estándar de facto para foco — se lee
+       como "esto está activo", no como error ni como borde pesado. */
+    --ring: 217.2 91.2% 59.8%;
     --radius: 0.5rem;
   }
 
