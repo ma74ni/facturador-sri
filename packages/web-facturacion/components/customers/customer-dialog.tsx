@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -12,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberInput } from '@/components/ui/number-input';
 import {
   Select,
   SelectContent,
@@ -43,6 +45,7 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
     email: '',
     phone: '',
     address: '',
+    retentionPercentage: undefined,
   });
 
   useEffect(() => {
@@ -56,6 +59,7 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
         email: customer.email || '',
         phone: customer.phone || '',
         address: customer.address || '',
+        retentionPercentage: customer.retentionPercentage ?? undefined,
       });
     } else {
       setFormData({
@@ -67,6 +71,7 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
         email: '',
         phone: '',
         address: '',
+        retentionPercentage: undefined,
       });
     }
     setErrors({});
@@ -150,7 +155,7 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent size="full">
         <DialogHeader>
           <DialogTitle>
             {customer ? 'Editar Cliente' : 'Nuevo Cliente'}
@@ -162,7 +167,8 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+        <DialogBody className="space-y-4 max-w-2xl w-full mx-auto pr-1">
           <div className="grid gap-4 md:grid-cols-2">
             {/* Tipo de Identificación */}
             <div className="space-y-2">
@@ -319,6 +325,25 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
             </div>
           </div>
 
+          {/* Retención en la fuente */}
+          <div className="space-y-2">
+            <Label htmlFor="retentionPercentage">% de retención habitual (opcional)</Label>
+            <NumberInput
+              id="retentionPercentage"
+              value={formData.retentionPercentage ?? 0}
+              onChange={(v) => setFormData({ ...formData, retentionPercentage: v || undefined })}
+              allowDecimals
+              min={0}
+              max={100}
+              className="max-w-[160px]"
+            />
+            <p className="text-xs text-muted-foreground">
+              Si este cliente suele retener en la fuente, indicá el % (ej. 1.5). Al registrar un
+              pago se va a precalcular sola, sin tener que hacer la cuenta a mano. Dejalo en 0 si no
+              retiene.
+            </p>
+          </div>
+
           {/* Dirección */}
           <div className="space-y-2">
             <Label htmlFor="address">Dirección</Label>
@@ -331,8 +356,9 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
               rows={3}
             />
           </div>
+        </DialogBody>
 
-          <DialogFooter className='gap-4'>
+          <DialogFooter className='gap-4 max-w-2xl w-full mx-auto'>
             <Button
               type="button"
               variant="outline"

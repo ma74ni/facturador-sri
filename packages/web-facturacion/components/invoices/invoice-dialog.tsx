@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -425,7 +426,7 @@ export function InvoiceDialog({
   // Render
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] w-full lg:max-w-7xl max-h-[95vh] overflow-y-auto">
+      <DialogContent size="full">
         <DialogHeader>
           <DialogTitle className="text-2xl">
             Nueva Factura Electrónica
@@ -435,6 +436,8 @@ export function InvoiceDialog({
             marcados con * son obligatorios.
           </DialogDescription>
         </DialogHeader>
+
+        <DialogBody className="pr-1">
 
         <div className="space-y-6">
             {/* SECCIÓN 1: Datos Generales */}
@@ -971,6 +974,7 @@ export function InvoiceDialog({
               </div>
             )}
           </div>
+        </DialogBody>
 
         <DialogFooter className="gap-2 sm:gap-3 mt-6">
           <Button

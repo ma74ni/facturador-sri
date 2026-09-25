@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -121,7 +122,7 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent size="full">
         <DialogHeader>
           <DialogTitle>
             {product ? 'Editar Producto' : 'Nuevo Producto'}
@@ -133,7 +134,8 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+        <DialogBody className="space-y-4 max-w-2xl w-full mx-auto pr-1">
           <div className="grid gap-4 md:grid-cols-2">
             {/* Código Principal */}
             <div className="space-y-2">
@@ -306,8 +308,9 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
               ffff
             </div>
           )} */}
+        </DialogBody>
 
-          <DialogFooter className='gap-4'>
+          <DialogFooter className='gap-4 max-w-2xl w-full mx-auto'>
             <Button
               type="button"
               variant="outline"

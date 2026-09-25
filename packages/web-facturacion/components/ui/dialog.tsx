@@ -29,22 +29,47 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
+type DialogContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+  /**
+   * "default": modal chico centrado (sm:max-w-lg), para confirmaciones y
+   * formularios de 1-2 campos.
+   * "full": ocupa casi toda la pantalla en desktop también — para
+   * formularios con varias secciones o tablas, evitando el scroll interno.
+   *
+   * OJO al pasar tamaños por `className` en vez de este prop: cualquier
+   * `max-w-*`/`max-h-*` SIN el prefijo `sm:` no le gana al `sm:max-w-lg` de
+   * acá (tailwind-merge no las considera del mismo grupo por el modificador
+   * distinto, y en CSS la regla `sm:` -por quedar después en la hoja de
+   * estilos- termina ganando en pantallas de escritorio). Usá este prop.
+   */
+  size?: "default" | "full"
+}
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  DialogContentProps
+>(({ className, children, size = "default", ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed z-50 grid w-full gap-4 border bg-background shadow-lg duration-200",
-        "max-h-[100dvh] overflow-y-auto",
+        // flex-col (no grid): para "full" necesitamos que el medio (DialogBody)
+        // pueda crecer con flex-1 y quedarse con el scroll, mientras
+        // header/footer quedan siempre visibles arriba/abajo.
+        "fixed z-50 flex flex-col w-full gap-4 border bg-background shadow-lg duration-200",
         // Mobile: Full screen
         "inset-0 p-4 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         // Desktop: Centered modal
-        "sm:left-[50%] sm:top-[50%] sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-lg sm:p-6 sm:max-h-[90vh]",
+        "sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-lg sm:p-6",
         "sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95 sm:data-[state=closed]:slide-out-to-left-1/2 sm:data-[state=closed]:slide-out-to-top-[48%] sm:data-[state=open]:slide-in-from-left-1/2 sm:data-[state=open]:slide-in-from-top-[48%]",
+        size === "full"
+          // height FIJO (no max-height): así ocupa la pantalla completa
+          // siempre, aunque el contenido sea corto — no solo cuando hace
+          // falta. El contenido del medio va en <DialogBody>, que es el
+          // único que scrollea.
+          ? "max-h-[100dvh] overflow-hidden sm:w-[96vw] sm:h-[94vh]"
+          : "max-h-[100dvh] overflow-y-auto sm:max-w-lg sm:max-h-[90vh]",
         className
       )}
       {...props}
@@ -58,6 +83,17 @@ const DialogContent = React.forwardRef<
   </DialogPortal>
 ))
 DialogContent.displayName = DialogPrimitive.Content.displayName
+
+/**
+ * Envoltorio para el contenido "del medio" en un DialogContent size="full":
+ * crece para ocupar el espacio que dejan el header y el footer, y es el
+ * único que scrollea — así el título y los botones de acción quedan siempre
+ * visibles. No hace falta en dialogs size="default" (esos scrollean enteros).
+ */
+const DialogBody = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div className={cn("flex-1 overflow-y-auto min-h-0", className)} {...props} />
+)
+DialogBody.displayName = "DialogBody"
 
 const DialogHeader = ({
   className,
@@ -122,6 +158,7 @@ export {
   DialogTrigger,
   DialogContent,
   DialogHeader,
+  DialogBody,
   DialogFooter,
   DialogTitle,
   DialogDescription,
