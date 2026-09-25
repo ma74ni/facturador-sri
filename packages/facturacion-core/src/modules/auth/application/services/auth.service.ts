@@ -238,6 +238,7 @@ export class AuthService {
             status: true,
             phone: true,
             address: true,
+            enabledModules: true,
           },
         },
       },

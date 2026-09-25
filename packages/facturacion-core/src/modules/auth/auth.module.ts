@@ -6,6 +6,7 @@ import { AuthController } from './presentation/controllers/auth.controller';
 import { AuthService } from './application/services/auth.service';
 import { JwtStrategy } from './infrastructure/strategies/jwt.strategy';
 import { EmailVerifiedGuard } from './infrastructure/guards/email-verified.guard';
+import { RequireModuleGuard } from './infrastructure/guards/require-module.guard';
 import { PrismaService } from '../../shared/database/prisma.service';
 
 @Module({
@@ -23,7 +24,7 @@ import { PrismaService } from '../../shared/database/prisma.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, EmailVerifiedGuard, PrismaService],
-  exports: [AuthService, EmailVerifiedGuard],
+  providers: [AuthService, JwtStrategy, EmailVerifiedGuard, RequireModuleGuard, PrismaService],
+  exports: [AuthService, EmailVerifiedGuard, RequireModuleGuard],
 })
 export class AuthModule {}

@@ -41,6 +41,12 @@ enum CompanyStatus {
 
 }
 
+enum InvoicePaymentStatus {
+  PENDING
+  PARTIALLY_PAID
+  PAID
+}
+
 // ==================== USERS ====================
 
 model User {
@@ -66,6 +72,7 @@ model User {
 
   invoices    Invoice[]    @relation("CreatedBy")
   creditNotes CreditNote[] @relation("CreditNotesCreatedBy")
+  payments    Payment[]    @relation("PaymentsCreatedBy")
 
   @@index([email])
   @@index([companyId])
@@ -118,6 +125,9 @@ model Company {
   certificateExpiry   DateTime?
   hasCertificate      Boolean   @default(false)
 
+  // Módulos de producto habilitados para este tenant (ej. "cobranza") — ver RequireModuleGuard
+  enabledModules String[] @default([])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -127,6 +137,7 @@ model Company {
   products       Product[]
   invoices       Invoice[]
   creditNotes    CreditNote[]
+  payments       Payment[]
 
   @@index([ruc])
   @@map("companies")
@@ -190,12 +201,17 @@ model Customer {
   email              String?
   phone              String?
   address            String?
+  // % de retención en la fuente que este cliente aplica habitualmente (ver
+  // PaymentAllocation.retentionAmount) — null/0 = no retiene. Precalcula la
+  // retención al registrar un pago, no hace falta que el usuario la calcule.
+  retentionPercentage Decimal? @db.Decimal(5, 2)
 
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   invoices    Invoice[]
   creditNotes CreditNote[]
+  payments    Payment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -295,6 +311,10 @@ model Invoice {
   // Metadata para integraciones (POS, etc)
   metadata Json?
 
+  // Cobranza: estado de cobro, independiente del estado SRI. Se recalcula
+  // transaccionalmente desde PaymentAllocation (ver PaymentsService)
+  paymentStatus InvoicePaymentStatus @default(PENDING)
+
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
@@ -307,11 +327,13 @@ model Invoice {
   items       InvoiceItem[]
   emailLogs   EmailLog[]
   creditNotes CreditNote[] @relation("InvoiceCreditNotes")
+  allocations PaymentAllocation[]
 
   @@index([accessKey])
   @@index([sriStatus])
   @@index([companyId, issueDate])
   @@index([customerId])
+  @@index([paymentStatus])
   @@map("invoices")
 }
 
@@ -334,6 +356,57 @@ model InvoiceItem {
 
   @@index([invoiceId])
   @@map("invoice_items")
+}
+
+// ==================== PAYMENTS (cobranza) ====================
+// Cuenta corriente por cliente: un Payment puede saldar total o parcialmente
+// una o varias Invoice (ver PaymentAllocation). Módulo gateado por
+// Company.enabledModules — ver RequireModuleGuard.
+
+model Payment {
+  id          String   @id @default(cuid())
+  paymentDate DateTime
+  totalAmount Decimal  @db.Decimal(12, 2)
+  reference   String? // n° de comprobante/transferencia, opcional
+  note        String?
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation("PaymentsCreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  allocations PaymentAllocation[]
+
+  @@index([companyId, customerId])
+  @@map("payments")
+}
+
+model PaymentAllocation {
+  id     String  @id @default(cuid())
+  amount Decimal @db.Decimal(12, 2)
+  // Retención en la fuente aplicada a esta factura dentro de este pago (opcional,
+  // varía por transacción/comprador — no toda la plata "no recibida" es deuda).
+  // Cuenta para saldar la factura (amount + retentionAmount) pero no para
+  // Payment.totalAmount, que sigue siendo solo el efectivo real.
+  retentionAmount Decimal @default(0) @db.Decimal(12, 2)
+
+  paymentId String
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([paymentId, invoiceId])
+  @@index([invoiceId])
+  @@map("payment_allocations")
 }
 
 // ==================== CREDIT NOTES ====================

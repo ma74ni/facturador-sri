@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsOptional, IsNotEmpty, Matches } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsNotEmpty, IsNumber, Min, Max } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateCustomerDto {
@@ -41,4 +41,17 @@ export class CreateCustomerDto {
   @IsString()
   @IsOptional()
   address?: string;
+
+  @ApiProperty({
+    example: 1.5,
+    required: false,
+    description:
+      'Porcentaje de retención en la fuente que este cliente aplica habitualmente (0-100). ' +
+      'Se usa para precalcular la retención al registrar un pago — vacío/0 = no retiene.',
+  })
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  @IsOptional()
+  retentionPercentage?: number;
 }
