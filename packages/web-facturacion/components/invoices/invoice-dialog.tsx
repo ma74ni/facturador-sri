@@ -254,19 +254,25 @@ export function InvoiceDialog({
     discount: i.discount ?? 0,
   }));
 
-  // IVA de la vista previa agrupado por tarifa, como lo calculará el backend.
-  const ivaByRate = Array.from(
+  // Vista previa agrupada por tarifa, como lo calculará el backend: base
+  // imponible de cada tarifa y el IVA solo de las que lo cobran (> 0%).
+  const ivaGroups = Array.from(
     normalized
       .reduce((groups, item) => {
         const code = item.taxPercentageCode ?? "";
-        groups.set(code, (groups.get(code) ?? 0) + item.taxValue);
+        const group = groups.get(code) ?? { taxBase: 0, ivaValue: 0 };
+        groups.set(code, {
+          taxBase: group.taxBase + item.subtotal - item.discount,
+          ivaValue: group.ivaValue + item.taxValue,
+        });
         return groups;
-      }, new Map<string, number>())
+      }, new Map<string, { taxBase: number; ivaValue: number }>())
       .entries()
-  ).map(([code, value]) => ({
+  ).map(([code, amounts]) => ({
     code,
     label: getTaxLabel(taxCodesData?.taxCodes || [], code),
-    value,
+    chargesIva: getTaxPercentage(taxCodesData?.taxCodes || [], code) > 0,
+    ...amounts,
   }));
 
   const totals = normalized.reduce(
@@ -732,26 +738,35 @@ export function InvoiceDialog({
                       </div>
                     )}
 
-                    <div className="flex justify-between items-center text-base border-t border-dashed border-slate-300 pt-3">
-                      <span className="text-slate-700 font-medium">
-                        Base Imponible:
-                      </span>
-                      <span className="font-semibold text-lg">
-                        ${(totals.subtotal - totals.discount).toFixed(2)}
-                      </span>
+                    <div className="space-y-3 border-t border-dashed border-slate-300 pt-3">
+                      {ivaGroups.map((group) => (
+                        <div
+                          key={group.code}
+                          className="flex justify-between items-center text-base"
+                        >
+                          <span className="text-slate-700 font-medium">
+                            Subtotal {group.label}:
+                          </span>
+                          <span className="font-semibold text-lg">
+                            ${group.taxBase.toFixed(2)}
+                          </span>
+                        </div>
+                      ))}
                     </div>
 
-                    {ivaByRate.map((group) => (
-                      <div
-                        key={group.code}
-                        className="flex justify-between items-center text-base"
-                      >
-                        <span className="text-slate-600">{group.label}:</span>
-                        <span className="font-semibold text-lg text-blue-600">
-                          ${group.value.toFixed(2)}
-                        </span>
-                      </div>
-                    ))}
+                    {ivaGroups
+                      .filter((group) => group.chargesIva)
+                      .map((group) => (
+                        <div
+                          key={group.code}
+                          className="flex justify-between items-center text-base"
+                        >
+                          <span className="text-slate-600">{group.label}:</span>
+                          <span className="font-semibold text-lg text-blue-600">
+                            ${group.ivaValue.toFixed(2)}
+                          </span>
+                        </div>
+                      ))}
 
                     <div className="flex justify-between items-center border-t-2 border-primary/30 pt-4 mt-4">
                       <span className="text-xl font-bold text-primary uppercase">

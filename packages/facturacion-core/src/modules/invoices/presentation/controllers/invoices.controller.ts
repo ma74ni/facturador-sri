@@ -82,28 +82,11 @@ export class InvoicesController {
     @Res() res: Response,
   ) {
     const { companyId } = await this.getCompanyIdAndUserId(req.user.userId);
+    const xmlData = await this.invoicesService.getXml(id, companyId);
 
-    const invoice = await this.prisma.invoice.findFirst({
-      where: { id, companyId },
-    });
-
-    if (!invoice) {
-      throw new NotFoundException('Factura no encontrada');
-    }
-
-    if (!invoice.xmlPath) {
-      throw new NotFoundException('XML no encontrado');
-    }
-
-    // Descargar XML desde R2
-    const xmlContent = await this.r2Storage.downloadXml(invoice.xmlPath);
-
-    res.setHeader('Content-Type', 'application/xml');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${invoice.accessKey}.xml"`,
-    );
-    res.send(xmlContent);
+    res.setHeader('Content-Type', xmlData.contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${xmlData.filename}"`);
+    res.send(xmlData.content);
   }
 
   @Get('access-key/:accessKey')

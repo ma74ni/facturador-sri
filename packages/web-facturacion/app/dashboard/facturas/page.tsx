@@ -318,18 +318,24 @@ export default function FacturasPage() {
             <Send className="h-4 w-4 text-blue-600" />
           </Button>
         )}
+        {/* El XML existe desde que se genera, aunque el SRI lo haya rechazado:
+            sirve para revisar qué se envió. */}
+        {factura.xmlPath && (
+          <Button
+            variant="ghost"
+            size="sm"
+            title="Descargar XML"
+            aria-label="Descargar XML"
+            onClick={() => handleDownloadXml(factura.id, numero)}
+            className="h-9 w-9 p-0"
+          >
+            <FileDown
+              className={`h-4 w-4 ${factura.status === 'AUTHORIZED' ? 'text-green-600' : 'text-slate-500'}`}
+            />
+          </Button>
+        )}
         {factura.status === 'AUTHORIZED' && (
           <>
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Descargar XML"
-              aria-label="Descargar XML"
-              onClick={() => handleDownloadXml(factura.id, numero)}
-              className="h-9 w-9 p-0"
-            >
-              <FileDown className="h-4 w-4 text-green-600" />
-            </Button>
             <Button
               variant="ghost"
               size="sm"
