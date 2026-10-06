@@ -15,6 +15,17 @@
   # Habilitar pnpm
   NPM_FLAGS = "--version"
 
+# API por ambiente (se hornea en el build). Producción: rama main en
+# app.facturador.siete8.com. Staging: branch deploy de la rama dev.
+[context.production.environment]
+  NEXT_PUBLIC_API_URL = "https://api.facturador.siete8.com/api/v1"
+
+[context.branch-deploy.environment]
+  NEXT_PUBLIC_API_URL = "https://facturador-core-dev.onrender.com/api/v1"
+
+[context.deploy-preview.environment]
+  NEXT_PUBLIC_API_URL = "https://facturador-core-dev.onrender.com/api/v1"
+
 # Configuración de redirecciones para Next.js App Router
 [[redirects]]
   from = "/*"
