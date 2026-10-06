@@ -455,6 +455,34 @@ export class InvoicesService {
   }
 }
 
+  // ==================== DESCARGA DE XML ====================
+
+  /**
+   * XML de la factura: el firmado (el comprobante válido, el que se envió al
+   * SRI) y, si la firma falló, el generado sin firmar.
+   */
+  async getXml(invoiceId: string, companyId: string) {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id: invoiceId, companyId },
+    });
+
+    if (!invoice) {
+      throw new NotFoundException('Factura no encontrada');
+    }
+
+    const xmlPath = invoice.xmlSignedPath || invoice.xmlPath;
+
+    if (!xmlPath) {
+      throw new NotFoundException('XML no generado para esta factura');
+    }
+
+    return {
+      content: await this.r2Storage.downloadXml(xmlPath),
+      filename: `${invoice.accessKey}.xml`,
+      contentType: 'application/xml',
+    };
+  }
+
    // ==================== GENERACIÓN DE RIDE (PDF) ====================
 
   async generateRide(invoiceId: string, companyId: string) {
