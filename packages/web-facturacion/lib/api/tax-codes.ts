@@ -1,15 +1,23 @@
 import apiClient from './client';
 
+/** Tratamiento de IVA de una tarifa (Tabla 17 del SRI). */
+export type IvaTreatment = 'TAXED' | 'ZERO_RATED' | 'NOT_SUBJECT' | 'EXEMPT';
+
 export interface TaxCode {
   code: string;
   label: string;
   percentage: number;
   description: string;
+  treatment: IvaTreatment;
+  active: boolean;
 }
 
 export interface TaxCodesResponse {
+  /** Tarifas vigentes (las que se pueden elegir). */
   taxCodes: TaxCode[];
   commonCodes: string[];
+  /** Tarifa por defecto para productos nuevos. */
+  defaultCode: string;
   lastUpdated: string;
 }
 

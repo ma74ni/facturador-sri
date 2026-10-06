@@ -1,5 +1,7 @@
-import { IsString, IsNumber, IsOptional, Min } from 'class-validator';
+import { IsIn, IsString, IsNumber, IsOptional, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+import { ACTIVE_IVA_CODES } from '../../../tax-codes/domain/iva-rate.catalog';
 
 export class CreditNoteItemDto {
   @ApiPropertyOptional({
@@ -49,4 +51,15 @@ export class CreditNoteItemDto {
   @IsNumber()
   @Min(0)
   discount?: number;
+
+  @ApiPropertyOptional({
+    example: '4',
+    enum: ACTIVE_IVA_CODES,
+    description:
+      'Tarifa de IVA de la línea. Si se omite, se usa la de la misma línea de la factura ' +
+      'que se modifica y, si no está, la del producto.',
+  })
+  @IsOptional()
+  @IsIn(ACTIVE_IVA_CODES)
+  taxPercentageCode?: string;
 }

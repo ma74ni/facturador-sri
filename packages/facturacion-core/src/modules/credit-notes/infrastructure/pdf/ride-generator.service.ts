@@ -2,12 +2,17 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as PDFDocument from 'pdfkit';
 import * as bwipjs from 'bwip-js';
 import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
+import { ivaSubtotalLabel, IvaTreatment } from '../../../tax-codes/domain/iva-rate.catalog';
+import { TaxCalculatorService } from '../../../tax-codes/domain/services/tax-calculator.service';
 
 @Injectable()
 export class CreditNoteRideGeneratorService {
   private readonly logger = new Logger(CreditNoteRideGeneratorService.name);
 
-  constructor(private r2Storage: R2StorageService) {}
+  constructor(
+    private r2Storage: R2StorageService,
+    private taxCalculator: TaxCalculatorService,
+  ) {}
 
   // ========================= Helpers =========================
   private money(v: any): string {
@@ -570,22 +575,23 @@ export class CreditNoteRideGeneratorService {
       rightY += 10;
     };
 
-    // Subtotales por tarifa IVA (si aplican)
-    if (creditNote.subtotal15) addRow('SUBTOTAL 15%', creditNote.subtotal15);
-    if (creditNote.subtotal5) addRow('SUBTOTAL 5%', creditNote.subtotal5);
-    if (creditNote.subtotal0) addRow('SUBTOTAL 0%', creditNote.subtotal0);
-    if (creditNote.subtotalNoObjeto)
-      addRow('SUBTOTAL NO OBJETO DE IVA', creditNote.subtotalNoObjeto);
-    if (creditNote.subtotalExento) addRow('SUBTOTAL EXENTO DE IVA', creditNote.subtotalExento);
+    // Subtotales e IVA por tarifa, desde el IVA guardado en cada línea.
+    const taxes = this.taxCalculator.summarize(creditNote.items || []);
+    for (const group of taxes.groups) {
+      addRow(ivaSubtotalLabel(group), group.taxBase.toNumber());
+    }
 
-    addRow('SUBTOTAL SIN IMPUESTOS', creditNote.subtotal || 0);
+    addRow('SUBTOTAL SIN IMPUESTOS', taxes.totalWithoutTaxes.toNumber());
 
-    if (creditNote.totalDiscount) addRow('TOTAL DESCUENTO', creditNote.totalDiscount);
+    if (taxes.totalDiscount.gt(0)) addRow('TOTAL DESCUENTO', taxes.totalDiscount.toNumber());
     if (creditNote.iceValue) addRow('ICE', creditNote.iceValue);
     if (creditNote.irbpnrValue) addRow('IRBPNR', creditNote.irbpnrValue);
 
-    if (creditNote.iva5Value) addRow('IVA 5%', creditNote.iva5Value);
-    addRow('IVA 15%', creditNote.ivaValue || 0);
+    const taxedGroups = taxes.groups.filter((group) => group.treatment === IvaTreatment.TAXED);
+    for (const group of taxedGroups) {
+      addRow(`IVA ${group.percentage}%`, group.ivaValue.toNumber());
+    }
+    if (taxedGroups.length === 0) addRow('IVA', 0);
 
     if (creditNote.tip) addRow('PROPINA', creditNote.tip);
 

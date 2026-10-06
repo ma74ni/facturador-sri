@@ -10,6 +10,11 @@ import { SriWebServiceService } from '../../infrastructure/sri/sri-web-service.s
 import { RideGeneratorService } from '../../infrastructure/pdf/ride-generator.service';
 import { EmailService } from '../../../../shared/email/email.service';
 import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
+import { TaxCalculatorService } from '../../../tax-codes/domain/services/tax-calculator.service';
+import {
+  LineIvaResolverService,
+  toBadRequest,
+} from '../../../tax-codes/application/services/line-iva-resolver.service';
 
 @Injectable()
 export class InvoicesService {
@@ -25,6 +30,8 @@ export class InvoicesService {
     private emailService: EmailService,
     private sriService: SriWebServiceService,
     private r2Storage: R2StorageService,
+    private taxCalculator: TaxCalculatorService,
+    private lineIvaResolver: LineIvaResolverService,
   ) {}
 
   async create(dto: CreateInvoiceDto, companyId: string, userId: string) {
@@ -63,31 +70,18 @@ export class InvoicesService {
     const sequential = emissionPoint.invoiceSequence.toString().padStart(9, '0');
     this.logger.log(`📋 Usando secuencial: ${sequential} (no incrementado aún)`);
 
-    // 5. Calcular totales
-    let subtotal = new Decimal(0);
-    let totalDiscount = new Decimal(0);
-    let ivaValue = new Decimal(0);
-
-    const calculatedItems: any[] = [];
-
-    for (const item of dto.items) {
-      const itemSubtotal = new Decimal(item.quantity).mul(item.unitPrice);
-      const itemDiscount = new Decimal(item.discount || 0);
-      const itemTotal = itemSubtotal.sub(itemDiscount);
-
-      subtotal = subtotal.add(itemTotal);
-      totalDiscount = totalDiscount.add(itemDiscount);
-
-      const itemIva = itemTotal.mul(0.15);
-      ivaValue = ivaValue.add(itemIva);
-
-      calculatedItems.push({
-        ...item,
-        subtotal: itemTotal.toNumber(),
-      });
-    }
-
-    const total = subtotal.add(ivaValue);
+    // 5. IVA por línea (tarifa de la línea o de su producto) y totales
+    const ivaCodes = await this.lineIvaResolver.resolve(companyId, dto.items);
+    const taxes = toBadRequest(() =>
+      this.taxCalculator.calculate(
+        dto.items.map((item, index) => ({
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          discount: item.discount,
+          ivaCode: ivaCodes[index],
+        })),
+      ),
+    );
 
     // 6. Generar clave de acceso
     const issueDate = new Date(dto.issueDate);
@@ -115,23 +109,30 @@ export class InvoicesService {
           customerId: customer.id,
           establishmentId: establishment.id,
           emissionPointId: emissionPoint.id,
-          subtotal: subtotal.toNumber(),
-          totalDiscount: totalDiscount.toNumber(),
-          ivaValue: ivaValue.toNumber(),
-          total: total.toNumber(),
+          // subtotal = total sin impuestos (ya neto de descuentos).
+          subtotal: taxes.totalWithoutTaxes,
+          totalDiscount: taxes.totalDiscount,
+          ivaValue: taxes.ivaTotal,
+          total: taxes.total,
           companyId,
           createdById: userId,
           sriStatus: 'DRAFT', // 👈 Estado DRAFT hasta que se firme exitosamente
           items: {
-            create: calculatedItems.map((item) => ({
-              productId: item.productId,
-              mainCode: item.mainCode,
-              description: item.description,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              discount: item.discount || 0,
-              subtotal: item.subtotal,
-            })),
+            create: dto.items.map((item, index) => {
+              const line = taxes.lines[index];
+              return {
+                productId: item.productId,
+                mainCode: item.mainCode,
+                description: item.description,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                discount: item.discount || 0,
+                subtotal: line.taxBase,
+                ivaCode: line.ivaCode,
+                ivaRate: line.ivaRate,
+                ivaValue: line.ivaValue,
+              };
+            }),
           },
         },
         include: {

@@ -2,12 +2,17 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as PDFDocument from 'pdfkit';
 import * as bwipjs from 'bwip-js';
 import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
+import { ivaSubtotalLabel, IvaTreatment } from '../../../tax-codes/domain/iva-rate.catalog';
+import { TaxCalculatorService } from '../../../tax-codes/domain/services/tax-calculator.service';
 
 @Injectable()
 export class RideGeneratorService {
   private readonly logger = new Logger(RideGeneratorService.name);
 
-  constructor(private r2Storage: R2StorageService) {}
+  constructor(
+    private r2Storage: R2StorageService,
+    private taxCalculator: TaxCalculatorService,
+  ) {}
 
   // ========================= Helpers =========================
   private money(v: any): string {
@@ -602,21 +607,23 @@ private drawAdditionalInfoAndTotals(
     rightY += 10;
   };
 
-  // Subtotales por tarifa IVA
-  if (invoice.subtotal15) addRow('SUBTOTAL 15%', invoice.subtotal15);
-  if (invoice.subtotal5) addRow('SUBTOTAL 5%', invoice.subtotal5);
-  if (invoice.subtotal0) addRow('SUBTOTAL 0%', invoice.subtotal0);
-  if (invoice.subtotalNoObjeto) addRow('SUBTOTAL NO OBJETO DE IVA', invoice.subtotalNoObjeto);
-  if (invoice.subtotalExento) addRow('SUBTOTAL EXENTO DE IVA', invoice.subtotalExento);
+  // Subtotales e IVA por tarifa, desde el IVA guardado en cada línea.
+  const taxes = this.taxCalculator.summarize(invoice.items || []);
+  for (const group of taxes.groups) {
+    addRow(ivaSubtotalLabel(group), group.taxBase.toNumber());
+  }
 
-  addRow('SUBTOTAL SIN IMPUESTOS', invoice.subtotal || 0);
+  addRow('SUBTOTAL SIN IMPUESTOS', taxes.totalWithoutTaxes.toNumber());
 
-  if (invoice.totalDiscount) addRow('TOTAL DESCUENTO', invoice.totalDiscount);
+  if (taxes.totalDiscount.gt(0)) addRow('TOTAL DESCUENTO', taxes.totalDiscount.toNumber());
   if (invoice.iceValue) addRow('ICE', invoice.iceValue);
   if (invoice.irbpnrValue) addRow('IRBPNR', invoice.irbpnrValue);
 
-  if (invoice.iva5Value) addRow('IVA 5%', invoice.iva5Value);
-  addRow('IVA 15%', invoice.ivaValue || 0);
+  const taxedGroups = taxes.groups.filter((group) => group.treatment === IvaTreatment.TAXED);
+  for (const group of taxedGroups) {
+    addRow(`IVA ${group.percentage}%`, group.ivaValue.toNumber());
+  }
+  if (taxedGroups.length === 0) addRow('IVA', 0);
 
   if (invoice.tip) addRow('PROPINA', invoice.tip);
 

@@ -47,6 +47,8 @@ export interface InvoiceItemDto {
   unitPrice: number;
   discount?: number;
   productId?: string;
+  /** Tarifa de IVA de la línea (Tabla 17 del SRI); si falta, el backend usa la del producto. */
+  taxPercentageCode?: string;
 }
 
 export interface CreateInvoiceDto {

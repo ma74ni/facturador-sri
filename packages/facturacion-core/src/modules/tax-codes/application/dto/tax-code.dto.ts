@@ -1,39 +1,41 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+import { IvaTreatment } from '../../domain/iva-rate.catalog';
+
 export class TaxCodeDto {
-  @ApiProperty({ example: '2', description: 'Código del porcentaje de IVA según SRI' })
+  @ApiProperty({ example: '4', description: 'codigoPorcentaje de IVA (Tabla 17 del SRI)' })
   code: string;
 
   @ApiProperty({ example: 'IVA 15%', description: 'Etiqueta descriptiva del impuesto' })
   label: string;
 
-  @ApiProperty({ example: 15, description: 'Porcentaje del impuesto' })
+  @ApiProperty({ example: 15, description: 'Tarifa en porcentaje' })
   percentage: number;
 
-  @ApiProperty({
-    example: 'Tarifa 15% - Tarifa vigente actual',
-    description: 'Descripción detallada del código de impuesto'
-  })
+  @ApiProperty({ example: 'Tarifa general vigente', description: 'Descripción de la tarifa' })
   description: string;
+
+  @ApiProperty({ enum: IvaTreatment, example: IvaTreatment.TAXED })
+  treatment: IvaTreatment;
+
+  @ApiProperty({ example: true, description: 'Se puede usar en comprobantes nuevos' })
+  active: boolean;
 }
 
 export class TaxCodesResponseDto {
-  @ApiProperty({
-    type: [TaxCodeDto],
-    description: 'Lista de códigos de impuesto disponibles'
-  })
+  @ApiProperty({ type: [TaxCodeDto], description: 'Tarifas vigentes' })
   taxCodes: TaxCodeDto[];
 
   @ApiProperty({
     type: [String],
-    example: ['2', '0', '6', '7'],
-    description: 'Códigos más comunes para uso en selectores'
+    example: ['0', '4', '5', '6', '7'],
+    description: 'Códigos para los selectores',
   })
   commonCodes: string[];
 
-  @ApiProperty({
-    example: '2025-01-29',
-    description: 'Última fecha de actualización de las tarifas'
-  })
+  @ApiProperty({ example: '4', description: 'Tarifa por defecto para productos nuevos' })
+  defaultCode: string;
+
+  @ApiProperty({ example: '2026-10-06', description: 'Última revisión del catálogo' })
   lastUpdated: string;
 }

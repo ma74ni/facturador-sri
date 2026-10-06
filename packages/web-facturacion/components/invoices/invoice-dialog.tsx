@@ -44,7 +44,7 @@ import {
   useUpdateCustomer,
 } from "@/lib/hooks/use-customers";
 import { useCreateProduct } from "@/lib/hooks/use-products";
-import { useTaxCodes, getTaxPercentage } from "@/lib/hooks/use-tax-codes";
+import { useTaxCodes, getTaxLabel, getTaxPercentage } from "@/lib/hooks/use-tax-codes";
 import { useCertificateStatus } from "@/lib/hooks/use-certificate";
 import { CertificateRequiredDialog } from "@/components/shared/certificate-required-dialog";
 
@@ -254,6 +254,21 @@ export function InvoiceDialog({
     discount: i.discount ?? 0,
   }));
 
+  // IVA de la vista previa agrupado por tarifa, como lo calculará el backend.
+  const ivaByRate = Array.from(
+    normalized
+      .reduce((groups, item) => {
+        const code = item.taxPercentageCode ?? "";
+        groups.set(code, (groups.get(code) ?? 0) + item.taxValue);
+        return groups;
+      }, new Map<string, number>())
+      .entries()
+  ).map(([code, value]) => ({
+    code,
+    label: getTaxLabel(taxCodesData?.taxCodes || [], code),
+    value,
+  }));
+
   const totals = normalized.reduce(
     (acc, item) => ({
       subtotal: acc.subtotal + item.subtotal,
@@ -304,7 +319,8 @@ export function InvoiceDialog({
         establishmentId: selectedEstablishment,
         emissionPointId: selectedEmissionPoint,
         items: items.map(
-          ({ subtotal, taxValue, total, taxPercentageCode, ...item }) => item
+          // La tarifa de cada línea viaja al backend; los totales los recalcula él.
+          ({ subtotal, taxValue, total, ...item }) => item
         ),
         metadata: {
           paymentMethod,
@@ -725,12 +741,17 @@ export function InvoiceDialog({
                       </span>
                     </div>
 
-                    <div className="flex justify-between items-center text-base">
-                      <span className="text-slate-600">IVA (15%):</span>
-                      <span className="font-semibold text-lg text-blue-600">
-                        ${totals.tax.toFixed(2)}
-                      </span>
-                    </div>
+                    {ivaByRate.map((group) => (
+                      <div
+                        key={group.code}
+                        className="flex justify-between items-center text-base"
+                      >
+                        <span className="text-slate-600">{group.label}:</span>
+                        <span className="font-semibold text-lg text-blue-600">
+                          ${group.value.toFixed(2)}
+                        </span>
+                      </div>
+                    ))}
 
                     <div className="flex justify-between items-center border-t-2 border-primary/30 pt-4 mt-4">
                       <span className="text-xl font-bold text-primary uppercase">

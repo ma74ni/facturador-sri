@@ -45,8 +45,8 @@ export class TaxCodesController {
   })
   @ApiParam({
     name: 'code',
-    description: 'Código del impuesto (ej: 2, 0, 6, 7)',
-    example: '2',
+    description: 'codigoPorcentaje de IVA (ej: 4 = 15%, 0 = 0%)',
+    example: '4',
   })
   @ApiResponse({
     status: 200,

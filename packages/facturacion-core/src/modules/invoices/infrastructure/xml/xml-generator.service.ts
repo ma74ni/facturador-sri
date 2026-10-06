@@ -1,9 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { create } from 'xmlbuilder2';
 
+import { SRI_IVA_TAX_CODE } from '../../../tax-codes/domain/iva-rate.catalog';
+import { TaxCalculatorService } from '../../../tax-codes/domain/services/tax-calculator.service';
+
 @Injectable()
 export class XmlGeneratorService {
   private readonly logger = new Logger(XmlGeneratorService.name);
+
+  constructor(private readonly taxCalculator: TaxCalculatorService) {}
 
   /**
    * Formatea una fecha a DD/MM/YYYY en UTC (issueDate se guarda normalizado
@@ -114,29 +119,28 @@ export class XmlGeneratorService {
       infoFactura.ele('direccionComprador').txt(invoice.customer.address);
     }
     
-    // Totales
-    // totalSinImpuestos = subtotal - totalDescuento (base imponible)
-    const subtotalSinImpuestos = parseFloat(invoice.subtotal) - parseFloat(invoice.totalDiscount);
-    infoFactura.ele('totalSinImpuestos').txt(subtotalSinImpuestos.toFixed(2));
-    infoFactura.ele('totalDescuento').txt(parseFloat(invoice.totalDiscount).toFixed(2));
+    // Totales, agrupados por tarifa desde el IVA guardado en cada línea.
+    // invoice.subtotal ya es la base neta de descuentos (totalSinImpuestos).
+    const taxes = this.taxCalculator.summarize(invoice.items);
+    infoFactura.ele('totalSinImpuestos').txt(taxes.totalWithoutTaxes.toFixed(2));
+    infoFactura.ele('totalDescuento').txt(taxes.totalDiscount.toFixed(2));
 
     // ==================== TOTAL CON IMPUESTOS ====================
+    // Un totalImpuesto por tarifa presente (también 0 %, no objeto y exento).
     const totalConImpuestos = infoFactura.ele('totalConImpuestos');
-
-    // IVA 15% (código 4) - Solo si hay productos con IVA 15%
-    if (subtotalSinImpuestos > 0) {
+    for (const group of taxes.groups) {
       const totalImpuesto = totalConImpuestos.ele('totalImpuesto');
-      totalImpuesto.ele('codigo').txt('2'); // 2 = IVA
-      totalImpuesto.ele('codigoPorcentaje').txt('4'); // 4 = 15%
-      totalImpuesto.ele('baseImponible').txt(subtotalSinImpuestos.toFixed(2));
-      totalImpuesto.ele('valor').txt(parseFloat(invoice.ivaValue).toFixed(2));
+      totalImpuesto.ele('codigo').txt(SRI_IVA_TAX_CODE);
+      totalImpuesto.ele('codigoPorcentaje').txt(group.ivaCode);
+      totalImpuesto.ele('baseImponible').txt(group.taxBase.toFixed(2));
+      totalImpuesto.ele('valor').txt(group.ivaValue.toFixed(2));
     }
-    
+
     // Propina (generalmente 0)
     infoFactura.ele('propina').txt('0.00');
 
     // Importe total = totalSinImpuestos + IVA + propina
-    infoFactura.ele('importeTotal').txt(parseFloat(invoice.total).toFixed(2));
+    infoFactura.ele('importeTotal').txt(taxes.total.toFixed(2));
     
     // Moneda
     infoFactura.ele('moneda').txt('DOLAR');
@@ -145,7 +149,7 @@ export class XmlGeneratorService {
     const pagos = infoFactura.ele('pagos');
     const pago = pagos.ele('pago');
     pago.ele('formaPago').txt('01'); // 01 = Sin utilización del sistema financiero
-    pago.ele('total').txt(invoice.total.toFixed(2));
+    pago.ele('total').txt(taxes.total.toFixed(2));
     pago.ele('plazo').txt('0');
     pago.ele('unidadTiempo').txt('dias');
 
@@ -162,20 +166,16 @@ export class XmlGeneratorService {
       detalle.ele('precioUnitario').txt(parseFloat(item.unitPrice).toFixed(6));
       detalle.ele('descuento').txt(parseFloat(item.discount).toFixed(2));
 
-      // precioTotalSinImpuesto = (cantidad * precioUnitario) - descuento
-      const precioTotal = (parseFloat(item.quantity) * parseFloat(item.unitPrice)) - parseFloat(item.discount);
-      detalle.ele('precioTotalSinImpuesto').txt(precioTotal.toFixed(2));
+      // precioTotalSinImpuesto e IVA de la línea: lo que se guardó al emitir.
+      detalle.ele('precioTotalSinImpuesto').txt(parseFloat(item.subtotal).toFixed(2));
 
-      // Impuestos del item
       const impuestos = detalle.ele('impuestos');
       const impuesto = impuestos.ele('impuesto');
-      impuesto.ele('codigo').txt('2'); // IVA
-      impuesto.ele('codigoPorcentaje').txt('4'); // 4 = 15%
-      impuesto.ele('tarifa').txt('15.00'); // Tarifa 15%
-      impuesto.ele('baseImponible').txt(precioTotal.toFixed(2));
-
-      const ivaItem = precioTotal * 0.15;
-      impuesto.ele('valor').txt(ivaItem.toFixed(2));
+      impuesto.ele('codigo').txt(SRI_IVA_TAX_CODE);
+      impuesto.ele('codigoPorcentaje').txt(item.ivaCode);
+      impuesto.ele('tarifa').txt(parseFloat(item.ivaRate).toFixed(2));
+      impuesto.ele('baseImponible').txt(parseFloat(item.subtotal).toFixed(2));
+      impuesto.ele('valor').txt(parseFloat(item.ivaValue).toFixed(2));
     }
 
     // ==================== INFO ADICIONAL (OPCIONAL) ====================

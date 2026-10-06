@@ -1,8 +1,17 @@
 import { Injectable } from '@nestjs/common';
+import { Decimal } from '@prisma/client/runtime/library';
 import { create } from 'xmlbuilder2';
+
+import { SRI_IVA_TAX_CODE } from '../../../tax-codes/domain/iva-rate.catalog';
+import {
+  IvaGroup,
+  TaxCalculatorService,
+} from '../../../tax-codes/domain/services/tax-calculator.service';
 
 @Injectable()
 export class CreditNoteXmlGeneratorService {
+  constructor(private readonly taxCalculator: TaxCalculatorService) {}
+
   /**
    * Formatea una fecha a DD/MM/YYYY en UTC (issueDate se guarda normalizado
    * a medianoche UTC). Usar dayjs/Date sin fijar UTC toma la hora LOCAL del
@@ -90,27 +99,29 @@ export class CreditNoteXmlGeneratorService {
     // 4. totalConImpuestos
     // 5. motivo
 
-    infoNotaCredito.ele('totalSinImpuestos').txt(creditNote.subtotal.toFixed(2));
-    infoNotaCredito.ele('valorModificacion').txt(creditNote.total.toFixed(2));
+    const taxes = this.taxCalculator.summarize(creditNote.items);
+    infoNotaCredito.ele('totalSinImpuestos').txt(taxes.totalWithoutTaxes.toFixed(2));
+    infoNotaCredito.ele('valorModificacion').txt(taxes.total.toFixed(2));
     infoNotaCredito.ele('moneda').txt('DOLAR');
 
     // ==================== TOTAL CON IMPUESTOS ====================
+    // Un totalImpuesto por tarifa presente, desde el IVA guardado en cada
+    // línea. Se mantiene siempre un grupo 0 % (aunque esté en cero): el SRI
+    // lo exigió en las pruebas de esta integración.
     const totalConImpuestos = infoNotaCredito.ele('totalConImpuestos');
-
-    // IVA 15% (código 4)
-    const totalImpuesto = totalConImpuestos.ele('totalImpuesto');
-    totalImpuesto.ele('codigo').txt('2'); // 2 = IVA
-    totalImpuesto.ele('codigoPorcentaje').txt('4'); // 4 = 15%
-    totalImpuesto.ele('baseImponible').txt(creditNote.subtotal.toFixed(2));
-    totalImpuesto.ele('valor').txt(creditNote.ivaValue.toFixed(2));
-    totalImpuesto.ele('valorDevolucionIva').txt('0.00'); // Campo requerido por SRI
-
-    // IVA 0% (obligatorio para validación del SRI)
-    const totalImpuesto0 = totalConImpuestos.ele('totalImpuesto');
-    totalImpuesto0.ele('codigo').txt('2');
-    totalImpuesto0.ele('codigoPorcentaje').txt('0'); // 0 = 0%
-    totalImpuesto0.ele('baseImponible').txt('0.00');
-    totalImpuesto0.ele('valor').txt('0.00');
+    const groups: Pick<IvaGroup, 'ivaCode' | 'taxBase' | 'ivaValue'>[] = taxes.groups.some(
+      (group) => group.ivaCode === '0',
+    )
+      ? taxes.groups
+      : [...taxes.groups, { ivaCode: '0', taxBase: new Decimal(0), ivaValue: new Decimal(0) }];
+    for (const group of groups) {
+      const totalImpuesto = totalConImpuestos.ele('totalImpuesto');
+      totalImpuesto.ele('codigo').txt(SRI_IVA_TAX_CODE);
+      totalImpuesto.ele('codigoPorcentaje').txt(group.ivaCode);
+      totalImpuesto.ele('baseImponible').txt(group.taxBase.toFixed(2));
+      totalImpuesto.ele('valor').txt(group.ivaValue.toFixed(2));
+      totalImpuesto.ele('valorDevolucionIva').txt('0.00');
+    }
 
     // Motivo de la nota de crédito (DEBE IR AL FINAL)
     infoNotaCredito.ele('motivo').txt(creditNote.reason);
@@ -129,16 +140,14 @@ export class CreditNoteXmlGeneratorService {
       detalle.ele('descuento').txt(item.discount.toFixed(2));
       detalle.ele('precioTotalSinImpuesto').txt(item.subtotal.toFixed(2));
 
-      // Impuestos del item
+      // IVA de la línea: lo que se guardó al emitir la nota.
       const impuestos = detalle.ele('impuestos');
       const impuesto = impuestos.ele('impuesto');
-      impuesto.ele('codigo').txt('2'); // IVA
-      impuesto.ele('codigoPorcentaje').txt('4'); // 15%
-      impuesto.ele('tarifa').txt('15'); // Tarifa solo va en detalles
-      impuesto.ele('baseImponible').txt(item.subtotal.toFixed(2));
-
-      const ivaItem = parseFloat(item.subtotal) * 0.15;
-      impuesto.ele('valor').txt(ivaItem.toFixed(2));
+      impuesto.ele('codigo').txt(SRI_IVA_TAX_CODE);
+      impuesto.ele('codigoPorcentaje').txt(item.ivaCode);
+      impuesto.ele('tarifa').txt(parseFloat(item.ivaRate).toFixed(2));
+      impuesto.ele('baseImponible').txt(parseFloat(item.subtotal).toFixed(2));
+      impuesto.ele('valor').txt(parseFloat(item.ivaValue).toFixed(2));
     }
 
     // ==================== INFO ADICIONAL (OPCIONAL) ====================
