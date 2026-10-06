@@ -70,13 +70,21 @@ export class AccessKeyService {
     // Retornar clave completa de 49 dígitos
     const fullKey = base48 + checkDigit;
 
+    // El SRI rechaza toda clave que no sea de 49 dígitos ("ARCHIVO NO CUMPLE
+    // ESTRUCTURA XML"); mejor fallar aquí que emitir un comprobante inválido.
+    if (!/^\d{49}$/.test(fullKey)) {
+      throw new Error(`Error: la clave de acceso debe tener 49 dígitos, tiene ${fullKey.length}`);
+    }
+
     console.log(`🔑 Clave de acceso generada: ${fullKey} (longitud: ${fullKey.length})`);
 
     return fullKey;
   }
 
   /**
-   * Calcula el dígito verificador usando módulo 11
+   * Calcula el dígito verificador usando módulo 11 (factores 2..7 de derecha
+   * a izquierda). Ficha técnica del SRI: si 11 - residuo da 11 el dígito es 0
+   * y si da 10 el dígito es 1, para que siempre sea un único dígito.
    */
   private calculateModule11(key: string): string {
     let sum = 0;
@@ -88,10 +96,10 @@ export class AccessKeyService {
       factor = factor === 7 ? 2 : factor + 1;
     }
 
-    const mod = sum % 11;
-    const checkDigit = mod === 0 ? 0 : 11 - mod;
-
-    return checkDigit === 11 ? '0' : checkDigit.toString();
+    const checkDigit = 11 - (sum % 11);
+    if (checkDigit === 11) return '0';
+    if (checkDigit === 10) return '1';
+    return checkDigit.toString();
   }
 
   /**
