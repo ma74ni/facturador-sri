@@ -350,7 +350,14 @@ model InvoiceItem {
   quantity    Decimal @db.Decimal(12, 6)
   unitPrice   Decimal @db.Decimal(12, 6)
   discount    Decimal @default(0) @db.Decimal(12, 2)
+  // Base imponible de la línea (precioTotalSinImpuesto del SRI).
   subtotal    Decimal @db.Decimal(12, 2)
+
+  // IVA de la línea al momento de la emisión: si el producto cambia de
+  // tarifa después, el comprobante no cambia. Tabla 17 del SRI.
+  ivaCode  String
+  ivaRate  Decimal @db.Decimal(5, 2)
+  ivaValue Decimal @db.Decimal(12, 2)
 
   createdAt DateTime @default(now())
 
@@ -495,7 +502,13 @@ model CreditNoteItem {
   quantity    Decimal @db.Decimal(12, 6)
   unitPrice   Decimal @db.Decimal(12, 6)
   discount    Decimal @default(0) @db.Decimal(12, 2)
+  // Base imponible de la línea (precioTotalSinImpuesto del SRI).
   subtotal    Decimal @db.Decimal(12, 2)
+
+  // IVA de la línea al momento de la emisión. Tabla 17 del SRI.
+  ivaCode  String
+  ivaRate  Decimal @db.Decimal(5, 2)
+  ivaValue Decimal @db.Decimal(12, 2)
 
   createdAt DateTime @default(now())
 

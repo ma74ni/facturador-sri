@@ -1,114 +1,52 @@
 import { Injectable } from '@nestjs/common';
+
+import {
+  activeIvaRates,
+  DEFAULT_IVA_CODE,
+  findIvaRate,
+  IvaRate,
+} from '../../domain/iva-rate.catalog';
 import { TaxCodeDto, TaxCodesResponseDto } from '../dto/tax-code.dto';
 
 /**
- * Servicio para gestionar los códigos de impuestos del SRI Ecuador
- *
- * IMPORTANTE: Estos valores pueden cambiar según decretos del SRI.
- * Actualizar este servicio cuando haya cambios en las tarifas de IVA.
- *
- * Última actualización: 2025-01-29
- * Referencia: https://www.sri.gob.ec/
+ * Códigos de IVA para la API (selectores de producto, etiquetas). Lee el
+ * catálogo del dominio (`iva-rate.catalog.ts`, Tabla 17 del SRI): aquí no se
+ * define ninguna tarifa.
  */
 @Injectable()
 export class TaxCodesService {
-  /**
-   * Códigos de porcentaje de IVA según tabla del SRI
-   */
-  private readonly taxCodes: Record<string, TaxCodeDto> = {
-    '0': {
-      code: '0',
-      label: '0%',
-      percentage: 0,
-      description: 'Tarifa 0% - Productos y servicios gravados con tarifa 0%',
-    },
-    '2': {
-      code: '2',
-      label: '15%',
-      percentage: 15,
-      description: 'Tarifa 15% - Tarifa vigente actual desde 2024',
-    },
-    '3': {
-      code: '3',
-      label: '5%',
-      percentage: 5,
-      description: 'Tarifa 5% - Código alternativo',
-    },
-    '4': {
-      code: '4',
-      label: 'IVA 15%',
-      percentage: 15,
-      description: 'Tarifa 15% - Código alternativo adicional',
-    },
-    '6': {
-      code: '6',
-      label: 'No objeto de IVA',
-      percentage: 0,
-      description: 'No objeto de impuesto - Productos/servicios no gravados',
-    },
-    '7': {
-      code: '7',
-      label: 'Exento de IVA',
-      percentage: 0,
-      description: 'Exento de IVA - Productos/servicios con exención',
-    },
-  };
+  /** Fecha de la última revisión del catálogo contra la ficha técnica. */
+  private readonly lastUpdated = '2026-10-06';
 
-  /**
-   * Códigos de impuesto más comunes (para selectores en UI)
-   */
-  private readonly commonCodes = ['2', '3', '0', '6', '7'];
-
-  /**
-   * Fecha de última actualización de las tarifas
-   */
-  private readonly lastUpdated = '2025-01-29';
-
-  /**
-   * Obtiene todos los códigos de impuesto disponibles
-   */
+  /** Las tarifas vigentes, para elegir en productos y comprobantes nuevos. */
   getAllTaxCodes(): TaxCodesResponseDto {
+    const taxCodes = activeIvaRates().map(toDto);
     return {
-      taxCodes: Object.values(this.taxCodes),
-      commonCodes: this.commonCodes,
+      taxCodes,
+      commonCodes: taxCodes.map((taxCode) => taxCode.code),
+      defaultCode: DEFAULT_IVA_CODE,
       lastUpdated: this.lastUpdated,
     };
   }
 
-  /**
-   * Obtiene un código de impuesto específico por su código
-   */
+  /** Cualquier tarifa conocida, vigente o histórica (para mostrar documentos viejos). */
   getTaxCodeByCode(code: string): TaxCodeDto | null {
-    return this.taxCodes[code] || null;
+    const rate = findIvaRate(code);
+    return rate ? toDto(rate) : null;
   }
 
-  /**
-   * Obtiene el porcentaje de un código de impuesto
-   */
-  getTaxPercentage(code: string): number {
-    return this.taxCodes[code]?.percentage || 0;
-  }
-
-  /**
-   * Obtiene el label de un código de impuesto
-   */
-  getTaxLabel(code: string): string {
-    return this.taxCodes[code]?.label || `IVA (${code})`;
-  }
-
-  /**
-   * Valida si un código de impuesto existe
-   */
-  isValidTaxCode(code: string): boolean {
-    return code in this.taxCodes;
-  }
-
-  /**
-   * Obtiene solo los códigos más comunes
-   */
   getCommonTaxCodes(): TaxCodeDto[] {
-    return this.commonCodes
-      .map((code) => this.taxCodes[code])
-      .filter((taxCode) => taxCode !== undefined);
+    return activeIvaRates().map(toDto);
   }
+}
+
+function toDto(rate: IvaRate): TaxCodeDto {
+  return {
+    code: rate.code,
+    label: rate.label,
+    percentage: rate.percentage,
+    description: rate.description,
+    treatment: rate.treatment,
+    active: rate.active,
+  };
 }

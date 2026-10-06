@@ -1,6 +1,8 @@
-import { IsString, IsNotEmpty, IsOptional, IsDecimal, IsNumber } from 'class-validator';
+import { IsIn, IsString, IsNotEmpty, IsOptional, IsNumber } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+
+import { ACTIVE_IVA_CODES, SRI_IVA_TAX_CODE } from '../../../tax-codes/domain/iva-rate.catalog';
 
 export class CreateProductDto {
   @ApiProperty({ example: 'PROD-001', description: 'Código principal del producto' })
@@ -23,19 +25,20 @@ export class CreateProductDto {
   @IsNumber()
   unitPrice: number;
 
-  @ApiProperty({ 
-    example: '2', 
-    description: 'Código impuesto SRI: 2=IVA, 3=ICE, 5=IRBPNR, 0=Sin impuesto' 
+  @ApiProperty({
+    example: SRI_IVA_TAX_CODE,
+    enum: [SRI_IVA_TAX_CODE],
+    description: 'Código del impuesto (Tabla 16 del SRI). Hoy solo IVA: 2.',
   })
-  @IsString()
-  @IsNotEmpty()
+  @IsIn([SRI_IVA_TAX_CODE])
   taxCode: string;
 
-  @ApiProperty({ 
-    example: '2', 
-    description: 'Código % impuesto: 0=0%, 2=12%, 3=14%, 4=15%, 6=5%, 7=8%' 
+  @ApiProperty({
+    example: '4',
+    enum: ACTIVE_IVA_CODES,
+    description:
+      'Tarifa de IVA (Tabla 17 del SRI): 0 = 0%, 4 = 15%, 5 = 5%, 6 = no objeto, 7 = exento.',
   })
-  @IsString()
-  @IsNotEmpty()
+  @IsIn(ACTIVE_IVA_CODES)
   taxPercentageCode: string;
 }

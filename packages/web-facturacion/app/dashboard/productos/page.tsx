@@ -420,12 +420,19 @@ export default function ProductosPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                Con IVA 15%
+                Con IVA
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {products.filter(p => ['2', '3'].includes(p.taxPercentageCode)).length}
+                {
+                  products.filter((p) =>
+                    taxCodesData?.taxCodes.some(
+                      (taxCode) =>
+                        taxCode.code === p.taxPercentageCode && taxCode.treatment === 'TAXED'
+                    )
+                  ).length
+                }
               </div>
               <p className="text-xs text-muted-foreground">
                 productos gravados

@@ -8,8 +8,10 @@ import { DigitalSignatureService } from './infrastructure/xml/digital-signature.
 import { PrismaService } from '../../shared/database/prisma.service';
 import { SriWebServiceService } from './infrastructure/sri/sri-web-service.service';
 import { RideGeneratorService } from './infrastructure/pdf/ride-generator.service';
+import { TaxCodesModule } from '../tax-codes/tax-codes.module';
 
 @Module({
+  imports: [TaxCodesModule],
   controllers: [InvoicesController],
   providers: [
     InvoicesService,

@@ -13,8 +13,10 @@ import { AccessKeyService } from '../invoices/domain/services/access-key.service
 import { DigitalSignatureService } from '../invoices/infrastructure/xml/digital-signature.service';
 import { SriWebServiceService } from '../invoices/infrastructure/sri/sri-web-service.service';
 import { MailjetProvider } from '../../shared/email/providers/mailjet.provider';
+import { TaxCodesModule } from '../tax-codes/tax-codes.module';
 
 @Module({
+  imports: [TaxCodesModule],
   controllers: [CreditNotesController],
   providers: [
     CreditNotesService,

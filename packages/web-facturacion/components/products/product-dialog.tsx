@@ -26,6 +26,20 @@ import { Product, CreateProductDto } from '@/lib/api/products';
 import { AlertCircle } from 'lucide-react';
 import { useTaxCodes, getTaxLabel } from '@/lib/hooks/use-tax-codes';
 
+/** Producto en blanco; el IVA siempre es el impuesto 2 de la Tabla 16 del SRI. */
+function emptyProduct(taxPercentageCode: string): CreateProductDto {
+  return {
+    mainCode: '',
+    auxiliaryCode: '',
+    name: '',
+    description: '',
+    unitPrice: 0,
+    cost: 0,
+    taxCode: '2',
+    taxPercentageCode,
+  };
+}
+
 interface ProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -37,16 +51,9 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
   const { data: taxCodesData, isLoading: taxCodesLoading } = useTaxCodes();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [formData, setFormData] = useState<CreateProductDto>({
-    mainCode: '',
-    auxiliaryCode: '',
-    name: '',
-    description: '',
-    unitPrice: 0,
-    cost: 0,
-    taxCode: '2',
-    taxPercentageCode: '2',
-  });
+  // La tarifa por defecto la define el catálogo del backend (Tabla 17 del SRI).
+  const defaultIvaCode = taxCodesData?.defaultCode ?? '';
+  const [formData, setFormData] = useState<CreateProductDto>(() => emptyProduct(defaultIvaCode));
 
   useEffect(() => {
     if (product) {
@@ -61,19 +68,19 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
         taxPercentageCode: product.taxPercentageCode,
       });
     } else {
-      setFormData({
-        mainCode: '',
-        auxiliaryCode: '',
-        name: '',
-        description: '',
-        unitPrice: 0,
-        cost: 0,
-        taxCode: '2',
-        taxPercentageCode: '2',
-      });
+      setFormData(emptyProduct(defaultIvaCode));
     }
     setErrors({});
-  }, [product, open]);
+  }, [product, open, defaultIvaCode]);
+
+  // Referencia para quien piensa en el precio final: lo que pagará el cliente.
+  const selectedTaxCode = taxCodesData?.taxCodes.find(
+    (taxCode) => taxCode.code === formData.taxPercentageCode
+  );
+  const priceWithIva =
+    selectedTaxCode && formData.unitPrice > 0
+      ? formData.unitPrice * (1 + selectedTaxCode.percentage / 100)
+      : null;
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -96,6 +103,12 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
     // Validar costo (opcional, pero si existe debe ser positivo)
     if (formData.cost && formData.cost < 0) {
       newErrors.cost = 'El costo no puede ser negativo';
+    }
+
+    // Validar tarifa de IVA (debe ser una de las vigentes del catálogo)
+    const validCodes = taxCodesData?.taxCodes.map((taxCode) => taxCode.code) ?? [];
+    if (!validCodes.includes(formData.taxPercentageCode)) {
+      newErrors.taxPercentageCode = 'Elige el tipo de IVA del producto';
     }
 
     setErrors(newErrors);
@@ -214,7 +227,7 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
           {/* Precio y Costo */}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="unitPrice">Precio Unitario * ($)</Label>
+              <Label htmlFor="unitPrice">Precio unitario sin IVA * ($)</Label>
               <NumberInput
                 id="unitPrice"
                 value={formData.unitPrice}
@@ -230,11 +243,18 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
                 placeholder="Ej: 15.99"
                 className={errors.unitPrice ? 'border-red-500' : ''}
               />
-              {errors.unitPrice && (
+              {errors.unitPrice ? (
                 <div className="flex items-center gap-1 text-sm text-red-500">
                   <AlertCircle className="h-4 w-4" />
                   <span>{errors.unitPrice}</span>
                 </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Ingresa el precio <strong>sin IVA</strong>: el IVA se suma al facturar.
+                  {priceWithIva !== null && (
+                    <> Precio final con IVA: ${priceWithIva.toFixed(2)}.</>
+                  )}
+                </p>
               )}
             </div>
 
@@ -290,9 +310,16 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
                 )}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">
-              Selecciona el tipo de IVA que aplica a este producto según la normativa del SRI
-            </p>
+            {errors.taxPercentageCode ? (
+              <div className="flex items-center gap-1 text-sm text-red-500">
+                <AlertCircle className="h-4 w-4" />
+                <span>{errors.taxPercentageCode}</span>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Selecciona el tipo de IVA que aplica a este producto según la normativa del SRI
+              </p>
+            )}
           </div>
           {/* Margen de Ganancia (Informativo) */}
           {/* {formData.cost && formData.cost > 0 && formData.unitPrice > 0 && (
