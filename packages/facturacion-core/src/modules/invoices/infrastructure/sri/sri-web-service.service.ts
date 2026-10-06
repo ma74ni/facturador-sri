@@ -91,7 +91,7 @@ export class SriWebServiceService {
           success: respuesta.estado === 'RECIBIDA',
           claveAcceso: respuesta.claveAccesoComprobante || claveAcceso,
           estado: respuesta.estado,
-          mensaje: respuesta.comprobantes?.comprobante?.mensajes?.mensaje?.mensaje,
+          mensaje: this.describeReceptionMessages(respuesta.comprobantes?.comprobante?.mensajes?.mensaje),
           comprobantes: respuesta.comprobantes,
         };
 
@@ -117,6 +117,24 @@ export class SriWebServiceService {
 
     // Este código nunca debería ejecutarse, pero TypeScript lo requiere
     throw new InternalServerErrorException('Error inesperado al enviar al SRI');
+  }
+
+  /**
+   * Une los mensajes de recepción del SRI (uno o varios) con su
+   * `informacionAdicional`, que es donde el SRI indica qué etiqueta o valor
+   * incumple — sin ese detalle "ARCHIVO NO CUMPLE ESTRUCTURA XML" no dice nada.
+   */
+  private describeReceptionMessages(mensajes: unknown): string | undefined {
+    const list = (Array.isArray(mensajes) ? mensajes : mensajes ? [mensajes] : []) as Array<{
+      mensaje?: string;
+      informacionAdicional?: string;
+    }>;
+    const parts = list
+      .map(({ mensaje, informacionAdicional }) =>
+        [mensaje, informacionAdicional].filter(Boolean).join(': '),
+      )
+      .filter(Boolean);
+    return parts.length > 0 ? parts.join('; ') : undefined;
   }
 
   /**
