@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../../../shared/database/prisma.service';
 import * as forge from 'node-forge';
 import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
+import { sealCertificatePassword } from '../../../../shared/crypto/secret-cipher';
 
 @Injectable()
 export class CompaniesService {
@@ -118,7 +119,8 @@ export class CompaniesService {
       where: { id: companyId },
       data: {
         certificatePath: r2Key,
-        certificatePassword: password, // En producción, cifrar esto
+        // Cifrada en reposo (AES-256-GCM); solo se abre en memoria para firmar.
+        certificatePassword: sealCertificatePassword(password),
         certificateExpiry: expiryDate ? new Date(expiryDate) : null,
         hasCertificate: true,
       },

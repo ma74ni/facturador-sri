@@ -2,6 +2,7 @@ import axios, { AxiosError, AxiosInstance } from 'axios';
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
+import { openCertificatePassword } from '../../../../shared/crypto/secret-cipher';
 
 interface SigningRequest {
   xmlContent: string;
@@ -131,7 +132,7 @@ export class DigitalSignatureService {
 
       return {
         certificateBase64,
-        password: company.certificatePassword,
+        password: openCertificatePassword(company.certificatePassword),
       };
 
     } catch (error) {
