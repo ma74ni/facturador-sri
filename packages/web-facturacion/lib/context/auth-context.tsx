@@ -86,25 +86,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * Abre la sesión con el token recién emitido. El usuario se toma del perfil
+   * (`/auth/profile`) y no de la respuesta de login/registro, que no trae
+   * `companyId`: sin él las consultas de facturas, clientes y productos
+   * quedaban deshabilitadas hasta recargar la página.
+   */
+  const startSession = async (accessToken: string) => {
+    localStorage.setItem('token', accessToken);
+    try {
+      const { data: profile } = await apiClient.get('/auth/profile');
+      localStorage.setItem('user', JSON.stringify(profile.user));
+      setToken(accessToken);
+      setUser(profile.user);
+      setCompany(profile.company);
+    } catch (error) {
+      localStorage.removeItem('token');
+      throw error;
+    }
+  };
+
   const login = async (data: LoginFormData) => {
     try {
       const response = await apiClient.post('/auth/login', data);
-      const { access_token, user: userData } = response.data;
-
-      setToken(access_token);
-      setUser(userData);
-
-      localStorage.setItem('token', access_token);
-      localStorage.setItem('user', JSON.stringify(userData));
-
-      // Obtener datos completos del perfil (incluyendo company)
-      try {
-        const profileResponse = await apiClient.get('/auth/profile');
-        setCompany(profileResponse.data.company);
-      } catch (profileError) {
-        console.error('Error al obtener datos de la empresa:', profileError);
-      }
-
+      await startSession(response.data.access_token);
       router.push('/dashboard');
     } catch (error: any) {
       throw new Error(
@@ -132,22 +137,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
 
       const response = await apiClient.post('/auth/register', payload);
-      const { access_token, user: userData, company: companyData } = response.data;
 
-      setToken(access_token);
-      setUser(userData);
-      setCompany(companyData);
-
-      localStorage.setItem('token', access_token);
-      localStorage.setItem('user', JSON.stringify(userData));
-
-      // Obtener datos completos del perfil (por si acaso)
       try {
-        const profileResponse = await apiClient.get('/auth/profile');
-        setCompany(profileResponse.data.company);
+        await startSession(response.data.access_token);
       } catch (profileError) {
-        console.error('Error al obtener datos de la empresa:', profileError);
-        // No lanzamos error aquí porque ya tenemos companyData del registro
+        // La cuenta ya existe: si no se pudo abrir la sesión, que inicie
+        // sesión normalmente en vez de mostrar un error de registro.
+        console.error('Error al abrir la sesión tras el registro:', profileError);
+        router.push('/login');
+        return;
       }
 
       router.push('/dashboard');
