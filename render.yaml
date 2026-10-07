@@ -1,37 +1,44 @@
-# Render Blueprint - staging (todo en una sola cuenta)
+# Render Blueprint - producción y staging del facturador (una sola cuenta).
 #
-# Crea dos servicios web:
-#   - facturador-core-staging     (NestJS / Node)   packages/facturacion-core
-#   - facturador-signing-staging  (Java / Docker)   signing-service/
+# Producción (rama main, instancias Starter, siempre encendidas):
+#   - facturador-core      (NestJS / Node)   packages/facturacion-core
+#   - facturador-signing   (Java / Docker)   signing-service/
+# Staging (rama dev, instancias Free: se apagan sin uso y tardan ~50 s en
+# despertar):
+#   - facturador-core-dev
+#   - facturador-signing-dev
 #
-# Las variables con `sync: false` NO se versionan: Render las pide en el
-# dashboard al crear el Blueprint. Copialas del servicio viejo.
+# Los dos de producción son los servicios que antes se llamaban
+# `*-staging`: se renombran en el dashboard ANTES de sincronizar este archivo
+# (Render empareja servicios por nombre; ver PRODUCCION.md). Las variables con
+# `sync: false` no se versionan: Render las pide en el dashboard.
 #
-# La base de datos (Neon) es externa: no se define acá.
+# Bases de datos (Neon, externas): producción = el proyecto que era staging;
+# staging = una rama (branch) de ese proyecto, limpiada con
+# scripts/staging-scrub.sql. Buckets R2 distintos para cada ambiente.
 
 services:
   # ─────────────────────────────────────────────────────────────
-  # Backend principal - facturacion-core
+  # PRODUCCIÓN - backend principal
   # ─────────────────────────────────────────────────────────────
   - type: web
-    name: facturador-core-staging
+    name: facturador-core
     runtime: node
     region: oregon
     plan: starter
-    branch: dev
+    branch: main
     rootDir: packages/facturacion-core
     buildCommand: ./render-build.sh
     startCommand: ./render-start.sh
-    # facturacion-core no expone /health -> sin healthCheckPath
     envVars:
       - key: NODE_ENV
         value: production
       - key: JWT_EXPIRATION
         value: 7d
       - key: FRONTEND_URL
-        value: https://boisterous-griffin-ebe677.netlify.app
+        value: https://app.facturador.siete8.com
       - key: SIGNING_SERVICE_URL
-        value: https://facturador-signing-staging.onrender.com
+        sync: false # URL de facturador-signing (onrender.com)
       - key: SRI_RECEPTION_URL_TEST
         value: https://celcer.sri.gob.ec/comprobantes-electronicos-ws/RecepcionComprobantesOffline?wsdl
       - key: SRI_AUTHORIZATION_URL_TEST
@@ -41,11 +48,15 @@ services:
       - key: SRI_AUTHORIZATION_URL_PROD
         value: https://cel.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline?wsdl
       # --- secrets: cargar en el dashboard ---
-      - key: DATABASE_URL          # Neon, connection string POOLED (?pgbouncer=true&connection_limit=1)
+      - key: DATABASE_URL # Neon, POOLED (?pgbouncer=true&connection_limit=1)
         sync: false
-      - key: DIRECT_URL            # Neon, connection string DIRECTA (sin -pooler) -> la usa migrate deploy
+      - key: DIRECT_URL # Neon, directa (sin -pooler): la usa migrate deploy
         sync: false
       - key: JWT_SECRET
+        sync: false
+      # 32 bytes en base64. Fijarla UNA vez: si cambia, las claves de
+      # certificado ya cifradas quedan ilegibles.
+      - key: CERTIFICATE_ENCRYPTION_KEY
         sync: false
       - key: MAILJET_API_KEY
         sync: false
@@ -65,14 +76,14 @@ services:
         sync: false
 
   # ─────────────────────────────────────────────────────────────
-  # Microservicio de firma XAdES - signing-service (Java 17)
+  # PRODUCCIÓN - microservicio de firma XAdES (Java 17)
   # ─────────────────────────────────────────────────────────────
   - type: web
-    name: facturador-signing-staging
+    name: facturador-signing
     runtime: docker
     region: oregon
     plan: starter
-    branch: dev
+    branch: main
     rootDir: signing-service
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/v1/signature/health
@@ -80,5 +91,75 @@ services:
       - key: SPRING_PROFILES_ACTIVE
         value: production
       # 512 MB de RAM: heap y metaspace acotados + SerialGC
+      - key: JAVA_OPTS
+        value: -Xmx256m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -XX:+UseContainerSupport
+
+  # ─────────────────────────────────────────────────────────────
+  # STAGING - backend principal (Free)
+  # Sin las URLs de PRODUCCIÓN del SRI: si una empresa quedara en ambiente
+  # PRODUCTION, el envío falla en vez de emitir una factura real.
+  # ─────────────────────────────────────────────────────────────
+  - type: web
+    name: facturador-core-dev
+    runtime: node
+    region: oregon
+    plan: free
+    branch: dev
+    rootDir: packages/facturacion-core
+    buildCommand: ./render-build.sh
+    startCommand: ./render-start.sh
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_EXPIRATION
+        value: 7d
+      - key: FRONTEND_URL
+        sync: false # URL de la rama dev del frontend en Netlify
+      - key: SIGNING_SERVICE_URL
+        sync: false # URL de facturador-signing-dev (onrender.com)
+      - key: SRI_RECEPTION_URL_TEST
+        value: https://celcer.sri.gob.ec/comprobantes-electronicos-ws/RecepcionComprobantesOffline?wsdl
+      - key: SRI_AUTHORIZATION_URL_TEST
+        value: https://celcer.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline?wsdl
+      - key: DATABASE_URL # rama staging de Neon, POOLED
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: JWT_SECRET # distinto del de producción
+        sync: false
+      - key: CERTIFICATE_ENCRYPTION_KEY # distinta de la de producción
+        sync: false
+      - key: MAILJET_API_KEY
+        sync: false
+      - key: MAILJET_SECRET_KEY
+        sync: false
+      - key: MAILJET_FROM_EMAIL
+        sync: false
+      - key: MAILJET_FROM_NAME
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME # bucket propio de staging, sin certificados reales
+        sync: false
+
+  # ─────────────────────────────────────────────────────────────
+  # STAGING - microservicio de firma (Free)
+  # ─────────────────────────────────────────────────────────────
+  - type: web
+    name: facturador-signing-dev
+    runtime: docker
+    region: oregon
+    plan: free
+    branch: dev
+    rootDir: signing-service
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/v1/signature/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: production
       - key: JAVA_OPTS
         value: -Xmx256m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -XX:+UseContainerSupport
