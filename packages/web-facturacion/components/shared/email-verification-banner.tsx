@@ -22,12 +22,6 @@ export function EmailVerificationBanner() {
     }
   }, [isLoading, user]);
 
-  // No mostrar hasta que hayamos confirmado el estado
-  // Solo mostrar si explícitamente emailVerified es false
-  if (!hasCheckedStatus || isLoading || !user || user.emailVerified !== false) {
-    return null;
-  }
-
   // Cooldown timer
   useEffect(() => {
     if (cooldownSeconds > 0) {
@@ -57,6 +51,13 @@ export function EmailVerificationBanner() {
       }
     }
   }, [user?.email]);
+
+  // No mostrar hasta que hayamos confirmado el estado; solo si emailVerified
+  // es explícitamente false. Va después de todos los hooks: un return previo
+  // cambia la cantidad de hooks entre renders y React tumba la página.
+  if (!hasCheckedStatus || isLoading || !user || user.emailVerified !== false) {
+    return null;
+  }
 
   const handleResendVerification = async () => {
     if (!user?.email || cooldownSeconds > 0) return;
