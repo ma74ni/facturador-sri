@@ -204,45 +204,6 @@ export class CompaniesService {
     };
   }
 
-  async updateEnvironment(companyId: string, environment: 'TEST' | 'PRODUCTION') {
-  const company = await this.prisma.company.findUnique({
-    where: { id: companyId },
-  });
-
-  if (!company) {
-    throw new NotFoundException('Empresa no encontrada');
-  }
-
-  if (environment === 'PRODUCTION') {
-    if (!company.hasCertificate || !company.certificatePath) {
-      throw new BadRequestException(
-        'Debes cargar un certificado digital válido antes de activar producción',
-      );
-    }
-
-    if (company.certificateExpiry && new Date() > company.certificateExpiry) {
-      throw new BadRequestException(
-        'El certificado digital cargado está expirado. Sube uno vigente antes de activar producción',
-      );
-    }
-  }
-
-  const updated = await this.prisma.company.update({
-    where: { id: companyId },
-    data: { environment },
-    select: {
-      id: true,
-      businessName: true,
-      environment: true,
-    },
-  });
-
-  return {
-    message: `Ambiente actualizado a ${environment}`,
-    company: updated,
-  };
-}
-
 async getCompanyInfo(companyId: string) {
   const company = await this.prisma.company.findUnique({
     where: { id: companyId },

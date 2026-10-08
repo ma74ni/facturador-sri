@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tu empresa necesita correcciones</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }
+    .header h1 { margin: 0; font-size: 24px; }
+    .content { padding: 30px; }
+    .reason { background-color: #fff3cd; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #ffc107; }
+    .button { display: inline-block; padding: 15px 40px; background-color: #667eea; color: white !important; text-decoration: none; border-radius: 6px; margin: 10px 0; font-weight: bold; font-size: 16px; }
+    .footer { background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Tu empresa necesita correcciones</h1>
+      <p>Sistema de Facturación Electrónica SRI</p>
+    </div>
+
+    <div class="content">
+      <p>Hola,</p>
+
+      <p>Revisamos los datos de <strong>{{companyName}}</strong> (RUC {{ruc}}) y por ahora no pudimos aprobar la empresa por este motivo:</p>
+
+      <div class="reason">{{reason}}</div>
+
+      <p>Corrige la información desde tu panel y responde a nuestro equipo de soporte para que la revisemos de nuevo.</p>
+
+      <p style="text-align: center;">
+        <a href="{{dashboardLink}}" class="button">Ir a mi panel</a>
+      </p>
+
+      <p style="margin-top: 30px;">
+        Saludos cordiales,<br>
+        <strong>Sistema de Facturación Electrónica SRI</strong>
+      </p>
+    </div>
+
+    <div class="footer">
+      <p>Este es un mensaje automático, por favor no responder a este correo.</p>
+      <p>© {{year}} Sistema de Facturación Electrónica. Todos los derechos reservados.</p>
+    </div>
+  </div>
+</body>
+</html>

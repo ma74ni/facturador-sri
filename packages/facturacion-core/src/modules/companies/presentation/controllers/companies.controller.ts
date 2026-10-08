@@ -18,7 +18,6 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody } from '@nes
 import { CompaniesService } from '../../application/services/companies.service';
 import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
 import { EmailVerifiedGuard } from '../../../auth/infrastructure/guards/email-verified.guard';
-import { AdminGuard } from '../../../auth/infrastructure/guards/admin.guard';
 import { PrismaService } from '../../../../shared/database/prisma.service';
 import { Response } from 'express';
 import { EmailService } from '@/shared/email/email.service';
@@ -118,34 +117,8 @@ export class CompaniesController {
     return this.companiesService.getCompanyInfo(companyId);
   }
 
-  @Put('environment')
-  @UseGuards(EmailVerifiedGuard, AdminGuard)
-  @ApiOperation({ summary: 'Cambiar ambiente (TEST/PRODUCTION) - Solo administradores' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      required: ['environment'],
-      properties: {
-        environment: {
-          type: 'string',
-          enum: ['TEST', 'PRODUCTION'],
-          description: 'Ambiente del SRI',
-          example: 'TEST',
-        },
-      },
-    },
-  })
-  async updateEnvironment(
-    @Body('environment') environment: 'TEST' | 'PRODUCTION',
-    @Request() req: any,
-  ) {
-    if (!environment || !['TEST', 'PRODUCTION'].includes(environment)) {
-      throw new BadRequestException('Environment debe ser TEST o PRODUCTION');
-    }
-
-    const companyId = await this.getCompanyId(req.user.userId);
-    return this.companiesService.updateEnvironment(companyId, environment);
-  }
+  // El ambiente (TEST/PRODUCTION) lo cambia solo un administrador de la
+  // plataforma: POST /admin/companies/:id/go-live (PlatformAdminModule).
 
   // ==================== LOGO ====================
 
