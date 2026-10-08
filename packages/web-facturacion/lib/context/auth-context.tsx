@@ -13,6 +13,8 @@ interface User {
   role: string;
   companyId: string;
   emailVerified?: boolean;
+  /** Administra la plataforma (aprueba empresas). Lo trae /auth/profile. */
+  isPlatformAdmin?: boolean;
 }
 
 interface Company {

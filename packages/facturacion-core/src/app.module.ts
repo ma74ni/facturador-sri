@@ -9,6 +9,7 @@ import { CreditNotesModule } from './modules/credit-notes/credit-notes.module';
 import { CompaniesModule } from './modules/companies/companies.module';
 import { TaxCodesModule } from './modules/tax-codes/tax-codes.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { PlatformAdminModule } from './modules/platform-admin/platform-admin.module';
 import { SharedModule } from './shared/shared.module';
 import { EmailModule } from './shared/email/email.module';
 
@@ -29,6 +30,7 @@ import { EmailModule } from './shared/email/email.module';
     CompaniesModule,
     TaxCodesModule,
     PaymentsModule,
+    PlatformAdminModule,
   ],
   controllers: [],
   providers: [],
