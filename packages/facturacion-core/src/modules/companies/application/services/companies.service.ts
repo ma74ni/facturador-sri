@@ -1,8 +1,49 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../../shared/database/prisma.service';
-import * as forge from 'node-forge';
 import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
 import { sealCertificatePassword } from '../../../../shared/crypto/secret-cipher';
+import {
+  assertCurrentlyValid,
+  CERTIFICATE_WARNING_DAYS,
+  CertificateInfo,
+  InvalidCertificateError,
+  inspectCertificate,
+} from '../../domain/certificate-inspector';
+
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+const certificateStatusSelect = {
+  id: true,
+  businessName: true,
+  hasCertificate: true,
+  certificateExpiry: true,
+  certificateValidFrom: true,
+  certificateHolder: true,
+  certificateIssuer: true,
+} as const;
+
+/** Estado del certificado tal como lo muestra la web. */
+function describeCertificate(company: {
+  hasCertificate: boolean;
+  certificateExpiry: Date | null;
+  certificateValidFrom: Date | null;
+  certificateHolder: string | null;
+  certificateIssuer: string | null;
+}) {
+  const expiry = company.certificateExpiry;
+  const daysUntilExpiry = expiry ? Math.floor((expiry.getTime() - Date.now()) / MS_PER_DAY) : null;
+  const isExpired = expiry ? new Date() > expiry : false;
+  return {
+    hasCertificate: company.hasCertificate,
+    expiryDate: expiry,
+    validFrom: company.certificateValidFrom,
+    holder: company.certificateHolder,
+    issuer: company.certificateIssuer,
+    isExpired,
+    isExpiringSoon: !isExpired && daysUntilExpiry !== null && daysUntilExpiry <= CERTIFICATE_WARNING_DAYS,
+    daysUntilExpiry,
+  };
+}
 
 @Injectable()
 export class CompaniesService {
@@ -15,7 +56,6 @@ export class CompaniesService {
     companyId: string,
     file: Express.Multer.File,
     password: string,
-    expiryDate?: string,
   ) {
     // 1. Verificar que la empresa existe
     const company = await this.prisma.company.findUnique({
@@ -31,78 +71,48 @@ export class CompaniesService {
       throw new BadRequestException('El archivo debe ser un certificado .p12 o .pfx');
     }
 
-    // 3. Validar el certificado con la contraseña y extraer información
-    let p12;
+    // 3. Abrir el certificado con su clave: titular, emisora, RUC y vigencia
+    //    salen del propio archivo (nadie escribe la fecha de vencimiento).
+    let info: CertificateInfo;
     try {
-      const p12Der = forge.util.encode64(file.buffer.toString('binary'));
-      const p12Asn1 = forge.asn1.fromDer(forge.util.decode64(p12Der));
-      p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
+      info = inspectCertificate(file.buffer, password);
+      assertCurrentlyValid(info);
     } catch (error) {
+      if (error instanceof InvalidCertificateError) throw new BadRequestException(error.message);
+      throw error;
+    }
+
+    // 4. Si el certificado trae RUC, debe ser el de la empresa
+    if (info.ruc && info.ruc !== company.ruc) {
       throw new BadRequestException(
-        'Contraseña incorrecta o certificado inválido: ' + error.message,
+        `El RUC del certificado (${info.ruc}) no coincide con el RUC de la empresa (${company.ruc}). ` +
+        'Sube el certificado correcto para esta empresa.',
       );
     }
 
-    // 4. Validar que el RUC del certificado coincida con el RUC de la empresa
-    try {
-      // Obtener el certificado del p12
-      const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
-      const certBag = certBags[forge.pki.oids.certBag]?.[0];
+    // 5. Subir el nuevo a R2 antes de tocar el anterior: si falla, la
+    //    empresa sigue firmando con el que tenía.
+    const filename = `${companyId}_${Date.now()}.p12`;
+    const r2Key = await this.r2Storage.uploadCertificate(companyId, file.buffer, filename);
 
-      if (certBag && certBag.cert) {
-        const cert = certBag.cert;
-        const subject = cert.subject;
+    // 6. Actualizar empresa en BD
+    const updatedCompany = await this.prisma.company.update({
+      where: { id: companyId },
+      data: {
+        certificatePath: r2Key,
+        // Cifrada en reposo (AES-256-GCM); solo se abre en memoria para firmar.
+        certificatePassword: sealCertificatePassword(password),
+        certificateExpiry: info.validTo,
+        certificateValidFrom: info.validFrom,
+        certificateHolder: info.holder,
+        certificateIssuer: info.issuer,
+        hasCertificate: true,
+      },
+      select: certificateStatusSelect,
+    });
 
-        // Buscar el RUC en el subject del certificado
-        // El RUC puede estar en diferentes campos: serialNumber, CN, etc.
-        let certificateRuc = null;
-
-        for (const attr of subject.attributes) {
-          if (attr.shortName === 'serialNumber' || attr.name === 'serialNumber') {
-            // El serialNumber a veces contiene el RUC
-            const value = attr.value;
-            if (value && typeof value === 'string' && /^\d{13}$/.test(value)) {
-              certificateRuc = value;
-              break;
-            }
-          }
-        }
-
-        // Si no encontramos el RUC en serialNumber, buscar en CN
-        if (!certificateRuc) {
-          for (const attr of subject.attributes) {
-            if (attr.shortName === 'CN' || attr.name === 'commonName') {
-              const value = attr.value;
-              if (value && typeof value === 'string') {
-                const match = value.match(/\b(\d{13})\b/);
-                if (match) {
-                  certificateRuc = match[1];
-                  break;
-                }
-              }
-            }
-          }
-        }
-
-        // Validar que el RUC del certificado coincida con el de la empresa
-        if (certificateRuc && certificateRuc !== company.ruc) {
-          throw new BadRequestException(
-            `El RUC del certificado (${certificateRuc}) no coincide con el RUC de la empresa (${company.ruc}). ` +
-            'Por favor, sube el certificado correcto para esta empresa.',
-          );
-        }
-      } else {
-        throw new BadRequestException('No se encontró el certificado en el archivo .p12');
-      }
-    } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      // Continuamos si no se puede extraer el RUC
-    }
-
-    // 5. Eliminar certificado anterior si existe en R2
-    if (company.certificatePath) {
+    // 7. Borrar el certificado anterior de R2
+    if (company.certificatePath && company.certificatePath !== r2Key) {
       try {
         await this.r2Storage.deleteFile(company.certificatePath);
       } catch (error) {
@@ -110,63 +120,26 @@ export class CompaniesService {
       }
     }
 
-    // 6. Subir nuevo certificado a R2
-    const filename = `${companyId}_${Date.now()}.p12`;
-    const r2Key = await this.r2Storage.uploadCertificate(companyId, file.buffer, filename);
-
-    // 7. Actualizar empresa en BD
-    const updatedCompany = await this.prisma.company.update({
-      where: { id: companyId },
-      data: {
-        certificatePath: r2Key,
-        // Cifrada en reposo (AES-256-GCM); solo se abre en memoria para firmar.
-        certificatePassword: sealCertificatePassword(password),
-        certificateExpiry: expiryDate ? new Date(expiryDate) : null,
-        hasCertificate: true,
-      },
-      select: {
-        id: true,
-        businessName: true,
-        hasCertificate: true,
-        certificateExpiry: true,
-      },
-    });
-
     return {
       message: 'Certificado digital cargado exitosamente',
       company: updatedCompany,
+      certificate: describeCertificate(updatedCompany),
     };
   }
 
   async getCertificateStatus(companyId: string) {
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
-      select: {
-        id: true,
-        businessName: true,
-        hasCertificate: true,
-        certificateExpiry: true,
-      },
+      select: certificateStatusSelect,
     });
 
     if (!company) {
       throw new NotFoundException('Empresa no encontrada');
     }
 
-    const isExpired = company.certificateExpiry 
-      ? new Date() > company.certificateExpiry 
-      : false;
-
     return {
       message: 'Estado del certificado',
-      hasCertificate: company.hasCertificate,
-      expiryDate: company.certificateExpiry,
-      isExpired,
-      daysUntilExpiry: company.certificateExpiry
-        ? Math.floor(
-            (company.certificateExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
-          )
-        : null,
+      ...describeCertificate(company),
     };
   }
 
@@ -195,6 +168,9 @@ export class CompaniesService {
         certificatePath: null,
         certificatePassword: null,
         certificateExpiry: null,
+        certificateValidFrom: null,
+        certificateHolder: null,
+        certificateIssuer: null,
         hasCertificate: false,
       },
     });

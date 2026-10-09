@@ -92,6 +92,21 @@ export function useUpdateEmissionSequence(companyId: string) {
   );
 }
 
+export function useSendCertificateReminder(companyId: string) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: () => platformAdminApi.sendCertificateReminder(companyId),
+    onSuccess: ({ sent, detail }) => {
+      queryClient.setQueryData(platformAdminKeys.company(companyId), detail);
+      toast({ title: `Recordatorio enviado a ${sent} correo(s)` });
+    },
+    onError: (error) => {
+      toast({ variant: 'destructive', title: 'No se envió el recordatorio', description: apiErrorMessage(error, 'Inténtalo de nuevo') });
+    },
+  });
+}
+
 export function useProductModules() {
   const enabled = useIsPlatformAdmin();
   return useQuery({

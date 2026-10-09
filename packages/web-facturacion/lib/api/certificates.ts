@@ -1,23 +1,28 @@
 import apiClient from './client';
 
+/** Estado del certificado de firma. Titular, emisora y vigencia salen del propio .p12. */
 export interface CertificateStatus {
   hasCertificate: boolean;
-  certificatePath?: string;
-  expiryDate?: string;
-  daysUntilExpiry?: number;
+  expiryDate?: string | null;
+  validFrom?: string | null;
+  holder?: string | null;
+  issuer?: string | null;
+  daysUntilExpiry?: number | null;
   isExpired?: boolean;
   isExpiringSoon?: boolean;
 }
 
+export interface CertificateUploadResult {
+  message: string;
+  certificate: CertificateStatus;
+}
+
 export const certificatesApi = {
-  // Subir certificado digital
-  upload: async (file: File, password: string, expiryDate?: string): Promise<any> => {
+  // Subir certificado digital: la API valida la clave y lee la vigencia del archivo.
+  upload: async (file: File, password: string): Promise<CertificateUploadResult> => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('password', password);
-    if (expiryDate) {
-      formData.append('expiryDate', expiryDate);
-    }
 
     const response = await apiClient.post('/companies/certificate', formData, {
       headers: {

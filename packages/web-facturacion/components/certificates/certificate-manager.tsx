@@ -29,11 +29,16 @@ import {
   FileKey,
   Calendar,
 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { certificatesApi, CertificateStatus } from '@/lib/api/certificates';
 import { useToast } from '@/hooks/use-toast';
 
+const formatLongDate = (value: string) =>
+  new Date(value).toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
+
 export function CertificateManager() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<CertificateStatus | null>(null);
@@ -43,7 +48,6 @@ export function CertificateManager() {
   // Upload form state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [password, setPassword] = useState('');
-  const [expiryDate, setExpiryDate] = useState('');
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -101,18 +105,21 @@ export function CertificateManager() {
 
     try {
       setUploading(true);
-      await certificatesApi.upload(selectedFile, password, expiryDate || undefined);
+      const { certificate } = await certificatesApi.upload(selectedFile, password);
 
       toast({
         title: 'Certificado subido',
-        description: 'El certificado digital ha sido configurado correctamente',
+        description: certificate.expiryDate
+          ? `${certificate.holder ? `A nombre de ${certificate.holder}. ` : ''}Válido hasta el ${formatLongDate(certificate.expiryDate)}.`
+          : 'El certificado digital ha sido configurado correctamente',
       });
 
       // Reset form
       setSelectedFile(null);
       setPassword('');
-      setExpiryDate('');
       setUploadErrors({});
+      // El aviso de "certificado requerido" y la factura leen este estado.
+      queryClient.invalidateQueries({ queryKey: ['certificate-status'] });
       setShowUploadDialog(false);
 
       // Reload status
@@ -243,13 +250,24 @@ export function CertificateManager() {
                       <Calendar className="inline h-3 w-3 mr-1" />
                       Fecha de expiración
                     </Label>
-                    <div className="font-medium">
-                      {new Date(status.expiryDate).toLocaleDateString('es-EC', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })}
-                    </div>
+                    <div className="font-medium">{formatLongDate(status.expiryDate)}</div>
+                    {status.validFrom && (
+                      <p className="text-xs text-muted-foreground">Vigente desde el {formatLongDate(status.validFrom)}</p>
+                    )}
+                  </div>
+                )}
+
+                {status.holder && (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">Titular</Label>
+                    <div className="font-medium">{status.holder}</div>
+                  </div>
+                )}
+
+                {status.issuer && (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">Entidad emisora</Label>
+                    <div className="font-medium">{status.issuer}</div>
                   </div>
                 )}
               </div>
@@ -356,19 +374,9 @@ export function CertificateManager() {
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="certificate-expiry">Fecha de expiración (Opcional)</Label>
-              <Input
-                id="certificate-expiry"
-                type="date"
-                value={expiryDate}
-                onChange={(e) => setExpiryDate(e.target.value)}
-                placeholder="YYYY-MM-DD"
-              />
-              <p className="text-xs text-muted-foreground">
-                Fecha de expiración del certificado para recibir alertas
-              </p>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              El titular, la entidad emisora y la fecha de vencimiento se leen del propio certificado.
+            </p>
           </div>
 
           <AlertDialogFooter>
