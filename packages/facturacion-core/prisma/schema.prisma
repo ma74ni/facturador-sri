@@ -55,6 +55,7 @@ enum PlatformAuditAction {
   EMISSION_SEQUENCE_CHANGED
   PLATFORM_ADMIN_GRANTED
   PLATFORM_ADMIN_REVOKED
+  COMPANY_MODULES_CHANGED
 }
 
 // ==================== USERS ====================

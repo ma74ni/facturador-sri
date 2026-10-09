@@ -6,8 +6,22 @@ import { ChevronRight, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CompanyStatusBadge, ReadinessPills } from '@/components/admin/company-status';
-import { useAdminCompanies } from '@/lib/hooks/use-platform-admin';
+import { useAdminCompanies, useProductModules } from '@/lib/hooks/use-platform-admin';
 import { CompanyListFilter } from '@/lib/api/platform-admin';
+
+/** Módulos habilitados de una empresa, por nombre. */
+function ModuleBadges({ keys, names }: { keys: string[]; names: Record<string, string> }) {
+  if (keys.length === 0) return null;
+  return (
+    <div className="mt-1 flex flex-wrap gap-1">
+      {keys.map((key) => (
+        <span key={key} className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-700">
+          {names[key] ?? key}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 const FILTERS: Array<{ value: CompanyListFilter | 'ALL'; label: string }> = [
   { value: 'PENDING', label: 'Pendientes' },
@@ -22,6 +36,8 @@ const formatDate = (value: string) => new Date(value).toLocaleDateString('es-EC'
 export default function AdminEmpresasPage() {
   const [filter, setFilter] = useState<CompanyListFilter | 'ALL'>('PENDING');
   const { data: companies = [], isLoading } = useAdminCompanies(filter === 'ALL' ? undefined : filter);
+  const { data: modules = [] } = useProductModules();
+  const moduleNames = Object.fromEntries(modules.map((module) => [module.key, module.name]));
 
   return (
     <div className="space-y-4">
@@ -63,6 +79,7 @@ export default function AdminEmpresasPage() {
                       <div className="min-w-0">
                         <p className="font-medium truncate">{company.businessName}</p>
                         <p className="text-xs text-muted-foreground">RUC {company.ruc}</p>
+                        <ModuleBadges keys={company.enabledModules} names={moduleNames} />
                       </div>
                       <CompanyStatusBadge status={company.status} environment={company.environment} />
                     </div>
@@ -94,6 +111,7 @@ export default function AdminEmpresasPage() {
                         <p className="text-xs text-muted-foreground">
                           RUC {company.ruc} · {company.email}
                         </p>
+                        <ModuleBadges keys={company.enabledModules} names={moduleNames} />
                       </Link>
                     </TableCell>
                     <TableCell>

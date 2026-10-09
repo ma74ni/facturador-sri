@@ -23,6 +23,7 @@ import { CompanyStatusBadge, ReadinessChecklist } from '@/components/admin/compa
 import { GoLiveDialog } from '@/components/admin/go-live-dialog';
 import { RejectDialog } from '@/components/admin/reject-dialog';
 import { SequenceDialog } from '@/components/admin/sequence-dialog';
+import { ModulesCard } from '@/components/admin/modules-card';
 import { AdminEmissionPoint } from '@/lib/api/platform-admin';
 import { useAdminCompany, useApproveCompany } from '@/lib/hooks/use-platform-admin';
 
@@ -31,6 +32,7 @@ const ACTION_LABEL: Record<string, string> = {
   COMPANY_REJECTED: 'Rechazó la empresa',
   COMPANY_WENT_LIVE: 'Pasó la empresa a producción',
   EMISSION_SEQUENCE_CHANGED: 'Cambió una numeración',
+  COMPANY_MODULES_CHANGED: 'Cambió los módulos',
 };
 
 const ROLE_LABEL: Record<string, string> = {
@@ -222,6 +224,8 @@ export default function AdminEmpresaDetailPage() {
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
+        <ModulesCard companyId={company.id} enabledModules={company.enabledModules} />
+
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Usuarios</CardTitle>

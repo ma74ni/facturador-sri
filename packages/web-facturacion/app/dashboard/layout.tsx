@@ -26,6 +26,7 @@ import {
 import { usePathname } from "next/navigation";
 import { EmailVerificationBanner } from "@/components/shared/email-verification-banner";
 import { CompanyStatusBanners } from "@/components/shared/company-status-banners";
+import { COBRANZA_MODULE, hasModule } from "@/lib/product-modules";
 
 export default function DashboardLayout({
   children,
@@ -68,7 +69,7 @@ export default function DashboardLayout({
     { name: "Facturas", href: "/dashboard/facturas", icon: FileText },
     { name: "Clientes", href: "/dashboard/clientes", icon: Users },
     { name: "Productos", href: "/dashboard/productos", icon: Package },
-    ...(company?.enabledModules?.includes("cobranza")
+    ...(hasModule(company?.enabledModules, COBRANZA_MODULE)
       ? [{ name: "Cobranza", href: "/dashboard/cobranza", icon: Wallet }]
       : []),
     { name: "Reportes", href: "/dashboard/reportes", icon: BarChart3 },

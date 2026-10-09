@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/context/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -575,9 +576,8 @@ export default function ConfiguracionPage() {
                   <Label htmlFor="currentPassword">Contraseña Actual</Label>
                   <div className="flex items-center">
                     <Key className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <Input
+                    <PasswordInput
                       id="currentPassword"
-                      type="password"
                       placeholder="Ingresa tu contraseña actual"
                     />
                   </div>
@@ -587,9 +587,8 @@ export default function ConfiguracionPage() {
                   <Label htmlFor="newPassword">Nueva Contraseña</Label>
                   <div className="flex items-center">
                     <Key className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <Input
+                    <PasswordInput
                       id="newPassword"
-                      type="password"
                       placeholder="Mínimo 6 caracteres"
                     />
                   </div>
@@ -599,9 +598,8 @@ export default function ConfiguracionPage() {
                   <Label htmlFor="confirmPassword">Confirmar Nueva Contraseña</Label>
                   <div className="flex items-center">
                     <Key className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <Input
+                    <PasswordInput
                       id="confirmPassword"
-                      type="password"
                       placeholder="Repite la nueva contraseña"
                     />
                   </div>

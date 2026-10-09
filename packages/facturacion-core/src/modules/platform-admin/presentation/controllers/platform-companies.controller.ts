@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Put, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
 import { PlatformAdminGuard } from '../../../auth/infrastructure/guards/platform-admin.guard';
@@ -7,6 +7,7 @@ import { CompanyListQueryDto } from '../../application/dto/company-list-query.dt
 import { RejectCompanyDto } from '../../application/dto/reject-company.dto';
 import { GoLiveDto } from '../../application/dto/go-live.dto';
 import { UpdateEmissionSequenceDto } from '../../application/dto/update-emission-sequence.dto';
+import { UpdateCompanyModulesDto } from '../../application/dto/update-company-modules.dto';
 
 @ApiTags('admin')
 @Controller('admin/companies')
@@ -43,6 +44,12 @@ export class PlatformCompaniesController {
   @ApiOperation({ summary: 'Pasar la empresa al ambiente de PRODUCCIÓN del SRI' })
   goLive(@Param('id') id: string, @Body() dto: GoLiveDto, @Request() req: any) {
     return this.companies.goLive(req.user.userId, id, dto);
+  }
+
+  @Put(':id/modules')
+  @ApiOperation({ summary: 'Habilitar o deshabilitar módulos de producto (p. ej. Cobranza)' })
+  updateModules(@Param('id') id: string, @Body() dto: UpdateCompanyModulesDto, @Request() req: any) {
+    return this.companies.updateModules(req.user.userId, id, dto.modules);
   }
 
   @Patch(':id/emission-points/:emissionPointId/sequence')
