@@ -6,7 +6,7 @@ import { REQUIRED_MODULE_KEY } from '../decorators/require-module.decorator';
 /**
  * Bloquea el acceso a un endpoint si la Company del usuario autenticado no
  * tiene habilitado el módulo declarado con @RequireModule('clave'). Cada
- * tenant se habilita a mano al onboardearlo (Company.enabledModules).
+ * tenant se habilita desde el panel de administración (Company.enabledModules).
  */
 @Injectable()
 export class RequireModuleGuard implements CanActivate {

@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/auth-context';
+import { COBRANZA_MODULE, hasModule } from '@/lib/product-modules';
 
 /**
  * Defensa en profundidad además del RequireModuleGuard del backend: si la
@@ -14,12 +15,12 @@ export default function CobranzaLayout({ children }: { children: React.ReactNode
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && !company?.enabledModules?.includes('cobranza')) {
+    if (!isLoading && !hasModule(company?.enabledModules, COBRANZA_MODULE)) {
       router.push('/dashboard');
     }
   }, [isLoading, company, router]);
 
-  if (isLoading || !company?.enabledModules?.includes('cobranza')) {
+  if (isLoading || !hasModule(company?.enabledModules, COBRANZA_MODULE)) {
     return null;
   }
 

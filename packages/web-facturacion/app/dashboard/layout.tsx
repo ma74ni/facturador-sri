@@ -21,10 +21,12 @@ import {
   Menu,
   X,
   Wallet,
+  ShieldCheck,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { EmailVerificationBanner } from "@/components/shared/email-verification-banner";
 import { CompanyStatusBanners } from "@/components/shared/company-status-banners";
+import { COBRANZA_MODULE, hasModule } from "@/lib/product-modules";
 
 export default function DashboardLayout({
   children,
@@ -67,12 +69,15 @@ export default function DashboardLayout({
     { name: "Facturas", href: "/dashboard/facturas", icon: FileText },
     { name: "Clientes", href: "/dashboard/clientes", icon: Users },
     { name: "Productos", href: "/dashboard/productos", icon: Package },
-    ...(company?.enabledModules?.includes("cobranza")
+    ...(hasModule(company?.enabledModules, COBRANZA_MODULE)
       ? [{ name: "Cobranza", href: "/dashboard/cobranza", icon: Wallet }]
       : []),
     { name: "Reportes", href: "/dashboard/reportes", icon: BarChart3 },
     { name: "Empresa", href: "/dashboard/empresa", icon: Building2 },
     { name: "Configuración", href: "/dashboard/configuracion", icon: Settings },
+    ...(user?.isPlatformAdmin
+      ? [{ name: "Administración", href: "/dashboard/admin", icon: ShieldCheck }]
+      : []),
   ];
 
   return (
@@ -111,7 +116,11 @@ export default function DashboardLayout({
           <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
             {navigation.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href;
+              // Las subpáginas (p. ej. /dashboard/admin/empresas/:id) marcan su sección.
+              const isActive =
+                item.href === "/dashboard"
+                  ? pathname === item.href
+                  : pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <Link
                   key={item.name}

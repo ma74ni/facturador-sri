@@ -47,6 +47,17 @@ enum InvoicePaymentStatus {
   PAID
 }
 
+// Acciones del panel de administración de la plataforma (auditoría).
+enum PlatformAuditAction {
+  COMPANY_APPROVED
+  COMPANY_REJECTED
+  COMPANY_WENT_LIVE
+  EMISSION_SEQUENCE_CHANGED
+  PLATFORM_ADMIN_GRANTED
+  PLATFORM_ADMIN_REVOKED
+  COMPANY_MODULES_CHANGED
+}
+
 // ==================== USERS ====================
 
 model User {
@@ -57,6 +68,10 @@ model User {
   lastName  String
   isActive  Boolean @default(true)
   role      Role    @default(USER)
+
+  // Administra la plataforma (aprueba empresas, las pasa a producción).
+  // Independiente de `role`, que es el rol dentro de su propia empresa.
+  isPlatformAdmin Boolean @default(false)
 
   // Email verification
   emailVerified     Boolean   @default(false)
@@ -73,6 +88,9 @@ model User {
   invoices    Invoice[]    @relation("CreatedBy")
   creditNotes CreditNote[] @relation("CreditNotesCreatedBy")
   payments    Payment[]    @relation("PaymentsCreatedBy")
+
+  platformAuditActions PlatformAuditLog[] @relation("PlatformAuditActor")
+  platformAuditTargets PlatformAuditLog[] @relation("PlatformAuditTarget")
 
   @@index([email])
   @@index([companyId])
@@ -95,6 +113,8 @@ model Company {
   logoPath String?
 
   environment SRIEnvironment @default(TEST)
+  // Cuándo un administrador de la plataforma la pasó a PRODUCCIÓN.
+  productionSince DateTime?
   isActive    Boolean        @default(true)
 
   // Company approval status
@@ -139,8 +159,37 @@ model Company {
   creditNotes    CreditNote[]
   payments       Payment[]
 
+  platformAuditLogs PlatformAuditLog[]
+
   @@index([ruc])
   @@map("companies")
+}
+
+// Registro de lo que hace cada administrador de la plataforma. Guarda el
+// email del actor y el RUC como copia: el registro sobrevive aunque se borre
+// el usuario o la empresa.
+model PlatformAuditLog {
+  id     String              @id @default(cuid())
+  action PlatformAuditAction
+
+  actorId    String?
+  actor      User?   @relation("PlatformAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorEmail String
+
+  companyId  String?
+  company    Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  companyRuc String?
+
+  targetUserId String?
+  targetUser   User?   @relation("PlatformAuditTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+
+  details Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+  @@index([createdAt])
+  @@map("platform_audit_logs")
 }
 
 // ==================== ESTABLISHMENTS ====================
