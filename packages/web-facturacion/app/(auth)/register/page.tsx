@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/context/auth-context';
 import { registerSchema, RegisterFormData } from '@/lib/validations/schemas';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserPlus, AlertCircle, Building2, User } from 'lucide-react';
@@ -223,9 +224,8 @@ export default function RegisterPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="password">Contraseña *</Label>
-                  <Input
+                  <PasswordInput
                     id="password"
-                    type="password"
                     placeholder="••••••••"
                     {...register('password')}
                     disabled={isLoading}
@@ -237,9 +237,8 @@ export default function RegisterPage() {
 
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="confirmPassword">Confirmar Contraseña *</Label>
-                  <Input
+                  <PasswordInput
                     id="confirmPassword"
-                    type="password"
                     placeholder="••••••••"
                     {...register('confirmPassword')}
                     disabled={isLoading}
