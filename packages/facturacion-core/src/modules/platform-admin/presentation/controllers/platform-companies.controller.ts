@@ -46,6 +46,12 @@ export class PlatformCompaniesController {
     return this.companies.goLive(req.user.userId, id, dto);
   }
 
+  @Post(':id/certificate-reminder')
+  @ApiOperation({ summary: 'Enviar a la empresa un recordatorio para renovar su certificado de firma' })
+  sendCertificateReminder(@Param('id') id: string, @Request() req: any) {
+    return this.companies.sendCertificateReminder(req.user.userId, id);
+  }
+
   @Put(':id/modules')
   @ApiOperation({ summary: 'Habilitar o deshabilitar módulos de producto (p. ej. Cobranza)' })
   updateModules(@Param('id') id: string, @Body() dto: UpdateCompanyModulesDto, @Request() req: any) {

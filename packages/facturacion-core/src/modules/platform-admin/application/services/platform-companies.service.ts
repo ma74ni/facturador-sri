@@ -84,6 +84,9 @@ export class PlatformCompaniesService {
         rejectedAt: true,
         createdAt: true,
         enabledModules: true,
+        certificateHolder: true,
+        certificateIssuer: true,
+        certificateValidFrom: true,
         ...companyReadinessSelect,
       },
     });
@@ -113,6 +116,9 @@ export class PlatformCompaniesService {
         rejectedAt: true,
         createdAt: true,
         enabledModules: true,
+        certificateHolder: true,
+        certificateIssuer: true,
+        certificateValidFrom: true,
         ...companyReadinessSelect,
       },
     });
@@ -354,6 +360,36 @@ export class PlatformCompaniesService {
     });
 
     return this.detail(companyId);
+  }
+
+  /** Recuerda por correo a la empresa que renueve su certificado de firma. */
+  async sendCertificateReminder(actorUserId: string, companyId: string) {
+    const actor = await this.audit.resolveActor(actorUserId);
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true, ruc: true, hasCertificate: true, certificateExpiry: true },
+    });
+    if (!company) {
+      throw new NotFoundException('Empresa no encontrada');
+    }
+    if (!company.hasCertificate || !company.certificateExpiry) {
+      throw new BadRequestException('La empresa no tiene un certificado cargado con fecha de vencimiento');
+    }
+
+    const result = await this.notifier.notify(companyId, { kind: 'certificateExpiring' });
+    if (result.sent === 0) {
+      throw new BadRequestException('No se pudo enviar el correo a la empresa: revisa sus correos de contacto');
+    }
+
+    await this.prisma.$transaction((tx) =>
+      this.audit.record(tx, actor, {
+        action: 'CERTIFICATE_REMINDER_SENT',
+        company,
+        details: { certificateExpiry: company.certificateExpiry!.toISOString(), sent: result.sent },
+      }),
+    );
+
+    return { ...result, detail: await this.detail(companyId) };
   }
 
   /** Reemplaza los módulos de producto habilitados (p. ej. Cobranza). */

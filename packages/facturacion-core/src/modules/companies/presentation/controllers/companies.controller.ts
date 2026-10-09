@@ -67,12 +67,6 @@ export class CompaniesController {
           description: 'Contraseña del certificado',
           example: 'Mi_Password_Seguro123',
         },
-        expiryDate: {
-          type: 'string',
-          format: 'date',
-          description: 'Fecha de expiración (YYYY-MM-DD) - Opcional',
-          example: '2025-12-31',
-        },
       },
     },
   })
@@ -80,7 +74,6 @@ export class CompaniesController {
   async uploadCertificate(
     @UploadedFile() file: Express.Multer.File,
     @Body('password') password: string,
-    @Body('expiryDate') expiryDate: string,
     @Request() req: any,
   ) {
     if (!file) {
@@ -92,7 +85,8 @@ export class CompaniesController {
     }
 
     const companyId = await this.getCompanyId(req.user.userId);
-    return this.companiesService.uploadCertificate(companyId, file, password, expiryDate);
+    // La vigencia se lee del propio certificado (certificate-inspector.ts).
+    return this.companiesService.uploadCertificate(companyId, file, password);
   }
 
   @Get('certificate/status')

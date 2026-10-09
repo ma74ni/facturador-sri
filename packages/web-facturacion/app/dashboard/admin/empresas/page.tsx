@@ -6,6 +6,7 @@ import { ChevronRight, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CompanyStatusBadge, ReadinessPills } from '@/components/admin/company-status';
+import { CertificateExpiry } from '@/components/admin/certificate-card';
 import { useAdminCompanies, useProductModules } from '@/lib/hooks/use-platform-admin';
 import { CompanyListFilter } from '@/lib/api/platform-admin';
 
@@ -84,6 +85,14 @@ export default function AdminEmpresasPage() {
                       <CompanyStatusBadge status={company.status} environment={company.environment} />
                     </div>
                     <ReadinessPills readiness={company.readiness} />
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Certificado vence</span>
+                      <CertificateExpiry
+                        hasCertificate={company.hasCertificate}
+                        expiry={company.certificateExpiry}
+                        readiness={company.readiness}
+                      />
+                    </div>
                   </CardContent>
                 </Card>
               </Link>
@@ -98,6 +107,7 @@ export default function AdminEmpresasPage() {
                   <TableHead>Empresa</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Requisitos para producción</TableHead>
+                  <TableHead>Certificado vence</TableHead>
                   <TableHead>Registro</TableHead>
                   <TableHead className="w-8" />
                 </TableRow>
@@ -119,6 +129,13 @@ export default function AdminEmpresasPage() {
                     </TableCell>
                     <TableCell>
                       <ReadinessPills readiness={company.readiness} />
+                    </TableCell>
+                    <TableCell>
+                      <CertificateExpiry
+                        hasCertificate={company.hasCertificate}
+                        expiry={company.certificateExpiry}
+                        readiness={company.readiness}
+                      />
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{formatDate(company.createdAt)}</TableCell>
                     <TableCell>
