@@ -126,3 +126,47 @@ describe('PlatformCompaniesService.goLive', () => {
     await expect(service.goLive('admin-1', companyId, allPoints)).rejects.toThrow('ya está en producción');
   });
 });
+
+describe('PlatformCompaniesService.updateModules', () => {
+  function setup(enabledModules: string[]) {
+    const tx = { company: { update: jest.fn() }, platformAuditLog: { create: jest.fn() } };
+    const prisma = {
+      user: { findUnique: jest.fn().mockResolvedValue({ id: 'admin-1', email: 'admin@siete8.com' }) },
+      company: { findUnique: jest.fn().mockResolvedValue({ id: 'c-1', ruc: '1793082815001', enabledModules }) },
+      $transaction: jest.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
+    };
+    const service = new PlatformCompaniesService(
+      prisma as never,
+      new PlatformAuditService(prisma as never),
+      { notify: jest.fn() } as unknown as CompanyNotifierService,
+    );
+    jest.spyOn(service, 'detail').mockResolvedValue({} as never);
+    return { service, tx };
+  }
+
+  it('habilita Cobranza y lo audita', async () => {
+    const { service, tx } = setup([]);
+    await service.updateModules('admin-1', 'c-1', ['cobranza']);
+    expect(tx.company.update).toHaveBeenCalledWith({ where: { id: 'c-1' }, data: { enabledModules: ['cobranza'] } });
+    expect(tx.platformAuditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: 'COMPANY_MODULES_CHANGED', details: { enabled: ['cobranza'], disabled: [] } }),
+      }),
+    );
+  });
+
+  it('deshabilita y descarta claves que ya no existen en el catálogo', async () => {
+    const { service, tx } = setup(['cobranza', 'viejo']);
+    await service.updateModules('admin-1', 'c-1', []);
+    expect(tx.company.update).toHaveBeenCalledWith({ where: { id: 'c-1' }, data: { enabledModules: [] } });
+    expect(tx.platformAuditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ details: { enabled: [], disabled: ['cobranza', 'viejo'] } }) }),
+    );
+  });
+
+  it('no escribe si no cambia nada', async () => {
+    const { service, tx } = setup(['cobranza']);
+    await service.updateModules('admin-1', 'c-1', ['cobranza']);
+    expect(tx.company.update).not.toHaveBeenCalled();
+  });
+});

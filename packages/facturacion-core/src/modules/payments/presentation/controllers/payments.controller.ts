@@ -18,12 +18,13 @@ import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard
 import { EmailVerifiedGuard } from '../../../auth/infrastructure/guards/email-verified.guard';
 import { RequireModuleGuard } from '../../../auth/infrastructure/guards/require-module.guard';
 import { RequireModule } from '../../../auth/infrastructure/decorators/require-module.decorator';
+import { COBRANZA_MODULE } from '../../../companies/domain/product-modules.catalog';
 import { PrismaService } from '../../../../shared/database/prisma.service';
 
 @ApiTags('payments')
 @Controller('payments')
 @UseGuards(JwtAuthGuard, EmailVerifiedGuard, RequireModuleGuard)
-@RequireModule('cobranza')
+@RequireModule(COBRANZA_MODULE)
 @ApiBearerAuth()
 export class PaymentsController {
   constructor(

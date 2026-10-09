@@ -17,6 +17,7 @@ import { CompanyNotifierService } from './company-notifier.service';
 import { CompanyListFilter } from '../dto/company-list-query.dto';
 import { GoLiveDto } from '../dto/go-live.dto';
 import { UpdateEmissionSequenceDto } from '../dto/update-emission-sequence.dto';
+import { PRODUCT_MODULE_KEYS, ProductModuleKey } from '../../../companies/domain/product-modules.catalog';
 
 const TEST_DOCUMENT_REASON = 'Emitida en el ambiente de pruebas del SRI, antes de producción';
 
@@ -82,6 +83,7 @@ export class PlatformCompaniesService {
         approvedAt: true,
         rejectedAt: true,
         createdAt: true,
+        enabledModules: true,
         ...companyReadinessSelect,
       },
     });
@@ -110,6 +112,7 @@ export class PlatformCompaniesService {
         approvedAt: true,
         rejectedAt: true,
         createdAt: true,
+        enabledModules: true,
         ...companyReadinessSelect,
       },
     });
@@ -347,6 +350,37 @@ export class PlatformCompaniesService {
             to: dto.nextCreditNoteSequence ?? point.creditNoteSequence,
           },
         },
+      });
+    });
+
+    return this.detail(companyId);
+  }
+
+  /** Reemplaza los módulos de producto habilitados (p. ej. Cobranza). */
+  async updateModules(actorUserId: string, companyId: string, modules: ProductModuleKey[]) {
+    const actor = await this.audit.resolveActor(actorUserId);
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true, ruc: true, enabledModules: true },
+    });
+    if (!company) {
+      throw new NotFoundException('Empresa no encontrada');
+    }
+
+    // Orden del catálogo: la lista guardada no depende del orden de los clics.
+    const next = PRODUCT_MODULE_KEYS.filter((key) => modules.includes(key));
+    const enabled = next.filter((key) => !company.enabledModules.includes(key));
+    const disabled = company.enabledModules.filter((key) => !(next as string[]).includes(key));
+    if (enabled.length === 0 && disabled.length === 0) {
+      return this.detail(companyId);
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.company.update({ where: { id: companyId }, data: { enabledModules: next } });
+      await this.audit.record(tx, actor, {
+        action: 'COMPANY_MODULES_CHANGED',
+        company,
+        details: { enabled, disabled },
       });
     });
 

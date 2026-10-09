@@ -34,7 +34,16 @@ export interface AdminCompanySummary {
   hasCertificate: boolean;
   certificateExpiry: string | null;
   createdAt: string;
+  /** Módulos de producto habilitados (claves de ProductModule). */
+  enabledModules: string[];
   readiness: CompanyReadiness;
+}
+
+/** Módulo de producto que se habilita por empresa (catálogo de la API). */
+export interface ProductModule {
+  key: string;
+  name: string;
+  description: string;
 }
 
 export interface AdminEmissionPoint {
@@ -131,6 +140,16 @@ export const platformAdminApi = {
       `/admin/companies/${companyId}/emission-points/${emissionPointId}/sequence`,
       payload,
     );
+    return response.data;
+  },
+
+  listModules: async (): Promise<ProductModule[]> => {
+    const response = await apiClient.get('/admin/modules');
+    return response.data;
+  },
+
+  updateModules: async (companyId: string, modules: string[]): Promise<AdminCompanyDetail> => {
+    const response = await apiClient.put(`/admin/companies/${companyId}/modules`, { modules });
     return response.data;
   },
 

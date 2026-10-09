@@ -7,6 +7,7 @@ export const platformAdminKeys = {
   companies: (filter?: CompanyListFilter) => ['admin', 'companies', filter ?? 'all'] as const,
   company: (id: string) => ['admin', 'company', id] as const,
   admins: ['admin', 'platform-admins'] as const,
+  modules: ['admin', 'modules'] as const,
 };
 
 /** Mensaje de error de la API (class-validator puede devolver una lista). */
@@ -89,6 +90,23 @@ export function useUpdateEmissionSequence(companyId: string) {
       platformAdminApi.updateSequence(companyId, emissionPointId, payload),
     { success: 'Numeración actualizada', error: 'No se pudo actualizar la numeración' },
   );
+}
+
+export function useProductModules() {
+  const enabled = useIsPlatformAdmin();
+  return useQuery({
+    queryKey: platformAdminKeys.modules,
+    queryFn: platformAdminApi.listModules,
+    enabled,
+    staleTime: Infinity, // el catálogo solo cambia con un deploy
+  });
+}
+
+export function useUpdateCompanyModules(companyId: string) {
+  return useCompanyAction(companyId, (modules: string[]) => platformAdminApi.updateModules(companyId, modules), {
+    success: 'Módulos actualizados. La empresa los verá al volver a cargar la página.',
+    error: 'No se pudieron actualizar los módulos',
+  });
 }
 
 export function usePlatformAdmins() {
