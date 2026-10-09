@@ -56,6 +56,7 @@ enum PlatformAuditAction {
   PLATFORM_ADMIN_GRANTED
   PLATFORM_ADMIN_REVOKED
   COMPANY_MODULES_CHANGED
+  CERTIFICATE_REMINDER_SENT
 }
 
 // ==================== USERS ====================
@@ -143,6 +144,10 @@ model Company {
   certificatePath     String?
   certificatePassword String?
   certificateExpiry   DateTime?
+  // Datos leídos del certificado al subirlo (certificate-inspector.ts).
+  certificateHolder    String?
+  certificateIssuer    String?
+  certificateValidFrom DateTime?
   hasCertificate      Boolean   @default(false)
 
   // Módulos de producto habilitados para este tenant (ej. "cobranza") — ver RequireModuleGuard

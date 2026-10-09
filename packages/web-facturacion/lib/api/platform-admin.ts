@@ -33,6 +33,9 @@ export interface AdminCompanySummary {
   rejectedAt: string | null;
   hasCertificate: boolean;
   certificateExpiry: string | null;
+  certificateValidFrom: string | null;
+  certificateHolder: string | null;
+  certificateIssuer: string | null;
   createdAt: string;
   /** Módulos de producto habilitados (claves de ProductModule). */
   enabledModules: string[];
@@ -140,6 +143,13 @@ export const platformAdminApi = {
       `/admin/companies/${companyId}/emission-points/${emissionPointId}/sequence`,
       payload,
     );
+    return response.data;
+  },
+
+  sendCertificateReminder: async (
+    companyId: string,
+  ): Promise<{ recipients: number; sent: number; detail: AdminCompanyDetail }> => {
+    const response = await apiClient.post(`/admin/companies/${companyId}/certificate-reminder`);
     return response.data;
   },
 

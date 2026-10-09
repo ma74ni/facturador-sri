@@ -24,6 +24,7 @@ import { GoLiveDialog } from '@/components/admin/go-live-dialog';
 import { RejectDialog } from '@/components/admin/reject-dialog';
 import { SequenceDialog } from '@/components/admin/sequence-dialog';
 import { ModulesCard } from '@/components/admin/modules-card';
+import { CertificateCard } from '@/components/admin/certificate-card';
 import { AdminEmissionPoint } from '@/lib/api/platform-admin';
 import { useAdminCompany, useApproveCompany } from '@/lib/hooks/use-platform-admin';
 
@@ -33,6 +34,7 @@ const ACTION_LABEL: Record<string, string> = {
   COMPANY_WENT_LIVE: 'Pasó la empresa a producción',
   EMISSION_SEQUENCE_CHANGED: 'Cambió una numeración',
   COMPANY_MODULES_CHANGED: 'Cambió los módulos',
+  CERTIFICATE_REMINDER_SENT: 'Envió un recordatorio de renovación del certificado',
 };
 
 const ROLE_LABEL: Record<string, string> = {
@@ -169,6 +171,8 @@ export default function AdminEmpresaDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <CertificateCard company={company} />
 
       <Card>
         <CardHeader>

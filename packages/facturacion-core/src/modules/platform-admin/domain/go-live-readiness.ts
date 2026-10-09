@@ -4,8 +4,9 @@
  * (para mostrar qué falta) y la acción de pasar a producción (para impedirla).
  */
 
-/** Días antes del vencimiento del certificado en que se avisa. */
-export const CERTIFICATE_WARNING_DAYS = 30;
+import { CERTIFICATE_WARNING_DAYS } from '../../companies/domain/certificate-inspector';
+
+export { CERTIFICATE_WARNING_DAYS };
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -82,9 +83,11 @@ export function evaluateGoLiveReadiness(
       ok: certificateValid,
       message: !input.hasCertificate
         ? 'No ha cargado su certificado de firma electrónica'
-        : daysLeft === null || daysLeft < 0
-          ? 'El certificado de firma electrónica está vencido'
-          : `Certificado vigente (vence en ${daysLeft} días)`,
+        : daysLeft === null
+          ? 'Falta la fecha de vencimiento del certificado: que lo vuelva a subir'
+          : daysLeft < 0
+            ? 'El certificado de firma electrónica está vencido'
+            : `Certificado vigente (vence en ${daysLeft} días)`,
     },
     {
       key: 'EMISSION_POINT',

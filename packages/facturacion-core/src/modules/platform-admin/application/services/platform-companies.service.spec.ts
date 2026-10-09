@@ -170,3 +170,51 @@ describe('PlatformCompaniesService.updateModules', () => {
     expect(tx.company.update).not.toHaveBeenCalled();
   });
 });
+
+describe('PlatformCompaniesService.sendCertificateReminder', () => {
+  function setup(company: Record<string, unknown>, sent: number) {
+    const tx = { platformAuditLog: { create: jest.fn() } };
+    const prisma = {
+      user: { findUnique: jest.fn().mockResolvedValue({ id: 'admin-1', email: 'admin@siete8.com' }) },
+      company: { findUnique: jest.fn().mockResolvedValue(company) },
+      $transaction: jest.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
+    };
+    const notifier = { notify: jest.fn().mockResolvedValue({ recipients: 2, sent }) };
+    const service = new PlatformCompaniesService(
+      prisma as never,
+      new PlatformAuditService(prisma as never),
+      notifier as unknown as CompanyNotifierService,
+    );
+    jest.spyOn(service, 'detail').mockResolvedValue({} as never);
+    return { service, tx, notifier };
+  }
+
+  const withCertificate = {
+    id: 'c-1',
+    ruc: '1793082815001',
+    hasCertificate: true,
+    certificateExpiry: new Date('2026-10-14T15:35:39Z'),
+  };
+
+  it('envía el recordatorio y lo audita', async () => {
+    const { service, tx, notifier } = setup(withCertificate, 2);
+    const result = await service.sendCertificateReminder('admin-1', 'c-1');
+    expect(notifier.notify).toHaveBeenCalledWith('c-1', { kind: 'certificateExpiring' });
+    expect(result.sent).toBe(2);
+    expect(tx.platformAuditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ action: 'CERTIFICATE_REMINDER_SENT' }) }),
+    );
+  });
+
+  it('no envía si la empresa no tiene certificado', async () => {
+    const { service, notifier } = setup({ ...withCertificate, hasCertificate: false, certificateExpiry: null }, 0);
+    await expect(service.sendCertificateReminder('admin-1', 'c-1')).rejects.toThrow('no tiene un certificado');
+    expect(notifier.notify).not.toHaveBeenCalled();
+  });
+
+  it('avisa si no salió ningún correo y no lo audita', async () => {
+    const { service, tx } = setup(withCertificate, 0);
+    await expect(service.sendCertificateReminder('admin-1', 'c-1')).rejects.toThrow('No se pudo enviar');
+    expect(tx.platformAuditLog.create).not.toHaveBeenCalled();
+  });
+});
