@@ -30,8 +30,11 @@ import {
   DollarSign,
   Calendar,
   FileDown,
-  Trash2
+  FileMinus,
+  Ban
 } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { CreditNoteDialog } from '@/components/credit-notes/credit-note-dialog';
 import { invoicesApi, Invoice, CreateInvoiceDto, InvoiceStats } from '@/lib/api/invoices';
 import { Customer } from '@/lib/api/customers';
 import { Product } from '@/lib/api/products';
@@ -58,6 +61,9 @@ import {
 
 type InvoiceSort = 'recent' | 'oldest' | 'amountDesc' | 'amountAsc';
 
+// Los que acepta POST /invoices/:id/cancel: nunca llegaron a autorizarse.
+const CANCELLABLE_STATUSES: Invoice['status'][] = ['DRAFT', 'PENDING', 'ERROR', 'REJECTED'];
+
 export default function FacturasPage() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
@@ -79,9 +85,11 @@ export default function FacturasPage() {
   // Dialog states
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
-  const [deletingInvoice, setDeletingInvoice] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [invoiceToCancel, setInvoiceToCancel] = useState<Invoice | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancellingInvoice, setCancellingInvoice] = useState(false);
+  const [creditNoteInvoiceId, setCreditNoteInvoiceId] = useState<string | null>(null);
   const [certificateDialogOpen, setCertificateDialogOpen] = useState(false);
   const [emailVerificationDialogOpen, setEmailVerificationDialogOpen] = useState(false);
 
@@ -232,33 +240,34 @@ export default function FacturasPage() {
     }
   };
 
-  const handleDeleteClick = (invoice: Invoice) => {
-    setInvoiceToDelete(invoice);
-    setDeleteDialogOpen(true);
+  const handleCancelClick = (invoice: Invoice) => {
+    setInvoiceToCancel(invoice);
+    setCancelReason('');
+    setCancelDialogOpen(true);
   };
 
-  const handleDeleteConfirm = async () => {
-    if (!invoiceToDelete) return;
+  const handleCancelConfirm = async () => {
+    if (!invoiceToCancel) return;
 
     try {
-      setDeletingInvoice(true);
-      await invoicesApi.delete(invoiceToDelete.id);
+      setCancellingInvoice(true);
+      await invoicesApi.cancel(invoiceToCancel.id, cancelReason.trim());
       toast({
-        title: 'Factura eliminada',
-        description: `La factura ${invoiceToDelete.establishmentCode}-${invoiceToDelete.emissionPointCode}-${invoiceToDelete.sequential} ha sido eliminada`,
+        title: 'Factura cancelada',
+        description: `La factura ${invoiceToCancel.establishmentCode}-${invoiceToCancel.emissionPointCode}-${invoiceToCancel.sequential} quedó cancelada`,
       });
-      setDeleteDialogOpen(false);
-      setInvoiceToDelete(null);
+      setCancelDialogOpen(false);
+      setInvoiceToCancel(null);
       await loadData();
     } catch (error: any) {
-      console.error('Error deleting invoice:', error);
+      console.error('Error cancelling invoice:', error);
       toast({
         variant: 'destructive',
-        title: 'Error al eliminar',
-        description: error.response?.data?.message || 'No se pudo eliminar la factura',
+        title: 'No se pudo cancelar',
+        description: error.response?.data?.message || 'No se pudo cancelar la factura',
       });
     } finally {
-      setDeletingInvoice(false);
+      setCancellingInvoice(false);
     }
   };
 
@@ -356,19 +365,29 @@ export default function FacturasPage() {
             >
               <Mail className="h-4 w-4 text-purple-600" />
             </Button>
+            {/* Una autorizada no se cancela: se corrige con nota de crédito */}
+            <Button
+              variant="ghost"
+              size="sm"
+              title="Emitir nota de crédito"
+              aria-label="Emitir nota de crédito"
+              onClick={() => setCreditNoteInvoiceId(factura.id)}
+              className="h-9 w-9 p-0"
+            >
+              <FileMinus className="h-4 w-4 text-orange-600" />
+            </Button>
           </>
         )}
-        {/* Las autorizadas no se pueden eliminar */}
-        {factura.status !== 'AUTHORIZED' && (
+        {CANCELLABLE_STATUSES.includes(factura.status) && (
           <Button
             variant="ghost"
             size="sm"
-            title="Eliminar factura"
-            aria-label="Eliminar factura"
-            onClick={() => handleDeleteClick(factura)}
+            title="Cancelar factura"
+            aria-label="Cancelar factura"
+            onClick={() => handleCancelClick(factura)}
             className="h-9 w-9 p-0"
           >
-            <Trash2 className="h-4 w-4 text-red-600" />
+            <Ban className="h-4 w-4 text-red-600" />
           </Button>
         )}
       </>
@@ -377,6 +396,8 @@ export default function FacturasPage() {
 
   const getStatusBadge = (status: Invoice['status']) => {
     const statusConfig = {
+      DRAFT: { variant: 'secondary' as const, icon: Clock, label: 'Borrador' },
+      CANCELLED: { variant: 'secondary' as const, icon: Ban, label: 'Cancelada' },
       PENDING: { variant: 'warning' as const, icon: Clock, label: 'Pendiente' },
       SENT: { variant: 'info' as const, icon: Send, label: 'Enviada' },
       AUTHORIZED: { variant: 'success' as const, icon: CheckCircle2, label: 'Autorizada' },
@@ -507,6 +528,7 @@ export default function FacturasPage() {
                   <option value="AUTHORIZED">Autorizada</option>
                   <option value="REJECTED">Rechazada</option>
                   <option value="ERROR">Error</option>
+                  <option value="CANCELLED">Cancelada</option>
                 </NativeSelect>
               </FilterField>
               <FilterField label="Período">
@@ -730,41 +752,58 @@ export default function FacturasPage() {
         establishments={establishments}
       />
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      {/* Cancel Confirmation Dialog */}
+      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar factura?</AlertDialogTitle>
+            <AlertDialogTitle>¿Cancelar factura?</AlertDialogTitle>
             <AlertDialogDescription>
-              {invoiceToDelete && (
+              {invoiceToCancel && (
                 <>
-                  ¿Estás seguro de eliminar la factura{' '}
+                  La factura{' '}
                   <strong className="font-mono">
-                    {invoiceToDelete.establishmentCode}-{invoiceToDelete.emissionPointCode}-{invoiceToDelete.sequential}
-                  </strong>
-                  ?
-                  <br /><br />
-                  Esta acción no se puede deshacer. Se eliminarán todos los archivos asociados (XML, RIDE, etc.).
+                    {invoiceToCancel.establishmentCode}-{invoiceToCancel.emissionPointCode}-{invoiceToCancel.sequential}
+                  </strong>{' '}
+                  no fue autorizada por el SRI. Al cancelarla queda marcada como{' '}
+                  <strong>Cancelada</strong>: no se envía al SRI ni cuenta como deuda del cliente.
+                  Sigue en la lista para tu registro y su número no se reutiliza.
                   <br /><br />
                   <span className="text-xs text-muted-foreground">
-                    Nota: Solo se pueden eliminar facturas que no estén autorizadas por el SRI.
+                    Las facturas autorizadas no se cancelan: se corrigen con una nota de crédito.
                   </span>
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="cancel-reason">Motivo (opcional)</Label>
+            <Input
+              id="cancel-reason"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              maxLength={300}
+              placeholder="Ej.: datos del cliente incorrectos"
+            />
+          </div>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deletingInvoice}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={cancellingInvoice}>Volver</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDeleteConfirm}
-              disabled={deletingInvoice}
+              onClick={handleCancelConfirm}
+              disabled={cancellingInvoice}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deletingInvoice ? 'Eliminando...' : 'Eliminar'}
+              {cancellingInvoice ? 'Cancelando...' : 'Cancelar factura'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Credit Note Dialog */}
+      <CreditNoteDialog
+        invoiceId={creditNoteInvoiceId}
+        onOpenChange={(open) => !open && setCreditNoteInvoiceId(null)}
+        onIssued={loadData}
+      />
 
       {/* Certificate Required Dialog */}
       <CertificateRequiredDialog
