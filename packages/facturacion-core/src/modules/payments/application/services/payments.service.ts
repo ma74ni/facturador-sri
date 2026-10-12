@@ -1,9 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { Prisma, InvoicePaymentStatus } from '@prisma/client';
 import { PrismaService } from '../../../../shared/database/prisma.service';
 import { CreatePaymentDto } from '../dto/create-payment.dto';
+import { creditedAmount, MONEY_TOLERANCE, settledAmount } from '../../domain/invoice-balance';
+import { syncInvoicePaymentStatus } from './invoice-payment-status';
 
-type Tx = Prisma.TransactionClient;
+// Lo que hace falta de cada factura para calcular su saldo.
+const BALANCE_INCLUDE = {
+  allocations: true,
+  creditNotes: { select: { total: true, sriStatus: true } },
+} as const;
 
 @Injectable()
 export class PaymentsService {
@@ -40,7 +45,7 @@ export class PaymentsService {
       for (const allocation of dto.allocations) {
         const invoice = await tx.invoice.findFirst({
           where: { id: allocation.invoiceId, companyId, customerId: dto.customerId },
-          include: { allocations: true },
+          include: BALANCE_INCLUDE,
         });
         if (!invoice) {
           throw new NotFoundException(
@@ -48,13 +53,10 @@ export class PaymentsService {
           );
         }
 
-        const alreadySettled = invoice.allocations.reduce(
-          (sum, a) => sum + Number(a.amount) + Number(a.retentionAmount),
-          0,
-        );
-        const remaining = Number(invoice.total) - alreadySettled;
+        const remaining =
+          Number(invoice.total) - settledAmount(invoice.allocations, invoice.creditNotes);
         const retentionAmount = allocation.retentionAmount ?? 0;
-        if (allocation.amount + retentionAmount > remaining + 0.01) {
+        if (allocation.amount + retentionAmount > remaining + MONEY_TOLERANCE) {
           throw new BadRequestException(
             `El monto aplicado a la factura ${invoice.sequential} (${allocation.amount} + ${retentionAmount} de retención) excede su saldo pendiente (${remaining.toFixed(2)})`,
           );
@@ -69,7 +71,7 @@ export class PaymentsService {
           },
         });
 
-        await this.syncInvoicePaymentStatus(tx, allocation.invoiceId);
+        await syncInvoicePaymentStatus(tx, allocation.invoiceId);
       }
 
       return tx.payment.findUniqueOrThrow({
@@ -98,7 +100,7 @@ export class PaymentsService {
     await this.prisma.$transaction(async (tx) => {
       await tx.payment.delete({ where: { id } }); // cascade borra las allocations
       for (const invoiceId of invoiceIds) {
-        await this.syncInvoicePaymentStatus(tx, invoiceId);
+        await syncInvoicePaymentStatus(tx, invoiceId);
       }
     });
 
@@ -115,7 +117,7 @@ export class PaymentsService {
 
     const invoices = await this.prisma.invoice.findMany({
       where: { customerId, companyId },
-      include: { allocations: true },
+      include: BALANCE_INCLUDE,
       orderBy: { issueDate: 'asc' },
     });
 
@@ -125,6 +127,7 @@ export class PaymentsService {
         (sum, a) => sum + Number(a.retentionAmount),
         0,
       );
+      const credited = creditedAmount(invoice.creditNotes);
       return {
         id: invoice.id,
         sequential: invoice.sequential,
@@ -134,7 +137,8 @@ export class PaymentsService {
         total: Number(invoice.total),
         paidAmount,
         retainedAmount,
-        balance: Number(invoice.total) - paidAmount - retainedAmount,
+        creditedAmount: credited,
+        balance: Number(invoice.total) - paidAmount - retainedAmount - credited,
         paymentStatus: invoice.paymentStatus,
         sriStatus: invoice.sriStatus,
       };
@@ -169,27 +173,5 @@ export class PaymentsService {
         retentionAmount: Number(allocation.retentionAmount),
       })),
     };
-  }
-
-  private async syncInvoicePaymentStatus(tx: Tx, invoiceId: string) {
-    const invoice = await tx.invoice.findUniqueOrThrow({
-      where: { id: invoiceId },
-      include: { allocations: true },
-    });
-
-    const settledAmount = invoice.allocations.reduce(
-      (sum, a) => sum + Number(a.amount) + Number(a.retentionAmount),
-      0,
-    );
-    const total = Number(invoice.total);
-
-    let paymentStatus: InvoicePaymentStatus = InvoicePaymentStatus.PENDING;
-    if (settledAmount >= total - 0.01) {
-      paymentStatus = InvoicePaymentStatus.PAID;
-    } else if (settledAmount > 0) {
-      paymentStatus = InvoicePaymentStatus.PARTIALLY_PAID;
-    }
-
-    await tx.invoice.update({ where: { id: invoiceId }, data: { paymentStatus } });
   }
 }

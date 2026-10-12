@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { InvoicePaymentStatus } from '@prisma/client';
+import { InvoicePaymentStatus, SRIStatus } from '@prisma/client';
 import { PaymentsService } from './payments.service';
 
 /**
@@ -125,7 +125,12 @@ describe('PaymentsService', () => {
     service = new PaymentsService(prisma);
   });
 
-  function seedInvoice(id: string, total: number, sequential = '000000001') {
+  function seedInvoice(
+    id: string,
+    total: number,
+    sequential = '000000001',
+    creditNotes: { total: number; sriStatus: SRIStatus }[] = [],
+  ) {
     prisma.__db.invoices.set(id, {
       id,
       companyId,
@@ -133,6 +138,7 @@ describe('PaymentsService', () => {
       total,
       sequential,
       paymentStatus: InvoicePaymentStatus.PENDING,
+      creditNotes,
     });
   }
 
@@ -265,6 +271,45 @@ describe('PaymentsService', () => {
     expect(invoice.balance).toBeCloseTo(0);
     expect(invoice.paidAmount).toBeCloseTo(98.5);
     expect(invoice.retainedAmount).toBeCloseTo(1.5);
+  });
+
+  it('nota de crédito autorizada: baja el saldo; una pendiente todavía no', async () => {
+    seedInvoice('inv_1', 100, '000000001', [
+      { total: 30, sriStatus: SRIStatus.AUTHORIZED },
+      { total: 20, sriStatus: SRIStatus.PENDING },
+    ]);
+
+    let statement = await service.getAccountStatement(customerId, companyId);
+    expect(statement.invoices[0].creditedAmount).toBeCloseTo(30);
+    expect(statement.invoices[0].balance).toBeCloseTo(70);
+
+    await expect(
+      service.create(
+        {
+          customerId,
+          paymentDate: '2026-09-08',
+          totalAmount: 80,
+          allocations: [{ invoiceId: 'inv_1', amount: 80 }],
+        } as any,
+        companyId,
+        'user_1',
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    await service.create(
+      {
+        customerId,
+        paymentDate: '2026-09-08',
+        totalAmount: 70,
+        allocations: [{ invoiceId: 'inv_1', amount: 70 }],
+      } as any,
+      companyId,
+      'user_1',
+    );
+
+    statement = await service.getAccountStatement(customerId, companyId);
+    expect(statement.invoices[0].paymentStatus).toBe(InvoicePaymentStatus.PAID);
+    expect(statement.invoices[0].balance).toBeCloseTo(0);
   });
 
   it('rechaza si efectivo + retención juntos exceden el saldo pendiente', async () => {
