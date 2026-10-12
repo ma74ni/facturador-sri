@@ -1,15 +1,34 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { RegisterDto } from '../dto/register.dto';
 import { RegisterCompanyDto } from '../dto/register-company.dto';
 import { LoginDto } from '../dto/login.dto';
+import { ForgotPasswordDto, ResetPasswordDto } from '../dto/password-reset.dto';
 import * as bcrypt from 'bcryptjs';
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '@/shared/database/prisma.service';
 import { EmailService } from '@/shared/email/email.service';
 
+const PASSWORD_RESET_TTL_MINUTES = 60;
+// Evita que alguien llene de correos la bandeja de otra persona.
+const PASSWORD_RESET_COOLDOWN_SECONDS = 60;
+
+// Misma respuesta exista o no la cuenta, para no revelar qué emails están registrados.
+const FORGOT_PASSWORD_MESSAGE =
+  'Si el email está registrado, te enviamos un enlace para restablecer tu contraseña.';
+
+const hashResetToken = (token: string) => createHash('sha256').update(token).digest('hex');
+
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
@@ -152,7 +171,17 @@ export class AuthService {
     };
   }
 
-  async registerUser(dto: RegisterDto) {
+  /** Crea un usuario en la empresa del administrador que lo pide. */
+  async registerUser(dto: RegisterDto, adminUserId: string) {
+    const admin = await this.prisma.user.findUnique({
+      where: { id: adminUserId },
+      select: { companyId: true },
+    });
+
+    if (!admin) {
+      throw new UnauthorizedException('Usuario no encontrado');
+    }
+
     // Verificar si el usuario ya existe
     const existingUser = await this.prisma.user.findUnique({
       where: { email: dto.email },
@@ -172,7 +201,7 @@ export class AuthService {
         password: hashedPassword,
         firstName: dto.firstName,
         lastName: dto.lastName,
-        companyId: dto.companyId,
+        companyId: admin.companyId,
       },
     });
 
@@ -248,7 +277,14 @@ export class AuthService {
       throw new UnauthorizedException('Usuario no encontrado');
     }
 
-    const { password, verificationToken, verificationTokenExpiry, ...userWithoutSensitiveData } = user;
+    const {
+      password,
+      verificationToken,
+      verificationTokenExpiry,
+      passwordResetTokenHash,
+      passwordResetExpiry,
+      ...userWithoutSensitiveData
+    } = user;
 
     return {
       user: userWithoutSensitiveData,
@@ -376,6 +412,104 @@ export class AuthService {
       // En desarrollo, retornamos el link. En producción, solo el mensaje
       ...(process.env.NODE_ENV === 'development' && { verificationLink }),
     };
+  }
+
+  /**
+   * Envía un enlace para restablecer la contraseña. Responde lo mismo exista o
+   * no la cuenta, y no reenvía si se pidió hace menos de un minuto.
+   */
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const response = { message: FORGOT_PASSWORD_MESSAGE };
+
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email.trim() },
+    });
+
+    if (!user || !user.isActive) {
+      return response;
+    }
+
+    if (user.lastPasswordResetSent) {
+      const elapsedSeconds = (Date.now() - user.lastPasswordResetSent.getTime()) / 1000;
+      if (elapsedSeconds < PASSWORD_RESET_COOLDOWN_SECONDS) {
+        return response;
+      }
+    }
+
+    const token = randomBytes(32).toString('hex');
+    const passwordResetExpiry = new Date(Date.now() + PASSWORD_RESET_TTL_MINUTES * 60 * 1000);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetTokenHash: hashResetToken(token),
+        passwordResetExpiry,
+        lastPasswordResetSent: new Date(),
+      },
+    });
+
+    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3002'}/reset-password?token=${token}`;
+
+    const result = await this.emailService.sendEmail({
+      to: user.email,
+      subject: 'Restablece tu contraseña - Sistema de Facturación SRI',
+      template: 'password-reset',
+      context: {
+        userName: `${user.firstName} ${user.lastName}`,
+        resetLink,
+        expiryMinutes: PASSWORD_RESET_TTL_MINUTES,
+        year: new Date().getFullYear(),
+      },
+    });
+
+    if (!result.success) {
+      this.logger.error(`No se pudo enviar el correo de recuperación a ${user.email}: ${result.error}`);
+    }
+
+    if (process.env.NODE_ENV === 'development') {
+      this.logger.log(`🔗 Link de recuperación: ${resetLink}`);
+    }
+
+    return response;
+  }
+
+  /**
+   * Cambia la contraseña con un token vigente. El token sirve una sola vez y
+   * las sesiones abiertas antes del cambio quedan cerradas.
+   */
+  async resetPassword(dto: ResetPasswordDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { passwordResetTokenHash: hashResetToken(dto.token) },
+    });
+
+    // BadRequest y no Unauthorized: la web cierra la sesión ante un 401.
+    if (!user || !user.isActive) {
+      throw new BadRequestException(
+        'El enlace no es válido o ya fue usado. Solicita uno nuevo.',
+      );
+    }
+
+    if (!user.passwordResetExpiry || user.passwordResetExpiry < new Date()) {
+      throw new BadRequestException('El enlace expiró. Solicita uno nuevo.');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        passwordResetTokenHash: null,
+        passwordResetExpiry: null,
+        passwordChangedAt: new Date(),
+        // Abrir el enlace prueba que el correo es suyo.
+        emailVerified: true,
+        verificationToken: null,
+        verificationTokenExpiry: null,
+      },
+    });
+
+    return { message: 'Tu contraseña fue actualizada. Ya puedes iniciar sesión.' };
   }
 
   private generateToken(userId: string): string {

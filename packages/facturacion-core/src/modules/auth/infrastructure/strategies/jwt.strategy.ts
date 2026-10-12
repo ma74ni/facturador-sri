@@ -26,6 +26,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException();
     }
 
+    // Un cambio de contraseña cierra las sesiones abiertas antes (iat va en segundos).
+    if (
+      user.passwordChangedAt &&
+      typeof payload.iat === 'number' &&
+      payload.iat < Math.floor(user.passwordChangedAt.getTime() / 1000)
+    ) {
+      throw new UnauthorizedException();
+    }
+
     return { userId: user.id, email: user.email };
   }
 }

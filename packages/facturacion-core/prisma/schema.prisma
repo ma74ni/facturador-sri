@@ -80,6 +80,13 @@ model User {
   verificationTokenExpiry DateTime?
   lastVerificationEmailSent DateTime?
 
+  // Recuperación de contraseña: se guarda el SHA-256 del token, nunca el token.
+  passwordResetTokenHash String?   @unique
+  passwordResetExpiry    DateTime?
+  lastPasswordResetSent  DateTime?
+  // Los JWT emitidos antes de este momento dejan de valer.
+  passwordChangedAt      DateTime?
+
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
