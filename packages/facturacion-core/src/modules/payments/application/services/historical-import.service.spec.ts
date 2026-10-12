@@ -19,6 +19,9 @@ function matches(record: any, where: any): boolean {
     if (value instanceof Date) {
       return record[key] instanceof Date && record[key].getTime() === value.getTime();
     }
+    if (value && typeof value === 'object' && 'not' in value) {
+      return record[key] !== (value as { not: unknown }).not; // { sriStatus: { not: X } }
+    }
     if (value && typeof value === 'object') {
       return matches(record, value); // compound unique key: {companyId, identification}
     }

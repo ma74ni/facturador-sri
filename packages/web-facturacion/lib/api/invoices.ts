@@ -29,7 +29,7 @@ export interface Invoice {
   subtotalBeforeTax: number;
   totalTax: number;
   totalAmount: number;
-  status: 'PENDING' | 'SENT' | 'AUTHORIZED' | 'REJECTED' | 'ERROR';
+  status: 'DRAFT' | 'PENDING' | 'SENT' | 'AUTHORIZED' | 'REJECTED' | 'ERROR' | 'CANCELLED';
   sriStatus?: 'AUTHORIZED' | 'REJECTED' | 'ERROR';
   authorizationNumber?: string;
   authorizationDate?: string;
@@ -63,6 +63,43 @@ export interface CreateInvoiceDto {
     source?: string;
     sendToSri?: boolean;
   };
+}
+
+/** Línea tal como quedó en la factura emitida (base para una nota de crédito). */
+export interface InvoiceDetailItem {
+  id: string;
+  productId?: string | null;
+  mainCode: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  discount: number;
+  ivaCode: string;
+  ivaRate: number;
+}
+
+export interface InvoiceCreditNoteSummary {
+  id: string;
+  formattedNumber: string;
+  issueDate: string;
+  reason: string;
+  total: number;
+  sriStatus: string;
+}
+
+export interface InvoiceDetail {
+  id: string;
+  formattedNumber: string;
+  issueDate: string;
+  customerId: string;
+  customerName: string;
+  emissionPointId: string;
+  total: number;
+  sriStatus: Invoice['status'];
+  items: InvoiceDetailItem[];
+  creditNotes: InvoiceCreditNoteSummary[];
+  /** Monto que todavía se puede acreditar con notas de crédito. */
+  creditNoteAvailable: number;
 }
 
 export interface InvoiceStats {
@@ -100,6 +137,51 @@ export const invoicesApi = {
   getById: async (id: string): Promise<Invoice> => {
     const response = await apiClient.get(`/invoices/${id}`);
     return response.data;
+  },
+
+  // Detalle con líneas y notas de crédito (Decimal de Prisma llega como string)
+  getDetail: async (id: string): Promise<InvoiceDetail> => {
+    const response = await apiClient.get(`/invoices/${id}`);
+    const invoice = response.data.invoice;
+    const customer = invoice.customer;
+    return {
+      id: invoice.id,
+      formattedNumber: invoice.formattedNumber,
+      issueDate: invoice.issueDate,
+      customerId: invoice.customerId,
+      customerName: customer
+        ? customer.businessName || `${customer.firstName || ''} ${customer.lastName || ''}`.trim()
+        : 'Cliente desconocido',
+      emissionPointId: invoice.emissionPointId,
+      total: Number(invoice.total),
+      sriStatus: invoice.sriStatus,
+      items: (invoice.items || []).map((item: any) => ({
+        id: item.id,
+        productId: item.productId,
+        mainCode: item.mainCode,
+        description: item.description,
+        quantity: Number(item.quantity),
+        unitPrice: Number(item.unitPrice),
+        discount: Number(item.discount || 0),
+        ivaCode: item.ivaCode,
+        ivaRate: Number(item.ivaRate || 0),
+      })),
+      creditNotes: (invoice.creditNotes || []).map((cn: any) => ({
+        id: cn.id,
+        formattedNumber: `${cn.establishmentCode}-${cn.emissionPointCode}-${cn.sequential}`,
+        issueDate: cn.issueDate,
+        reason: cn.reason,
+        total: Number(cn.total),
+        sriStatus: cn.sriStatus,
+      })),
+      creditNoteAvailable: Number(invoice.creditNoteAvailable ?? 0),
+    };
+  },
+
+  // Cancelar una factura NO autorizada (borrador, pendiente, con error o
+  // rechazada). Queda como CANCELLED; no se borra ni llega al SRI.
+  cancel: async (id: string, reason: string): Promise<void> => {
+    await apiClient.post(`/invoices/${id}/cancel`, { reason });
   },
 
   // Crear nueva factura
@@ -157,7 +239,7 @@ export const invoicesApi = {
     await apiClient.post(`/invoices/${id}/send-email`, { email });
   },
 
-  // Eliminar factura
+  // DEPRECADO en la API (redirige a cancelar); usar `cancel`.
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/invoices/${id}`);
   },

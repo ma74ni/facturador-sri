@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   LayoutDashboard,
   FileText,
+  FileMinus,
   Users,
   Package,
   Building2,
@@ -67,6 +68,7 @@ export default function DashboardLayout({
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "Facturas", href: "/dashboard/facturas", icon: FileText },
+    { name: "Notas de crédito", href: "/dashboard/notas-credito", icon: FileMinus },
     { name: "Clientes", href: "/dashboard/clientes", icon: Users },
     { name: "Productos", href: "/dashboard/productos", icon: Package },
     ...(hasModule(company?.enabledModules, COBRANZA_MODULE)

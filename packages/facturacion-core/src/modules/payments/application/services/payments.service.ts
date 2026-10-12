@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { SRIStatus } from '@prisma/client';
 import { PrismaService } from '../../../../shared/database/prisma.service';
 import { CreatePaymentDto } from '../dto/create-payment.dto';
 import { creditedAmount, MONEY_TOLERANCE, settledAmount } from '../../domain/invoice-balance';
@@ -44,7 +45,12 @@ export class PaymentsService {
 
       for (const allocation of dto.allocations) {
         const invoice = await tx.invoice.findFirst({
-          where: { id: allocation.invoiceId, companyId, customerId: dto.customerId },
+          where: {
+            id: allocation.invoiceId,
+            companyId,
+            customerId: dto.customerId,
+            sriStatus: { not: SRIStatus.CANCELLED },
+          },
           include: BALANCE_INCLUDE,
         });
         if (!invoice) {
@@ -115,8 +121,9 @@ export class PaymentsService {
       throw new NotFoundException('Cliente no encontrado');
     }
 
+    // Una factura cancelada nunca llegó al SRI: no es deuda del cliente.
     const invoices = await this.prisma.invoice.findMany({
-      where: { customerId, companyId },
+      where: { customerId, companyId, sriStatus: { not: SRIStatus.CANCELLED } },
       include: BALANCE_INCLUDE,
       orderBy: { issueDate: 'asc' },
     });
