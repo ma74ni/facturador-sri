@@ -21,9 +21,4 @@ export class RegisterDto {
   @IsString()
   @IsNotEmpty()
   lastName: string;
-
-  @ApiProperty({ example: 'cuid_de_empresa' })
-  @IsString()
-  @IsNotEmpty()
-  companyId: string;
 }

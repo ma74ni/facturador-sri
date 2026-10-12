@@ -16,4 +16,15 @@ export const authApi = {
     const response = await apiClient.post('/auth/resend-verification', { email });
     return response.data;
   },
+
+  // Responde igual exista o no la cuenta.
+  forgotPassword: async (email: string): Promise<{ message: string }> => {
+    const response = await apiClient.post('/auth/forgot-password', { email });
+    return response.data;
+  },
+
+  resetPassword: async (token: string, password: string): Promise<{ message: string }> => {
+    const response = await apiClient.post('/auth/reset-password', { token, password });
+    return response.data;
+  },
 };
