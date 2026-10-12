@@ -19,6 +19,8 @@ import {
   LineIvaResolverService,
   toBadRequest,
 } from '../../../tax-codes/application/services/line-iva-resolver.service';
+import { availableForCreditNote, exceedsAvailable } from '../../domain/credit-note-limit';
+import { syncInvoicePaymentStatus } from '../../../payments/application/services/invoice-payment-status';
 
 @Injectable()
 export class CreditNotesService {
@@ -47,6 +49,7 @@ export class CreditNotesService {
         establishment: true,
         emissionPoint: true,
         items: { select: { mainCode: true, ivaCode: true } },
+        creditNotes: { select: { total: true, sriStatus: true } },
       },
     });
 
@@ -75,9 +78,9 @@ export class CreditNotesService {
       );
     }
 
-    // 3. Validar punto de emisión
+    // 3. Validar punto de emisión (de esta empresa: el id viene del cliente)
     const emissionPoint = await this.prisma.emissionPoint.findFirst({
-      where: { id: dto.emissionPointId },
+      where: { id: dto.emissionPointId, establishment: { companyId } },
       include: { establishment: true },
     });
 
@@ -114,20 +117,26 @@ export class CreditNotesService {
     );
     const total = taxes.total;
 
-    // Validar que el total de la nota de crédito no exceda el total de la factura
-    if (total.greaterThan(modifiedInvoice.total)) {
+    // Validar que, sumada a las notas ya emitidas, no exceda el total de la factura
+    const available = availableForCreditNote(
+      Number(modifiedInvoice.total),
+      modifiedInvoice.creditNotes,
+    );
+    if (exceedsAvailable(total.toNumber(), available)) {
       throw new BadRequestException(
-        'El total de la nota de crédito no puede exceder el total de la factura',
+        `El total de la nota de crédito (${total.toFixed(2)}) excede el saldo disponible de la factura (${available.toFixed(2)})`,
       );
     }
 
     // 6. Secuencial: se reserva solo después de validar las líneas, para no
-    //    perder un número por una nota rechazada.
-    const sequential = emissionPoint.creditNoteSequence.toString().padStart(9, '0');
-    await this.prisma.emissionPoint.update({
+    //    perder un número por una nota rechazada. El increment es atómico:
+    //    dos notas simultáneas no pueden llevarse el mismo número.
+    const reserved = await this.prisma.emissionPoint.update({
       where: { id: emissionPoint.id },
-      data: { creditNoteSequence: emissionPoint.creditNoteSequence + 1 },
+      data: { creditNoteSequence: { increment: 1 } },
+      select: { creditNoteSequence: true },
     });
+    const sequential = (reserved.creditNoteSequence - 1).toString().padStart(9, '0');
 
     // 7. Generar clave de acceso
     const issueDate = dto.issueDate ? new Date(dto.issueDate) : new Date();
@@ -381,6 +390,24 @@ export class CreditNotesService {
       throw new BadRequestException('Esta nota de crédito ya está autorizada por el SRI');
     }
 
+    // Una rechazada liberó su monto: mientras tanto pudo emitirse otra nota
+    // sobre la misma factura, así que se revalida el cupo antes de reenviarla.
+    if (creditNote.sriStatus === 'REJECTED') {
+      const otherNotes = await this.prisma.creditNote.findMany({
+        where: { modifiedInvoiceId: creditNote.modifiedInvoiceId, id: { not: creditNote.id } },
+        select: { total: true, sriStatus: true },
+      });
+      const available = availableForCreditNote(
+        Number(creditNote.modifiedInvoice.total),
+        otherNotes,
+      );
+      if (exceedsAvailable(Number(creditNote.total), available)) {
+        throw new BadRequestException(
+          `No se puede reenviar: el total de la nota (${Number(creditNote.total).toFixed(2)}) excede el saldo disponible de la factura (${available.toFixed(2)})`,
+        );
+      }
+    }
+
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
     });
@@ -416,6 +443,9 @@ export class CreditNotesService {
               authorizationDate: authorization.fechaAutorizacion ? new Date(authorization.fechaAutorizacion) : new Date(),
             },
           });
+
+          // Autorizada, la nota descuenta del saldo por cobrar de la factura.
+          await syncInvoicePaymentStatus(this.prisma, creditNote.modifiedInvoiceId);
 
           // ==================== ENVÍO AUTOMÁTICO DE EMAIL ====================
           let emailSent = false;

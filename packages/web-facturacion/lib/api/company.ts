@@ -37,4 +37,33 @@ export const companyApi = {
     const response = await apiClient.put('/companies/me', data);
     return response.data;
   },
+
+  // Logo (sale en el RIDE). La API acepta PNG/JPG de hasta 2 MB.
+  uploadLogo: async (file: File): Promise<void> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    await apiClient.post('/companies/logo', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+
+  // El endpoint pide token, así que no sirve como `src` de un <img>: se baja
+  // como blob. null = la empresa no tiene logo (la API responde 400).
+  getLogo: async (): Promise<Blob | null> => {
+    try {
+      const response = await apiClient.get('/companies/logo', { responseType: 'blob' });
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 400 || error.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  },
+
+  deleteLogo: async (): Promise<void> => {
+    await apiClient.delete('/companies/logo');
+  },
 };

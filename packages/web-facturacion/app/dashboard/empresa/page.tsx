@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { companyApi, UpdateCompanyDto } from '@/lib/api/company';
 import { useToast } from '@/hooks/use-toast';
+import { LogoManager } from '@/components/company/logo-manager';
 
 export default function EmpresaPage() {
   const { company, checkAuth } = useAuth();
@@ -317,6 +318,8 @@ export default function EmpresaPage() {
           </div>
         </CardContent>
       </Card>
+
+      <LogoManager />
 
       {/* SRI Configuration */}
       <Card>
