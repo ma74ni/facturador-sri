@@ -228,30 +228,4 @@ export class EstablishmentsService {
       message: 'Punto de emisión eliminado exitosamente',
     };
   }
-
-  async getNextSequential(emissionPointId: string, companyId: string) {
-    const emissionPoint = await this.prisma.emissionPoint.findUnique({
-      where: { id: emissionPointId },
-      include: { establishment: true },
-    });
-
-    if (!emissionPoint || emissionPoint.establishment.companyId !== companyId) {
-      throw new NotFoundException('Punto de emisión no encontrado');
-    }
-
-    const currentSequential = emissionPoint.invoiceSequence;
-    const nextSequential = currentSequential.toString().padStart(9, '0');
-
-    // Incrementar el secuencial para la próxima factura
-    await this.prisma.emissionPoint.update({
-      where: { id: emissionPointId },
-      data: { invoiceSequence: currentSequential + 1 },
-    });
-
-    return {
-      sequential: nextSequential,
-      establishment: emissionPoint.establishment.code,
-      emissionPoint: emissionPoint.code,
-    };
-  }
 }

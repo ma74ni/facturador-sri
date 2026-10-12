@@ -67,11 +67,7 @@ export class InvoicesService {
       throw new NotFoundException('Compañía no encontrada');
     }
 
-    // 4. Obtener secuencial (NO incrementar aún)
-    const sequential = emissionPoint.invoiceSequence.toString().padStart(9, '0');
-    this.logger.log(`📋 Usando secuencial: ${sequential} (no incrementado aún)`);
-
-    // 5. IVA por línea (tarifa de la línea o de su producto) y totales
+    // 4. IVA por línea (tarifa de la línea o de su producto) y totales
     const ivaCodes = await this.lineIvaResolver.resolve(companyId, dto.items);
     const taxes = toBadRequest(() =>
       this.taxCalculator.calculate(
@@ -84,21 +80,29 @@ export class InvoicesService {
       ),
     );
 
-    // 6. Generar clave de acceso
     const issueDate = new Date(dto.issueDate);
-    const accessKey = this.accessKeyService.generateAccessKey(
-      issueDate,
-      '01',
-      company.ruc,
-      company.environment,
-      establishment.code,
-      emissionPoint.code,
-      sequential,
-    );
 
-    // 7. Crear factura en estado DRAFT (dentro de transacción)
+    // 5. Reservar el secuencial y crear la factura en DRAFT en una sola transacción.
+    // El increment bloquea la fila del punto de emisión: dos facturas simultáneas
+    // reciben números distintos, y si la creación falla el número se libera.
     const invoice = await this.prisma.$transaction(async (prisma) => {
-      // Crear factura con items
+      const reserved = await prisma.emissionPoint.update({
+        where: { id: emissionPoint.id },
+        data: { invoiceSequence: { increment: 1 } },
+        select: { invoiceSequence: true },
+      });
+      const sequential = (reserved.invoiceSequence - 1).toString().padStart(9, '0');
+
+      const accessKey = this.accessKeyService.generateAccessKey(
+        issueDate,
+        '01',
+        company.ruc,
+        company.environment,
+        establishment.code,
+        emissionPoint.code,
+        sequential,
+      );
+
       const newInvoice = await prisma.invoice.create({
         data: {
           documentType: '01',
@@ -144,9 +148,10 @@ export class InvoicesService {
         },
       });
 
-      this.logger.log(`✅ Factura creada en estado DRAFT (ID: ${newInvoice.id})`);
+      this.logger.log(`✅ Factura ${sequential} creada en estado DRAFT (ID: ${newInvoice.id})`);
       return newInvoice;
     });
+    const { accessKey, sequential } = invoice;
 
     // ==================== GENERAR Y FIRMAR XML ====================
     let xmlPath: string | undefined;
@@ -175,35 +180,23 @@ export class InvoicesService {
         signatureStatus = 'sin_certificado';
       }
 
-      // 10. SI TODO ES EXITOSO, incrementar secuencial y cambiar a PENDING
-      await this.prisma.$transaction(async (prisma) => {
-        // Incrementar secuencial
-        await prisma.emissionPoint.update({
-          where: { id: emissionPoint.id },
-          data: { invoiceSequence: emissionPoint.invoiceSequence + 1 },
-        });
-
-        this.logger.log(`✅ Secuencial incrementado: ${emissionPoint.invoiceSequence} → ${emissionPoint.invoiceSequence + 1}`);
-
-        // Actualizar factura a PENDING con archivos
-        await prisma.invoice.update({
-          where: { id: invoice.id },
-          data: {
-            xmlPath,
-            xmlSignedPath,
-            sriStatus: xmlSignedPath ? 'PENDING' : 'DRAFT', // PENDING solo si está firmada
-          },
-        });
-
-        this.logger.log(`✅ Factura actualizada a estado: ${xmlSignedPath ? 'PENDING' : 'DRAFT'}`);
+      // 10. Guardar archivos; PENDING solo si quedó firmada
+      await this.prisma.invoice.update({
+        where: { id: invoice.id },
+        data: {
+          xmlPath,
+          xmlSignedPath,
+          sriStatus: xmlSignedPath ? 'PENDING' : 'DRAFT',
+        },
       });
 
+      this.logger.log(`✅ Factura actualizada a estado: ${xmlSignedPath ? 'PENDING' : 'DRAFT'}`);
     } catch (error) {
       this.logger.error(`❌ Error en generación/firma: ${error.message}`);
       signatureStatus = 'error_generacion';
 
-      // La factura queda en DRAFT, el secuencial NO se incrementó
-      this.logger.warn(`⚠️ Factura ${invoice.id} quedó en estado DRAFT. Secuencial NO incrementado.`);
+      // Conserva su número: la siguiente factura usa otro. Se puede cancelar.
+      this.logger.warn(`⚠️ Factura ${invoice.id} quedó en estado DRAFT con el secuencial ${sequential}.`);
     }
 
     return {
