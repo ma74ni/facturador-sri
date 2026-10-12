@@ -11,6 +11,7 @@ import { RideGeneratorService } from '../../infrastructure/pdf/ride-generator.se
 import { EmailService } from '../../../../shared/email/email.service';
 import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
 import { TaxCalculatorService } from '../../../tax-codes/domain/services/tax-calculator.service';
+import { availableForCreditNote } from '../../../credit-notes/domain/credit-note-limit';
 import {
   LineIvaResolverService,
   toBadRequest,
@@ -266,6 +267,19 @@ export class InvoicesService {
             email: true,
           },
         },
+        creditNotes: {
+          select: {
+            id: true,
+            establishmentCode: true,
+            emissionPointCode: true,
+            sequential: true,
+            issueDate: true,
+            reason: true,
+            total: true,
+            sriStatus: true,
+          },
+          orderBy: { createdAt: 'asc' },
+        },
       },
     });
 
@@ -278,6 +292,8 @@ export class InvoicesService {
       invoice: {
         ...invoice,
         formattedNumber: `${invoice.establishmentCode}-${invoice.emissionPointCode}-${invoice.sequential}`,
+        // Lo que aún se puede acreditar con una nota de crédito (ver credit-note-limit).
+        creditNoteAvailable: availableForCreditNote(Number(invoice.total), invoice.creditNotes),
       },
     };
   }

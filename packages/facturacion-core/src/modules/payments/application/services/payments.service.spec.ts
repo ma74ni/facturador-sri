@@ -18,6 +18,10 @@ function createFakePrisma() {
   let seq = 0;
   const nextId = (prefix: string) => `${prefix}_${++seq}`;
 
+  // Solo el filtro que usa el servicio: { sriStatus: { not: X } }.
+  const matchesSriStatus = (invoice: any, where: any) =>
+    !where.sriStatus?.not || invoice.sriStatus !== where.sriStatus.not;
+
   const allocationsForInvoice = (invoiceId: string) =>
     [...db.allocations.values()].filter((a) => a.invoiceId === invoiceId);
 
@@ -27,6 +31,7 @@ function createFakePrisma() {
       if (!invoice) return null;
       if (where.companyId && invoice.companyId !== where.companyId) return null;
       if (where.customerId && invoice.customerId !== where.customerId) return null;
+      if (!matchesSriStatus(invoice, where)) return null;
       return { ...invoice, allocations: allocationsForInvoice(invoice.id) };
     },
     findUniqueOrThrow: async ({ where }: any) => {
@@ -36,7 +41,12 @@ function createFakePrisma() {
     },
     findMany: async ({ where }: any) => {
       return [...db.invoices.values()]
-        .filter((i) => i.customerId === where.customerId && i.companyId === where.companyId)
+        .filter(
+          (i) =>
+            i.customerId === where.customerId &&
+            i.companyId === where.companyId &&
+            matchesSriStatus(i, where),
+        )
         .map((i) => ({ ...i, allocations: allocationsForInvoice(i.id) }));
     },
     update: async ({ where, data }: any) => {
@@ -310,6 +320,29 @@ describe('PaymentsService', () => {
     statement = await service.getAccountStatement(customerId, companyId);
     expect(statement.invoices[0].paymentStatus).toBe(InvoicePaymentStatus.PAID);
     expect(statement.invoices[0].balance).toBeCloseTo(0);
+  });
+
+  it('una factura cancelada no es deuda: no sale en el estado de cuenta ni admite pagos', async () => {
+    seedInvoice('inv_ok', 100, '000000001');
+    seedInvoice('inv_cancelada', 50, '000000002');
+    prisma.__db.invoices.get('inv_cancelada').sriStatus = SRIStatus.CANCELLED;
+
+    const statement = await service.getAccountStatement(customerId, companyId);
+    expect(statement.invoices.map((i) => i.id)).toEqual(['inv_ok']);
+    expect(statement.totalPending).toBeCloseTo(100);
+
+    await expect(
+      service.create(
+        {
+          customerId,
+          paymentDate: '2026-09-08',
+          totalAmount: 50,
+          allocations: [{ invoiceId: 'inv_cancelada', amount: 50 }],
+        } as any,
+        companyId,
+        'user_1',
+      ),
+    ).rejects.toThrow(NotFoundException);
   });
 
   it('rechaza si efectivo + retención juntos exceden el saldo pendiente', async () => {
