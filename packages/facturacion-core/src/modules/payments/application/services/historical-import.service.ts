@@ -3,6 +3,7 @@ import { parse } from 'csv-parse/sync';
 import { PrismaService } from '../../../../shared/database/prisma.service';
 import { PaymentsService } from './payments.service';
 import { CreateHistoricalInvoiceDto } from '../dto/create-historical-invoice.dto';
+import { MONEY_TOLERANCE, settledAmount } from '../../domain/invoice-balance';
 
 export interface ImportRowError {
   row: number;
@@ -410,14 +411,14 @@ export class HistoricalImportService {
         for (const allocation of allocations) {
           const invoice = await this.prisma.invoice.findFirst({
             where: { id: allocation.invoiceId },
-            include: { allocations: true },
+            include: {
+              allocations: true,
+              creditNotes: { select: { total: true, sriStatus: true } },
+            },
           });
-          const alreadySettled = invoice!.allocations.reduce(
-            (sum, a) => sum + Number(a.amount) + Number(a.retentionAmount),
-            0,
-          );
-          const remaining = Number(invoice!.total) - alreadySettled;
-          if (allocation.amount + allocation.retentionAmount > remaining + 0.01) {
+          const remaining =
+            Number(invoice!.total) - settledAmount(invoice!.allocations, invoice!.creditNotes);
+          if (allocation.amount + allocation.retentionAmount > remaining + MONEY_TOLERANCE) {
             balanceError = `Factura ${invoice!.sequential}: excede su saldo pendiente (${remaining.toFixed(2)})`;
             break;
           }
