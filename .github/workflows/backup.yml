@@ -43,13 +43,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Instalar pg_dump 17
-        # Debe ser igual o más nuevo que la versión de Postgres de Neon.
+      - name: Instalar pg_dump 18
+        # Debe ser igual o más nuevo que la versión de Postgres de Neon (18.x).
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-common
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
-          sudo apt-get install -y -qq postgresql-client-17
+          sudo apt-get install -y -qq postgresql-client-18
 
       - name: Respaldar y cifrar
         env:
@@ -65,12 +65,12 @@ jobs:
             *-pooler.*) echo "::error::FACTURADOR_DB_URL debe ser la conexión directa de Neon, sin -pooler."; exit 1 ;;
           esac
           file="facturador-$(date -u +%Y-%m-%d).dump"
-          /usr/lib/postgresql/17/bin/pg_dump "$FACTURADOR_DB_URL" \
+          /usr/lib/postgresql/18/bin/pg_dump "$FACTURADOR_DB_URL" \
             --format=custom --no-owner --no-privileges \
             --file="$file"
           # pg_restore debe poder leerlo, y debe ser la base del FACTURADOR:
           # un secret apuntando a otra base (p. ej. la del POS) también "funciona".
-          /usr/lib/postgresql/17/bin/pg_restore --list "$file" > toc.txt
+          /usr/lib/postgresql/18/bin/pg_restore --list "$file" > toc.txt
           echo "Tablas en el respaldo: $(grep -c ' TABLE DATA ' toc.txt || true)"
           for table in companies users invoices invoice_items credit_notes customers payments; do
             if ! grep -q " TABLE DATA public $table " toc.txt; then
