@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { openSecret } from '../../crypto/secret-cipher';
 const Mailjet = require('node-mailjet');
 
 // Interfaces para la respuesta de Mailjet
@@ -39,10 +40,11 @@ export class MailjetProvider {
   }
 
   /**
-   * Crea un cliente de Mailjet para una empresa específica
+   * Crea un cliente de Mailjet para una empresa específica. La secret key
+   * llega cifrada desde la base (o en claro al validar una nueva).
    */
   private createCompanyClient(apiKey: string, secretKey: string): any {
-    return Mailjet.apiConnect(apiKey, secretKey);
+    return Mailjet.apiConnect(apiKey, openSecret(secretKey));
   }
 
   /**

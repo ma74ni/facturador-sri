@@ -1,14 +1,27 @@
+// Primero: Sentry debe cargarse antes que Express y Nest.
+import './instrument';
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { isAllowedOrigin, parseCorsOrigins } from './shared/http/cors-origins';
 
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // CORS
-  app.enableCors();
+  // CORS: solo la web del facturador. Sin CORS_ORIGIN queda abierto (desarrollo).
+  const corsOrigins = parseCorsOrigins(process.env.CORS_ORIGIN);
+  if (corsOrigins.length === 0) {
+    Logger.warn('CORS_ORIGIN vacío: la API acepta llamadas desde cualquier origen', 'CORS');
+    app.enableCors();
+  } else {
+    app.enableCors({
+      // Un origen no permitido recibe la respuesta sin cabeceras CORS y el navegador la bloquea.
+      origin: (origin, callback) =>
+        callback(null, !origin || isAllowedOrigin(origin, corsOrigins)),
+    });
+  }
 
   // Global prefix
   app.setGlobalPrefix('api/v1');
