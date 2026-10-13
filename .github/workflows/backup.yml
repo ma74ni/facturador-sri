@@ -6,9 +6,10 @@
 # artifact del workflow.
 #
 # Secrets (Settings > Secrets and variables > Actions):
-# - FACTURADOR_DB_URL: cadena DIRECTA de Neon de producción (la de DIRECT_URL
-#   en Render, sin "-pooler" en el host): pg_dump no funciona bien a través de
-#   PgBouncer. Ideal: un rol de solo lectura.
+# - FACTURADOR_DB_URL: cadena DIRECTA de Neon de producción del FACTURADOR
+#   (la DIRECT_URL del servicio facturador-core en Render, no la del POS; sin
+#   "-pooler" en el host): pg_dump no funciona bien a través de PgBouncer.
+#   Ideal: un rol de solo lectura.
 # - BACKUP_PASSPHRASE: frase larga y aleatoria. Sin ella los respaldos no se
 #   pueden descifrar: guardar una copia fuera de GitHub (gestor de contraseñas).
 #
@@ -67,13 +68,17 @@ jobs:
           /usr/lib/postgresql/17/bin/pg_dump "$FACTURADOR_DB_URL" \
             --format=custom --no-owner --no-privileges \
             --file="$file"
-          # Un respaldo vacío o truncado no sirve: pg_restore debe poder leerlo.
-          tables=$(/usr/lib/postgresql/17/bin/pg_restore --list "$file" | grep -c " TABLE DATA " || true)
-          echo "Tablas en el respaldo: $tables"
-          if [ "$tables" -lt 10 ]; then
-            echo "::error::El respaldo tiene solo $tables tablas; revisar la conexión."
-            exit 1
-          fi
+          # pg_restore debe poder leerlo, y debe ser la base del FACTURADOR:
+          # un secret apuntando a otra base (p. ej. la del POS) también "funciona".
+          /usr/lib/postgresql/17/bin/pg_restore --list "$file" > toc.txt
+          echo "Tablas en el respaldo: $(grep -c ' TABLE DATA ' toc.txt || true)"
+          for table in companies users invoices invoice_items credit_notes customers payments; do
+            if ! grep -q " TABLE DATA public $table " toc.txt; then
+              echo "::error::Falta la tabla $table: FACTURADOR_DB_URL no apunta a la base del facturador."
+              exit 1
+            fi
+          done
+          rm toc.txt
           gpg --batch --yes --pinentry-mode loopback \
             --passphrase-fd 3 --symmetric --cipher-algo AES256 \
             --output "$file.gpg" "$file" 3<<<"$BACKUP_PASSPHRASE"
