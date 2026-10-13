@@ -37,6 +37,10 @@ services:
         value: 7d
       - key: FRONTEND_URL
         value: https://app.facturador.siete8.com
+      # Orígenes de navegador permitidos (coma). El POS llama de servidor a
+      # servidor y no necesita estar aquí.
+      - key: CORS_ORIGIN
+        value: https://app.facturador.siete8.com
       - key: SIGNING_SERVICE_URL
         sync: false # URL de facturador-signing (onrender.com)
       - key: SRI_RECEPTION_URL_TEST
@@ -115,6 +119,8 @@ services:
         value: 7d
       - key: FRONTEND_URL
         sync: false # URL de la rama dev del frontend en Netlify
+      - key: CORS_ORIGIN
+        value: https://dev--facturador-siete8.netlify.app,https://deploy-preview-*--facturador-siete8.netlify.app,http://localhost:3002
       - key: SIGNING_SERVICE_URL
         sync: false # URL de facturador-signing-dev (onrender.com)
       - key: SRI_RECEPTION_URL_TEST
