@@ -5,8 +5,10 @@ import {
   encryptSecret,
   isEncrypted,
   openCertificatePassword,
+  openSecret,
   parseKey,
   sealCertificatePassword,
+  sealSecret,
 } from './secret-cipher';
 
 describe('secret-cipher', () => {
@@ -55,5 +57,13 @@ describe('secret-cipher', () => {
     const stored = sealCertificatePassword('clave');
     expect(isEncrypted(stored)).toBe(true);
     expect(openCertificatePassword(stored)).toBe('clave');
+  });
+
+  it('sella cualquier secreto de la empresa con la misma llave', () => {
+    process.env.CERTIFICATE_ENCRYPTION_KEY = key.toString('base64');
+    const stored = sealSecret('mailjet-secret');
+    expect(stored).not.toContain('mailjet-secret');
+    expect(openSecret(stored)).toBe('mailjet-secret');
+    expect(openSecret('mailjet-plano')).toBe('mailjet-plano');
   });
 });

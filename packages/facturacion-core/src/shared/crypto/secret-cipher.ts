@@ -1,14 +1,14 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 
 /**
- * Cifrado de secretos guardados en la base (hoy: la clave del certificado
- * .p12 de cada empresa). AES-256-GCM con una llave de 32 bytes en base64
- * (`CERTIFICATE_ENCRYPTION_KEY`).
+ * Cifrado de secretos guardados en la base: la clave del certificado .p12 y
+ * la secret key de Mailjet de cada empresa. AES-256-GCM con una llave de 32
+ * bytes en base64 (`CERTIFICATE_ENCRYPTION_KEY`).
  *
  * Formato guardado: `enc:v1:<iv>:<tag>:<texto cifrado>`, cada parte en
  * base64. Un valor sin el prefijo es texto plano de antes del cifrado: se
  * devuelve tal cual, para que la migración se haga sin cortar el servicio
- * (scripts/encrypt-certificate-passwords.ts).
+ * (scripts/encrypt-certificate-passwords.ts, scripts/encrypt-mail-secrets.ts).
  */
 
 const PREFIX = 'enc:v1:';
@@ -54,17 +54,26 @@ export function certificateKey(): Buffer | null {
   return parseKey(process.env.CERTIFICATE_ENCRYPTION_KEY);
 }
 
-/** Lo que se guarda en `Company.certificatePassword`. */
-export function sealCertificatePassword(password: string): string {
+/**
+ * Lo que se guarda en la base para un secreto de la empresa (clave del
+ * certificado, secret key de Mailjet). Usa la misma llave para todos.
+ */
+export function sealSecret(plain: string): string {
   const key = certificateKey();
-  if (key) return encryptSecret(password, key);
+  if (key) return encryptSecret(plain, key);
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('Falta CERTIFICATE_ENCRYPTION_KEY: no se guardan claves sin cifrar');
+    throw new Error('Falta CERTIFICATE_ENCRYPTION_KEY: no se guardan secretos sin cifrar');
   }
-  return password;
+  return plain;
 }
 
-/** La clave en claro, solo en memoria, para firmar. */
-export function openCertificatePassword(stored: string): string {
+/** El secreto en claro, solo en memoria. Un valor sin cifrar se devuelve tal cual. */
+export function openSecret(stored: string): string {
   return decryptSecret(stored, certificateKey());
 }
+
+/** Lo que se guarda en `Company.certificatePassword`. */
+export const sealCertificatePassword = sealSecret;
+
+/** La clave en claro, solo en memoria, para firmar. */
+export const openCertificatePassword = openSecret;
