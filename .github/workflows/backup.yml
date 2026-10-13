@@ -1,0 +1,90 @@
+# Respaldo diario de la base de PRODUCCIÓN del facturador (Neon).
+#
+# pg_dump completo (facturas, notas de crédito, clientes, usuarios, cobranza),
+# cifrado con BACKUP_PASSPHRASE: este repositorio es público y cualquiera con
+# cuenta de GitHub puede descargar sus artifacts. Se guarda 30 días como
+# artifact del workflow.
+#
+# Secrets (Settings > Secrets and variables > Actions):
+# - FACTURADOR_DB_URL: cadena DIRECTA de Neon de producción (la de DIRECT_URL
+#   en Render, sin "-pooler" en el host): pg_dump no funciona bien a través de
+#   PgBouncer. Ideal: un rol de solo lectura.
+# - BACKUP_PASSPHRASE: frase larga y aleatoria. Sin ella los respaldos no se
+#   pueden descifrar: guardar una copia fuera de GitHub (gestor de contraseñas).
+#
+# No incluye los archivos de R2 (XML, RIDE, certificados, logos): solo sus
+# rutas en la base. Complementa, no reemplaza, la restauración a un punto en
+# el tiempo de Neon (History retention del proyecto).
+#
+# Restaurar en una base local o en una rama nueva de Neon:
+#   gpg --decrypt facturador-AAAA-MM-DD.dump.gpg > facturador.dump
+#   pg_restore --clean --if-exists --no-owner --no-privileges \
+#     -d "<URL de destino>" facturador.dump
+# Nunca restaurar sobre producción sin un respaldo previo de su estado actual.
+
+name: Respaldo de la base
+
+on:
+  schedule:
+    # 08:00 UTC = 03:00 en Quito, fuera del horario de facturación.
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Instalar pg_dump 17
+        # Debe ser igual o más nuevo que la versión de Postgres de Neon.
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-client-17
+
+      - name: Respaldar y cifrar
+        env:
+          FACTURADOR_DB_URL: ${{ secrets.FACTURADOR_DB_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if [ -z "$FACTURADOR_DB_URL" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::error::Faltan los secrets FACTURADOR_DB_URL y BACKUP_PASSPHRASE."
+            exit 1
+          fi
+          case "$FACTURADOR_DB_URL" in
+            *-pooler.*) echo "::error::FACTURADOR_DB_URL debe ser la conexión directa de Neon, sin -pooler."; exit 1 ;;
+          esac
+          file="facturador-$(date -u +%Y-%m-%d).dump"
+          /usr/lib/postgresql/17/bin/pg_dump "$FACTURADOR_DB_URL" \
+            --format=custom --no-owner --no-privileges \
+            --file="$file"
+          # Un respaldo vacío o truncado no sirve: pg_restore debe poder leerlo.
+          tables=$(/usr/lib/postgresql/17/bin/pg_restore --list "$file" | grep -c " TABLE DATA " || true)
+          echo "Tablas en el respaldo: $tables"
+          if [ "$tables" -lt 10 ]; then
+            echo "::error::El respaldo tiene solo $tables tablas; revisar la conexión."
+            exit 1
+          fi
+          gpg --batch --yes --pinentry-mode loopback \
+            --passphrase-fd 3 --symmetric --cipher-algo AES256 \
+            --output "$file.gpg" "$file" 3<<<"$BACKUP_PASSPHRASE"
+          rm "$file"
+          echo "BACKUP_FILE=$file.gpg" >> "$GITHUB_ENV"
+          ls -l "$file.gpg"
+
+      - name: Guardar 30 días
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BACKUP_FILE }}
+          path: ${{ env.BACKUP_FILE }}
+          retention-days: 30
+          if-no-files-found: error
