@@ -22,6 +22,7 @@ import { PrismaService } from '../../../../shared/database/prisma.service';
 import { Response } from 'express';
 import { EmailService } from '@/shared/email/email.service';
 import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
+import { sealSecret } from '../../../../shared/crypto/secret-cipher';
 
 @ApiTags('companies')
 @Controller('companies')
@@ -215,7 +216,7 @@ async updateMailjetConfig(@Body() dto: any, @Request() req: any) {
     data: {
       emailProvider: 'MAILJET',
       mailjetApiKey: dto.mailjetApiKey,
-      mailjetSecretKey: dto.mailjetSecretKey,
+      mailjetSecretKey: sealSecret(dto.mailjetSecretKey),
       mailjetFromEmail: dto.mailjetFromEmail || null,
       mailjetFromName: dto.mailjetFromName || null,
       mailjetSenderVerified: false,
