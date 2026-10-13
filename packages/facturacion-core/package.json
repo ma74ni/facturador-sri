@@ -38,6 +38,7 @@
     "@nestjs/swagger": "^7.1.17",
     "@nestjs/throttler": "^5.1.1",
     "@prisma/client": "^5.7.1",
+    "@sentry/nestjs": "^11.7.0",
     "@xmldom/xmldom": "^0.8.11",
     "axios": "^1.12.2",
     "bcryptjs": "^3.0.2",

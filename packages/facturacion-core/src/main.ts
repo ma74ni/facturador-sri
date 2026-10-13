@@ -1,3 +1,5 @@
+// Primero: Sentry debe cargarse antes que Express y Nest.
+import './instrument';
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
