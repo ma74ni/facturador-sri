@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { SentryGlobalFilter, SentryModule } from '@sentry/nestjs/setup';
 import { AuthModule } from './modules/auth/auth.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { ProductsModule } from './modules/products/products.module';
@@ -15,6 +17,7 @@ import { EmailModule } from './shared/email/email.module';
 
 @Module({
   imports: [
+    SentryModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
@@ -33,6 +36,9 @@ import { EmailModule } from './shared/email/email.module';
     PlatformAdminModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [
+    // Reporta a Sentry los errores inesperados; responde igual que el filtro de Nest.
+    { provide: APP_FILTER, useClass: SentryGlobalFilter },
+  ],
 })
 export class AppModule {}
