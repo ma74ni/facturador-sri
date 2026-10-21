@@ -64,6 +64,18 @@ type InvoiceSort = 'recent' | 'oldest' | 'amountDesc' | 'amountAsc';
 // Los que acepta POST /invoices/:id/cancel: nunca llegaron a autorizarse.
 const CANCELLABLE_STATUSES: Invoice['status'][] = ['DRAFT', 'PENDING', 'ERROR', 'REJECTED'];
 
+// Resultado de "Enviar al SRI". SENT = recibida sin respuesta: se vuelve a consultar con el mismo botón.
+function sriResultToast(result: Awaited<ReturnType<typeof invoicesApi.sendToSri>>) {
+  const detail = result.errors?.join(' ') || result.message;
+  if (result.status === 'AUTHORIZED') {
+    return { title: 'Factura autorizada', description: 'El SRI autorizó la factura' };
+  }
+  if (result.status === 'SENT') {
+    return { title: 'Factura enviada', description: detail };
+  }
+  return { variant: 'destructive' as const, title: 'El SRI no autorizó la factura', description: detail };
+}
+
 export default function FacturasPage() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
@@ -110,11 +122,7 @@ export default function FacturasPage() {
       const sendToSri = (data as any).metadata?.sendToSri;
       if (sendToSri) {
         try {
-          const result = await invoicesApi.sendToSri(invoice.id);
-          toast({
-            title: 'Factura creada y enviada',
-            description: 'La factura ha sido creada y enviada al SRI para su autorización',
-          });
+          toast(sriResultToast(await invoicesApi.sendToSri(invoice.id)));
         } catch (sriError: any) {
           console.error('Error sending to SRI:', sriError);
           const errorMessage = sriError.response?.data?.message || 'La factura se creó pero hubo un error al enviar al SRI';
@@ -162,11 +170,7 @@ export default function FacturasPage() {
 
   const handleSendToSri = async (id: string) => {
     try {
-      await invoicesApi.sendToSri(id);
-      toast({
-        title: 'Factura enviada',
-        description: 'La factura ha sido enviada al SRI para autorización',
-      });
+      toast(sriResultToast(await invoicesApi.sendToSri(id)));
       await loadData();
     } catch (error: any) {
       console.error('Error sending to SRI:', error);
@@ -315,7 +319,7 @@ export default function FacturasPage() {
     const numero = `${factura.establishmentCode}-${factura.emissionPointCode}-${factura.sequential}`;
     return (
       <>
-        {factura.status === 'PENDING' && (
+        {(factura.status === 'PENDING' || factura.status === 'SENT') && (
           <Button
             variant="ghost"
             size="sm"
