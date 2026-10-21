@@ -128,3 +128,100 @@ describe('CreditNotesService.create', () => {
     await expect(service.create(dto(40), companyId, 'user_1')).resolves.toBeDefined();
   });
 });
+
+describe('CreditNotesService.downloadRide', () => {
+  it('devuelve el PDF tal como viene de R2, no su ArrayBuffer interno', async () => {
+    const pdf = Buffer.from('%PDF-1.3 contenido');
+    const prisma: any = {
+      creditNote: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'cn_1',
+          ridePdfPath: 'ride/company_1/clave.pdf',
+          establishmentCode: '001',
+          emissionPointCode: '001',
+          sequential: '000000001',
+        }),
+      },
+    };
+    const r2Storage: any = { downloadRide: jest.fn().mockResolvedValue(pdf) };
+    const service = new CreditNotesService(
+      prisma,
+      {} as any, // accessKeyService
+      {} as any, // xmlGenerator
+      {} as any, // xmlStorage
+      {} as any, // digitalSignature
+      {} as any, // sriWebService
+      {} as any, // emailService
+      {} as any, // rideGenerator
+      r2Storage,
+      new TaxCalculatorService(),
+      {} as any, // lineIvaResolver
+    );
+
+    const ride = await service.downloadRide('cn_1', 'company_1');
+
+    expect(Buffer.isBuffer(ride.buffer)).toBe(true);
+    expect(ride.buffer.toString()).toBe('%PDF-1.3 contenido');
+    expect(ride.filename).toBe('NC-001-001-000000001.pdf');
+  });
+});
+
+describe('CreditNotesService.sendToSri', () => {
+  function setup(sriResult: any) {
+    const prisma: any = {
+      creditNote: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'cn_1',
+          accessKey: '1'.repeat(49),
+          xmlSignedPath: 'xml-signed/cn.xml',
+          sriStatus: SRIStatus.PENDING,
+          modifiedInvoiceId: 'inv_1',
+          modifiedInvoice: { total: 115 },
+        }),
+        update: jest.fn(),
+      },
+      company: { findUnique: jest.fn().mockResolvedValue({ id: 'company_1', environment: 'TEST' }) },
+    };
+    const sriWebService: any = { sendAndAuthorize: jest.fn().mockResolvedValue(sriResult) };
+    const service = new CreditNotesService(
+      prisma,
+      {} as any, // accessKeyService
+      {} as any, // xmlGenerator
+      {} as any, // xmlStorage
+      {} as any, // digitalSignature
+      sriWebService,
+      {} as any, // emailService
+      {} as any, // rideGenerator
+      {} as any, // r2Storage
+      new TaxCalculatorService(),
+      {} as any, // lineIvaResolver
+    );
+    return { service, prisma };
+  }
+
+  it('sin respuesta del SRI la nota queda SENT y no REJECTED, así no libera su monto', async () => {
+    const { service, prisma } = setup({ sent: true, authorized: false, pending: true, errors: ['aún no'] });
+
+    const result = await service.sendToSri('cn_1', 'company_1');
+
+    expect(result.status).toBe('SENT');
+    expect(prisma.creditNote.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ sriStatus: 'SENT' }) }),
+    );
+  });
+
+  it('un rechazo del SRI queda REJECTED con su detalle', async () => {
+    const { service, prisma } = setup({
+      sent: true,
+      authorized: false,
+      errors: ['Comprobante rechazado: FIRMA INVALIDA'],
+    });
+
+    const result = await service.sendToSri('cn_1', 'company_1');
+
+    expect(result).toMatchObject({ status: 'REJECTED', errors: ['Comprobante rechazado: FIRMA INVALIDA'] });
+    expect(prisma.creditNote.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ sriStatus: 'REJECTED' }) }),
+    );
+  });
+});

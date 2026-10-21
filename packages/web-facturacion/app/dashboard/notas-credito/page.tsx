@@ -46,8 +46,9 @@ const STATUS_STYLE: Record<
 };
 
 // Se pueden (re)enviar las que no quedaron autorizadas, si tienen XML firmado.
+// Una SENT quedó sin respuesta del SRI: reenviarla vuelve a consultar su autorización.
 const canSend = (cn: CreditNote) =>
-  !!cn.xmlSignedPath && ['PENDING', 'ERROR', 'REJECTED'].includes(cn.sriStatus);
+  !!cn.xmlSignedPath && ['PENDING', 'SENT', 'ERROR', 'REJECTED'].includes(cn.sriStatus);
 
 function saveBlob(blob: Blob, filename: string) {
   const url = window.URL.createObjectURL(blob);
@@ -97,7 +98,13 @@ export default function NotasCreditoPage() {
         toast(
           result.status === 'AUTHORIZED'
             ? { title: `Nota ${cn.formattedNumber} autorizada`, description: 'El SRI autorizó la nota de crédito' }
-            : { variant: 'destructive', title: `El SRI rechazó la nota ${cn.formattedNumber}`, description: result.message },
+            : result.status === 'SENT'
+              ? { title: `Nota ${cn.formattedNumber} enviada`, description: result.errors?.join(' ') ?? result.message }
+              : {
+                  variant: 'destructive',
+                  title: `El SRI rechazó la nota ${cn.formattedNumber}`,
+                  description: result.errors?.join(' ') ?? result.message,
+                },
         );
         refresh();
       },

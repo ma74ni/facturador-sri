@@ -2,6 +2,7 @@ import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common
 import * as soap from 'soap';
 import { DOMParser } from '@xmldom/xmldom';
 import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
+import { classifyAuthorizationState, isAlreadyReceived } from './sri-authorization-state';
 
 @Injectable()
 export class SriWebServiceService {
@@ -91,7 +92,7 @@ export class SriWebServiceService {
           success: respuesta.estado === 'RECIBIDA',
           claveAcceso: respuesta.claveAccesoComprobante || claveAcceso,
           estado: respuesta.estado,
-          mensaje: this.describeReceptionMessages(respuesta.comprobantes?.comprobante?.mensajes?.mensaje),
+          mensaje: this.describeMessages(respuesta.comprobantes?.comprobante?.mensajes?.mensaje),
           comprobantes: respuesta.comprobantes,
         };
 
@@ -120,11 +121,12 @@ export class SriWebServiceService {
   }
 
   /**
-   * Une los mensajes de recepción del SRI (uno o varios) con su
-   * `informacionAdicional`, que es donde el SRI indica qué etiqueta o valor
-   * incumple — sin ese detalle "ARCHIVO NO CUMPLE ESTRUCTURA XML" no dice nada.
+   * Une los mensajes del SRI (uno o varios, de recepción o de autorización) con
+   * su `informacionAdicional`, que es donde el SRI indica qué etiqueta o valor
+   * incumple — sin ese detalle "ARCHIVO NO CUMPLE ESTRUCTURA XML" o
+   * "FIRMA INVALIDA" no dicen nada.
    */
-  private describeReceptionMessages(mensajes: unknown): string | undefined {
+  private describeMessages(mensajes: unknown): string | undefined {
     const list = (Array.isArray(mensajes) ? mensajes : mensajes ? [mensajes] : []) as Array<{
       mensaje?: string;
       informacionAdicional?: string;
@@ -217,7 +219,8 @@ export class SriWebServiceService {
             ? new Date(autorizacion.fechaAutorizacion)
             : undefined,
           ambiente: autorizacion.ambiente,
-          mensajes: autorizacion.mensajes?.mensaje || [],
+          // El SRI manda un objeto cuando hay un solo mensaje
+          mensajes: ([] as any[]).concat(autorizacion.mensajes?.mensaje ?? []),
         };
 
       } catch (error) {
@@ -257,6 +260,8 @@ export class SriWebServiceService {
   ): Promise<{
     sent: boolean;
     authorized: boolean;
+    /** Recibido pero sin veredicto todavía: se vuelve a consultar, no se rechaza. */
+    pending?: boolean;
     authorizationNumber?: string;
     authorizationDate?: Date;
     errors?: string[];
@@ -280,7 +285,9 @@ export class SriWebServiceService {
         mensaje: sendResult.mensaje
       })}`);
 
-      if (!sendResult.success) {
+      if (!sendResult.success && isAlreadyReceived(sendResult.mensaje)) {
+        this.logger.log(`ℹ️ El SRI ya tenía este comprobante; se consulta su autorización`);
+      } else if (!sendResult.success) {
         this.logger.error(`❌ Error en recepción SRI: ${sendResult.mensaje || 'Desconocido'}`);
         errors.push(`Error en recepción: ${sendResult.mensaje || 'Desconocido'}`);
         return {
@@ -303,8 +310,9 @@ export class SriWebServiceService {
         );
 
         this.logger.log(`📋 Estado de autorización: ${authResult.estado}`);
+        const verdict = classifyAuthorizationState(authResult.estado);
 
-        if (authResult.estado === 'AUTORIZADO') {
+        if (verdict === 'AUTHORIZED') {
           this.logger.log(`✅ Comprobante AUTORIZADO: ${authResult.numeroAutorizacion}`);
           return {
             sent: true,
@@ -314,8 +322,8 @@ export class SriWebServiceService {
           };
         }
 
-        if (authResult.estado === 'NO_AUTORIZADO' || authResult.estado === 'RECHAZADA') {
-          const mensajes = authResult.mensajes?.map((m: any) => m.mensaje || m.informacionAdicional).join(', ');
+        if (verdict === 'REJECTED') {
+          const mensajes = this.describeMessages(authResult.mensajes) ?? authResult.estado;
           this.logger.error(`❌ Comprobante RECHAZADO: ${mensajes}`);
           this.logger.error(`📋 Mensajes completos del SRI:`, JSON.stringify(authResult.mensajes, null, 2));
           errors.push(`Comprobante rechazado: ${mensajes}`);
@@ -328,11 +336,14 @@ export class SriWebServiceService {
         }
       }
 
-      // Si llegamos aquí, se agotaron los reintentos
-      errors.push('Se agotó el tiempo de espera para la autorización');
+      // Recibido pero sin veredicto: el SRI de pruebas a veces tarda minutos.
+      // No es un rechazo; el SRI puede autorizarlo después.
+      this.logger.warn(`⏳ Sin respuesta de autorización tras ${maxRetries} intentos (clave: ${claveAcceso})`);
+      errors.push('El SRI recibió el comprobante pero aún no lo autoriza. Vuelve a consultar en unos minutos.');
       return {
         sent: true,
         authorized: false,
+        pending: true,
         errors,
       };
 

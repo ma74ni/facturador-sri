@@ -443,21 +443,24 @@ export class InvoicesService {
       emailError,
     };
   } else {
+    // Sin veredicto queda SENT: no se puede cancelar y "Enviar al SRI" vuelve a consultar.
+    const status = result.pending ? 'SENT' : result.sent ? 'REJECTED' : 'ERROR';
     await this.prisma.invoice.update({
       where: { id: invoiceId },
       data: {
-        sriStatus: result.sent ? 'REJECTED' : 'ERROR',
+        sriStatus: status,
         sriErrors: { errors: result.errors },
       },
     });
 
-    this.logger.error('❌ Factura rechazada por el SRI');
+    this.logger.error(`❌ Factura no autorizada (${status})`);
     this.logger.error('📋 Errores del SRI:', JSON.stringify(result.errors, null, 2));
-    this.logger.error('📋 Estado de envío (sent):', result.sent);
 
     return {
-      message: 'La factura no fue autorizada',
-      status: result.sent ? 'REJECTED' : 'ERROR',
+      message: result.pending
+        ? 'El SRI aún no responde; la factura quedó enviada'
+        : 'La factura no fue autorizada',
+      status,
       errors: result.errors,
       emailSent: false,
     };

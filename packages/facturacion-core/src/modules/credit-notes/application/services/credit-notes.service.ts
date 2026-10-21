@@ -417,93 +417,89 @@ export class CreditNotesService {
     }
 
     try {
-      // Leer XML firmado desde R2
-      this.logger.log(`📥 Descargando XML firmado desde R2: ${creditNote.xmlSignedPath}`);
-      const xmlContent = await this.r2Storage.downloadXml(creditNote.xmlSignedPath);
-
-      // Enviar al SRI
+      // Mismo envío y sondeo que las facturas: antes se consultaba una sola vez
+      // y una nota aún en proceso quedaba REJECTED, liberando su monto.
       this.logger.log(`📤 Enviando nota de crédito al SRI: ${creditNote.accessKey}`);
-      const sriResponse = await this.sriWebService.sendInvoice(xmlContent, company.environment);
+      const result = await this.sriWebService.sendAndAuthorize(
+        creditNote.xmlSignedPath,
+        company.environment,
+      );
 
-      if (sriResponse.success) {
-        this.logger.log('✅ Nota de crédito recibida por el SRI');
+      if (result.authorized) {
+        await this.prisma.creditNote.update({
+          where: { id: creditNote.id },
+          data: {
+            sriStatus: 'AUTHORIZED',
+            authorizationNumber: result.authorizationNumber,
+            authorizationDate: result.authorizationDate ?? new Date(),
+          },
+        });
 
-        // Consultar autorización
-        const authorization = await this.sriWebService.checkAuthorization(
-          creditNote.accessKey,
-          company.environment,
-        );
+        // Autorizada, la nota descuenta del saldo por cobrar de la factura.
+        await syncInvoicePaymentStatus(this.prisma, creditNote.modifiedInvoiceId);
 
-        if (authorization.estado === 'AUTORIZADO') {
-          await this.prisma.creditNote.update({
-            where: { id: creditNote.id },
-            data: {
-              sriStatus: 'AUTHORIZED',
-              authorizationNumber: authorization.numeroAutorizacion,
-              authorizationDate: authorization.fechaAutorizacion ? new Date(authorization.fechaAutorizacion) : new Date(),
-            },
-          });
+        // ==================== ENVÍO AUTOMÁTICO DE EMAIL ====================
+        let emailSent = false;
 
-          // Autorizada, la nota descuenta del saldo por cobrar de la factura.
-          await syncInvoicePaymentStatus(this.prisma, creditNote.modifiedInvoiceId);
+        // Recargar la nota de crédito con el cliente para verificar email
+        const creditNoteWithCustomer = await this.prisma.creditNote.findUnique({
+          where: { id: creditNote.id },
+          include: { customer: true },
+        });
 
-          // ==================== ENVÍO AUTOMÁTICO DE EMAIL ====================
-          let emailSent = false;
+        if (creditNoteWithCustomer?.customer?.email) {
+          this.logger.log(`📧 Enviando nota de crédito automáticamente a: ${creditNoteWithCustomer.customer.email}`);
 
-          // Recargar la nota de crédito con el cliente para verificar email
-          const creditNoteWithCustomer = await this.prisma.creditNote.findUnique({
-            where: { id: creditNote.id },
-            include: { customer: true },
-          });
-
-          if (creditNoteWithCustomer?.customer?.email) {
-            this.logger.log(`📧 Enviando nota de crédito automáticamente a: ${creditNoteWithCustomer.customer.email}`);
-
-            try {
-              await this.sendCreditNoteByEmail(creditNote.id, companyId);
-              emailSent = true;
-              this.logger.log('✅ Email enviado automáticamente al cliente');
-            } catch (emailError: any) {
-              this.logger.warn(`⚠️ No se pudo enviar email automático: ${emailError.message}`);
-              // No lanzamos error, solo advertencia
-            }
-          } else {
-            this.logger.warn('⚠️ Cliente no tiene email registrado, saltando envío automático');
+          try {
+            await this.sendCreditNoteByEmail(creditNote.id, companyId);
+            emailSent = true;
+            this.logger.log('✅ Email enviado automáticamente al cliente');
+          } catch (emailError: any) {
+            this.logger.warn(`⚠️ No se pudo enviar email automático: ${emailError.message}`);
+            // No lanzamos error, solo advertencia
           }
-
-          return {
-            message: 'Nota de crédito autorizada por el SRI',
-            status: 'AUTHORIZED',
-            authorizationNumber: authorization.numeroAutorizacion,
-            authorizationDate: authorization.fechaAutorizacion,
-            emailSent,
-          };
         } else {
-          await this.prisma.creditNote.update({
-            where: { id: creditNote.id },
-            data: {
-              sriStatus: 'REJECTED',
-              sriErrors: authorization.mensajes || {},
-            },
-          });
-
-          return {
-            message: 'Nota de crédito rechazada por el SRI',
-            status: 'REJECTED',
-            errors: authorization.mensajes,
-          };
+          this.logger.warn('⚠️ Cliente no tiene email registrado, saltando envío automático');
         }
-      } else {
+
+        return {
+          message: 'Nota de crédito autorizada por el SRI',
+          status: 'AUTHORIZED',
+          authorizationNumber: result.authorizationNumber,
+          authorizationDate: result.authorizationDate,
+          emailSent,
+        };
+      }
+
+      if (!result.sent) {
         await this.prisma.creditNote.update({
           where: { id: creditNote.id },
           data: {
             sriStatus: 'ERROR',
-            sriErrors: { message: sriResponse.mensaje },
+            sriErrors: { errors: result.errors },
           },
         });
 
-        throw new BadRequestException(`Error del SRI: ${sriResponse.mensaje}`);
+        throw new BadRequestException(`Error del SRI: ${result.errors?.join('; ')}`);
       }
+
+      // Sin veredicto queda SENT: sigue consumiendo cupo y "Enviar al SRI" vuelve a consultar.
+      const status = result.pending ? 'SENT' : 'REJECTED';
+      await this.prisma.creditNote.update({
+        where: { id: creditNote.id },
+        data: {
+          sriStatus: status,
+          sriErrors: { errors: result.errors },
+        },
+      });
+
+      return {
+        message: result.pending
+          ? 'El SRI aún no responde; la nota quedó enviada'
+          : 'Nota de crédito rechazada por el SRI',
+        status,
+        errors: result.errors,
+      };
     } catch (error: any) {
       this.logger.error('❌ Error enviando al SRI:', error);
       throw new BadRequestException(`Error al enviar al SRI: ${error.message}`);
@@ -606,10 +602,11 @@ export class CreditNotesService {
 
     try {
       // Descargar desde R2
-      const rideData = await this.r2Storage.downloadRide(creditNote.ridePdfPath);
+      // downloadRide ya devuelve el Buffer; su .buffer es el ArrayBuffer interno y Express lo enviaba como "{}"
+      const pdfBuffer = await this.r2Storage.downloadRide(creditNote.ridePdfPath);
 
       return {
-        buffer: rideData.buffer,
+        buffer: pdfBuffer,
         filename: `NC-${creditNote.establishmentCode}-${creditNote.emissionPointCode}-${creditNote.sequential}.pdf`,
         contentType: 'application/pdf',
       };
