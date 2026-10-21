@@ -2,7 +2,13 @@ import * as forge from 'node-forge';
 import { assertCurrentlyValid, InvalidCertificateError, inspectCertificate } from './certificate-inspector';
 
 /** Arma un .p12 de prueba: certificado del titular (con su clave) + el de la entidad emisora. */
-function buildP12(options: { password: string; notBefore: Date; notAfter: Date; serialNumber?: string }) {
+function buildP12(options: {
+  password: string;
+  notBefore: Date;
+  notAfter: Date;
+  serialNumber?: string;
+  organizationIdentifier?: string;
+}) {
   const caKeys = forge.pki.rsa.generateKeyPair(1024);
   const ca = forge.pki.createCertificate();
   ca.publicKey = caKeys.publicKey;
@@ -27,6 +33,7 @@ function buildP12(options: { password: string; notBefore: Date; notAfter: Date; 
   cert.setSubject([
     { shortName: 'CN', value: 'JOHANA PAMELA SANTANA PAEZ' },
     ...(options.serialNumber ? [{ name: 'serialNumber', value: options.serialNumber }] : []),
+    ...(options.organizationIdentifier ? [{ type: '2.5.4.97', value: options.organizationIdentifier }] : []),
   ]);
   cert.setIssuer(caName);
   cert.setExtensions([{ name: 'basicConstraints', cA: false }]);
@@ -51,6 +58,17 @@ describe('inspectCertificate', () => {
       validFrom: notBefore,
       validTo: notAfter,
     });
+  });
+
+  it('lee el RUC de UANATACA (TINEC-…) aunque serialNumber solo traiga la cédula', () => {
+    const uanataca = buildP12({
+      password: 'x',
+      notBefore,
+      notAfter,
+      serialNumber: 'IDCEC-1709314163',
+      organizationIdentifier: 'TINEC-1709314163001',
+    });
+    expect(inspectCertificate(uanataca, 'x').ruc).toBe('1709314163001');
   });
 
   it('sin RUC en el certificado devuelve null', () => {
