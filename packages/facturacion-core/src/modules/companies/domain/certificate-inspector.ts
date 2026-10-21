@@ -34,8 +34,16 @@ function attribute(attributes: Attributes, shortName: string): string | null {
   return typeof found?.value === 'string' && found.value.trim() !== '' ? found.value.trim() : null;
 }
 
-/** El RUC puede venir en serialNumber o dentro del CN, según la entidad emisora. */
+/**
+ * El RUC puede venir en serialNumber o dentro del CN, según la entidad emisora.
+ * UANATACA usa identificadores ETSI: "TINEC-<RUC>" (organizationIdentifier,
+ * OID 2.5.4.97) y en serialNumber solo la cédula ("IDCEC-<cédula>").
+ */
 function rucOf(attributes: Attributes): string | null {
+  for (const attr of attributes) {
+    const match = typeof attr.value === 'string' ? attr.value.trim().match(/^(?:TIN|VAT)EC-(\d{13})$/i) : null;
+    if (match) return match[1];
+  }
   const serial = attribute(attributes, 'serialNumber');
   if (serial && /^\d{13}$/.test(serial)) return serial;
   const match = attribute(attributes, 'CN')?.match(/\b(\d{13})\b/);
