@@ -172,11 +172,16 @@ export function CreditNoteDialog({ invoiceId, onOpenChange, onIssued }: CreditNo
                   title: `Nota de crédito ${number} autorizada`,
                   description: 'El SRI la autorizó y se envió al cliente si tiene correo.',
                 }
-              : {
-                  variant: 'destructive',
-                  title: `El SRI rechazó la nota ${number}`,
-                  description: 'Revisa el detalle en Notas de crédito.',
-                },
+              : sri.status === 'SENT'
+                ? {
+                    title: `Nota de crédito ${number} enviada`,
+                    description: 'El SRI aún no la autoriza. Vuelve a consultarla en unos minutos desde Notas de crédito.',
+                  }
+                : {
+                    variant: 'destructive',
+                    title: `El SRI rechazó la nota ${number}`,
+                    description: sri.errors?.join(' ') || 'Revisa el detalle en Notas de crédito.',
+                  },
           );
         } catch (sriError: any) {
           toast({

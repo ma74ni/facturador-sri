@@ -104,7 +104,7 @@ export const creditNotesApi = {
   // Sincrónico: responde con status AUTHORIZED o REJECTED (+ errors).
   sendToSri: async (
     id: string,
-  ): Promise<{ status: 'AUTHORIZED' | 'REJECTED'; message: string; errors?: unknown }> => {
+  ): Promise<{ status: 'AUTHORIZED' | 'SENT' | 'REJECTED'; message: string; errors?: string[] }> => {
     const response = await apiClient.post(`/credit-notes/${id}/send-to-sri`);
     return response.data;
   },

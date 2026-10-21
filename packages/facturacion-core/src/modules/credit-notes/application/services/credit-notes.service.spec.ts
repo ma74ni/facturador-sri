@@ -165,3 +165,63 @@ describe('CreditNotesService.downloadRide', () => {
     expect(ride.filename).toBe('NC-001-001-000000001.pdf');
   });
 });
+
+describe('CreditNotesService.sendToSri', () => {
+  function setup(sriResult: any) {
+    const prisma: any = {
+      creditNote: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'cn_1',
+          accessKey: '1'.repeat(49),
+          xmlSignedPath: 'xml-signed/cn.xml',
+          sriStatus: SRIStatus.PENDING,
+          modifiedInvoiceId: 'inv_1',
+          modifiedInvoice: { total: 115 },
+        }),
+        update: jest.fn(),
+      },
+      company: { findUnique: jest.fn().mockResolvedValue({ id: 'company_1', environment: 'TEST' }) },
+    };
+    const sriWebService: any = { sendAndAuthorize: jest.fn().mockResolvedValue(sriResult) };
+    const service = new CreditNotesService(
+      prisma,
+      {} as any, // accessKeyService
+      {} as any, // xmlGenerator
+      {} as any, // xmlStorage
+      {} as any, // digitalSignature
+      sriWebService,
+      {} as any, // emailService
+      {} as any, // rideGenerator
+      {} as any, // r2Storage
+      new TaxCalculatorService(),
+      {} as any, // lineIvaResolver
+    );
+    return { service, prisma };
+  }
+
+  it('sin respuesta del SRI la nota queda SENT y no REJECTED, así no libera su monto', async () => {
+    const { service, prisma } = setup({ sent: true, authorized: false, pending: true, errors: ['aún no'] });
+
+    const result = await service.sendToSri('cn_1', 'company_1');
+
+    expect(result.status).toBe('SENT');
+    expect(prisma.creditNote.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ sriStatus: 'SENT' }) }),
+    );
+  });
+
+  it('un rechazo del SRI queda REJECTED con su detalle', async () => {
+    const { service, prisma } = setup({
+      sent: true,
+      authorized: false,
+      errors: ['Comprobante rechazado: FIRMA INVALIDA'],
+    });
+
+    const result = await service.sendToSri('cn_1', 'company_1');
+
+    expect(result).toMatchObject({ status: 'REJECTED', errors: ['Comprobante rechazado: FIRMA INVALIDA'] });
+    expect(prisma.creditNote.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ sriStatus: 'REJECTED' }) }),
+    );
+  });
+});

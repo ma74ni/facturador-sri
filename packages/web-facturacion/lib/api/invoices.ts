@@ -207,7 +207,9 @@ export const invoicesApi = {
   },
 
   // Enviar al SRI
-  sendToSri: async (id: string): Promise<Invoice> => {
+  sendToSri: async (
+    id: string,
+  ): Promise<{ status: 'AUTHORIZED' | 'SENT' | 'REJECTED' | 'ERROR'; message: string; errors?: string[] }> => {
     const response = await apiClient.post(`/invoices/${id}/send-to-sri`);
     return response.data;
   },
