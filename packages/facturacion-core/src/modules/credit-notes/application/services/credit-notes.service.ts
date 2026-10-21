@@ -606,10 +606,11 @@ export class CreditNotesService {
 
     try {
       // Descargar desde R2
-      const rideData = await this.r2Storage.downloadRide(creditNote.ridePdfPath);
+      // downloadRide ya devuelve el Buffer; su .buffer es el ArrayBuffer interno y Express lo enviaba como "{}"
+      const pdfBuffer = await this.r2Storage.downloadRide(creditNote.ridePdfPath);
 
       return {
-        buffer: rideData.buffer,
+        buffer: pdfBuffer,
         filename: `NC-${creditNote.establishmentCode}-${creditNote.emissionPointCode}-${creditNote.sequential}.pdf`,
         contentType: 'application/pdf',
       };

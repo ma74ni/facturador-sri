@@ -128,3 +128,40 @@ describe('CreditNotesService.create', () => {
     await expect(service.create(dto(40), companyId, 'user_1')).resolves.toBeDefined();
   });
 });
+
+describe('CreditNotesService.downloadRide', () => {
+  it('devuelve el PDF tal como viene de R2, no su ArrayBuffer interno', async () => {
+    const pdf = Buffer.from('%PDF-1.3 contenido');
+    const prisma: any = {
+      creditNote: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'cn_1',
+          ridePdfPath: 'ride/company_1/clave.pdf',
+          establishmentCode: '001',
+          emissionPointCode: '001',
+          sequential: '000000001',
+        }),
+      },
+    };
+    const r2Storage: any = { downloadRide: jest.fn().mockResolvedValue(pdf) };
+    const service = new CreditNotesService(
+      prisma,
+      {} as any, // accessKeyService
+      {} as any, // xmlGenerator
+      {} as any, // xmlStorage
+      {} as any, // digitalSignature
+      {} as any, // sriWebService
+      {} as any, // emailService
+      {} as any, // rideGenerator
+      r2Storage,
+      new TaxCalculatorService(),
+      {} as any, // lineIvaResolver
+    );
+
+    const ride = await service.downloadRide('cn_1', 'company_1');
+
+    expect(Buffer.isBuffer(ride.buffer)).toBe(true);
+    expect(ride.buffer.toString()).toBe('%PDF-1.3 contenido');
+    expect(ride.filename).toBe('NC-001-001-000000001.pdf');
+  });
+});
