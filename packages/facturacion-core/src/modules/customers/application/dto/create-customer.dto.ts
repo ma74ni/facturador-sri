@@ -1,5 +1,6 @@
 import { IsString, IsEmail, IsOptional, IsNotEmpty, IsNumber, Min, Max } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 export class CreateCustomerDto {
   @ApiProperty({ example: '05', description: 'Tipo: 04=RUC, 05=Cédula, 06=Pasaporte' })
@@ -49,9 +50,12 @@ export class CreateCustomerDto {
       'Porcentaje de retención en la fuente que este cliente aplica habitualmente (0-100). ' +
       'Se usa para precalcular la retención al registrar un pago — vacío/0 = no retiene.',
   })
-  @IsNumber()
-  @Min(0)
-  @Max(100)
+  // La API devuelve el Decimal como texto ("2"): un formulario que lo reenvía
+  // sin tocarlo no debe fallar
+  @Type(() => Number)
+  @IsNumber({}, { message: 'El % de retención debe ser un número' })
+  @Min(0, { message: 'El % de retención no puede ser negativo' })
+  @Max(100, { message: 'El % de retención no puede ser mayor a 100' })
   @IsOptional()
   retentionPercentage?: number;
 }
