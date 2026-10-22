@@ -4,6 +4,9 @@ import { PrismaService } from '../../../../shared/database/prisma.service';
 import { PaymentsService } from './payments.service';
 import { CreateHistoricalInvoiceDto } from '../dto/create-historical-invoice.dto';
 import { MONEY_TOLERANCE, settledAmount } from '../../domain/invoice-balance';
+import { readSriAuthorizedInvoice, SriAuthorizedInvoice } from '../../domain/sri-authorized-invoice';
+import { SriWebServiceService } from '../../../invoices/infrastructure/sri/sri-web-service.service';
+import { classifyAuthorizationState } from '../../../invoices/infrastructure/sri/sri-authorization-state';
 
 export interface ImportRowError {
   row: number;
@@ -15,6 +18,81 @@ export interface ImportReport {
   created: number;
   skipped: number;
   errors: ImportRowError[];
+  /** Filas importadas con algún dato faltante (ej. el SRI no respondió) */
+  warnings?: ImportRowError[];
+}
+
+export interface EnrichError {
+  invoice: string;
+  message: string;
+}
+
+export interface EnrichReport {
+  total: number;
+  invoicesUpdated: number;
+  customersUpdated: number;
+  errors: EnrichError[];
+}
+
+interface ValidSriRow {
+  row: number;
+  accessKey: string;
+  establishmentCode: string;
+  emissionPointCode: string;
+  sequential: string;
+  total: number;
+  issueDate: Date;
+  identification: string;
+  businessName?: string;
+}
+
+type SriInvoiceData = SriAuthorizedInvoice & {
+  authorizationNumber: string;
+  authorizationDate: Date | null;
+};
+
+type Contact = Pick<SriAuthorizedInvoice['buyer'], 'email' | 'phone' | 'address'>;
+
+// El SRI responde lento (crea el cliente SOAP en cada consulta); unas pocas a
+// la vez acortan un archivo grande sin saturarlo.
+const SRI_CONCURRENCY = 4;
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<({ ok: true; value: R } | { ok: false; error: string })[]> {
+  const results: ({ ok: true; value: R } | { ok: false; error: string })[] = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++;
+      try {
+        results[index] = { ok: true, value: await fn(items[index]) };
+      } catch (e: any) {
+        results[index] = { ok: false, error: e?.message ?? 'error desconocido' };
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+function contactData(buyer: Contact) {
+  return {
+    email: buyer.email ?? undefined,
+    phone: buyer.phone ?? undefined,
+    address: buyer.address ?? undefined,
+  };
+}
+
+/** Solo los datos que el cliente no tiene: nunca pisa lo cargado a mano. */
+function missingContact(customer: Partial<Record<keyof Contact, string | null>>, buyer: Contact) {
+  const data: Partial<Record<keyof Contact, string>> = {};
+  for (const field of ['email', 'phone', 'address'] as const) {
+    if (!customer[field]?.trim() && buyer[field]) data[field] = buyer[field]!;
+  }
+  return data;
 }
 
 interface SriInvoiceRow {
@@ -61,6 +139,7 @@ export class HistoricalImportService {
   constructor(
     private prisma: PrismaService,
     private paymentsService: PaymentsService,
+    private sriService: SriWebServiceService,
   ) {}
 
   private parseSriInvoicesExport(buffer: Buffer): SriInvoiceRow[] {
@@ -100,9 +179,11 @@ export class HistoricalImportService {
     const rows = this.parseSriInvoicesExport(buffer);
     const { establishment, emissionPoint } = await this.getEstablishmentAndEmissionPoint(companyId);
 
-    let created = 0;
     let skipped = 0;
     const errors: ImportRowError[] = [];
+    const warnings: ImportRowError[] = [];
+    const valid: ValidSriRow[] = [];
+    const seenKeys = new Set<string>();
 
     for (let i = 0; i < rows.length; i++) {
       const row = i + 2; // fila 1 = cabecera
@@ -119,8 +200,7 @@ export class HistoricalImportService {
         continue;
       }
 
-      const existingInvoice = await this.prisma.invoice.findUnique({ where: { accessKey } });
-      if (existingInvoice) {
+      if (seenKeys.has(accessKey) || (await this.prisma.invoice.findUnique({ where: { accessKey } }))) {
         skipped++;
         continue;
       }
@@ -150,53 +230,196 @@ export class HistoricalImportService {
         continue;
       }
 
-      if (dryRun) {
-        created++;
-        continue;
+      seenKeys.add(accessKey);
+      valid.push({
+        row,
+        accessKey,
+        establishmentCode,
+        emissionPointCode,
+        sequential,
+        total,
+        issueDate,
+        identification,
+        businessName: record.RAZON_SOCIAL?.trim() || undefined,
+      });
+    }
+
+    if (dryRun) {
+      return { total: rows.length, created: valid.length, skipped, errors, warnings };
+    }
+
+    // El .txt no trae contacto ni impuestos: se completan desde el XML autorizado
+    const fromSri = await mapWithConcurrency(valid, SRI_CONCURRENCY, (item) => this.fetchFromSri(item.accessKey));
+
+    let created = 0;
+    for (let i = 0; i < valid.length; i++) {
+      const item = valid[i];
+      const lookup = fromSri[i];
+      let sri = lookup.ok ? lookup.value : null;
+
+      if (!lookup.ok) {
+        warnings.push({
+          row: item.row,
+          message: `No se pudo completar desde el SRI (${lookup.error}); se importó con el total del archivo`,
+        });
+      } else if (Math.abs(lookup.value.total - item.total) > MONEY_TOLERANCE) {
+        warnings.push({
+          row: item.row,
+          message: `El SRI tiene un total de ${lookup.value.total.toFixed(2)} y el archivo ${item.total.toFixed(2)}; se usó el del archivo`,
+        });
+        sri = null;
       }
 
       let customer = await this.prisma.customer.findUnique({
-        where: { companyId_identification: { companyId, identification } },
+        where: { companyId_identification: { companyId, identification: item.identification } },
       });
       if (!customer) {
         customer = await this.prisma.customer.create({
           data: {
             companyId,
-            identification,
-            identificationType: inferIdentificationType(identification),
-            businessName: record.RAZON_SOCIAL?.trim() || undefined,
+            identification: item.identification,
+            identificationType: inferIdentificationType(item.identification),
+            businessName: item.businessName,
+            ...(lookup.ok ? contactData(lookup.value.buyer) : {}),
           },
         });
+      } else if (lookup.ok) {
+        const missing = missingContact(customer, lookup.value.buyer);
+        if (Object.keys(missing).length > 0) {
+          customer = await this.prisma.customer.update({ where: { id: customer.id }, data: missing });
+        }
       }
 
       await this.prisma.invoice.create({
         data: {
           documentType: '01',
-          accessKey,
-          establishmentCode,
-          emissionPointCode,
-          sequential,
-          issueDate,
+          accessKey: item.accessKey,
+          establishmentCode: item.establishmentCode,
+          emissionPointCode: item.emissionPointCode,
+          sequential: item.sequential,
+          issueDate: item.issueDate,
           customerId: customer.id,
           establishmentId: establishment.id,
           emissionPointId: emissionPoint.id,
-          subtotal: total,
-          ivaValue: 0,
-          total,
+          subtotal: sri ? sri.subtotal : item.total,
+          totalDiscount: sri ? sri.totalDiscount : 0,
+          ivaValue: sri ? sri.ivaValue : 0,
+          total: item.total,
           sriStatus: 'AUTHORIZED',
+          authorizationNumber: lookup.ok ? lookup.value.authorizationNumber : undefined,
+          authorizationDate: lookup.ok ? lookup.value.authorizationDate : undefined,
           companyId,
           createdById,
           metadata: {
             imported: true,
             importedAt: new Date().toISOString(),
             importedBy: createdById,
+            ...(sri ? { sriEnrichedAt: new Date().toISOString() } : {}),
           },
         },
       });
       created++;
     }
 
-    return { total: rows.length, created, skipped, errors };
+    return { total: rows.length, created, skipped, errors, warnings };
+  }
+
+  /**
+   * "Completar desde el SRI" para facturas ya importadas con el .txt (que
+   * quedaron con IVA 0 y clientes sin correo, dirección ni teléfono). Solo
+   * llena lo que está vacío: nunca pisa un dato que el usuario cargó a mano.
+   * Los importes se corrigen solo si el total del SRI coincide con el guardado,
+   * para no mover saldos con pagos ya aplicados.
+   */
+  async enrichImportedFromSri(companyId: string): Promise<EnrichReport> {
+    const imported = await this.prisma.invoice.findMany({
+      where: { companyId, metadata: { path: ['imported'], equals: true } },
+      include: { customer: true },
+      orderBy: { issueDate: 'asc' },
+    });
+    const pending = imported.filter(
+      (invoice) => !(invoice.metadata as any)?.sriEnrichedAt && /^\d{49}$/.test(invoice.accessKey),
+    );
+
+    const fromSri = await mapWithConcurrency(pending, SRI_CONCURRENCY, (invoice) =>
+      this.fetchFromSri(invoice.accessKey),
+    );
+
+    let invoicesUpdated = 0;
+    const customersUpdated = new Set<string>();
+    const errors: EnrichError[] = [];
+    // un cliente con varias facturas: lo ya completado no se vuelve a pisar
+    const customers = new Map(pending.map((invoice) => [invoice.customer.id, invoice.customer]));
+
+    for (let i = 0; i < pending.length; i++) {
+      const invoice = pending[i];
+      const number = `${invoice.establishmentCode}-${invoice.emissionPointCode}-${invoice.sequential}`;
+      const lookup = fromSri[i];
+      if (!lookup.ok) {
+        errors.push({ invoice: number, message: lookup.error });
+        continue;
+      }
+      const sri = lookup.value;
+
+      const customer = customers.get(invoice.customer.id)!;
+      const missing = missingContact(customer, sri.buyer);
+      if (Object.keys(missing).length > 0) {
+        customers.set(
+          customer.id,
+          await this.prisma.customer.update({ where: { id: customer.id }, data: missing }),
+        );
+        customersUpdated.add(customer.id);
+      }
+
+      const sameTotal = Math.abs(sri.total - Number(invoice.total)) <= MONEY_TOLERANCE;
+      if (!sameTotal) {
+        errors.push({
+          invoice: number,
+          message: `El SRI tiene un total de ${sri.total.toFixed(2)} y la app ${Number(invoice.total).toFixed(2)}; no se cambiaron los importes`,
+        });
+      }
+      await this.prisma.invoice.update({
+        where: { id: invoice.id },
+        data: {
+          ...(sameTotal
+            ? { subtotal: sri.subtotal, totalDiscount: sri.totalDiscount, ivaValue: sri.ivaValue }
+            : {}),
+          authorizationNumber: invoice.authorizationNumber ?? sri.authorizationNumber,
+          authorizationDate: invoice.authorizationDate ?? sri.authorizationDate,
+          metadata: { ...((invoice.metadata as object) ?? {}), sriEnrichedAt: new Date().toISOString() },
+        },
+      });
+      invoicesUpdated++;
+    }
+
+    return {
+      total: pending.length,
+      invoicesUpdated,
+      customersUpdated: customersUpdated.size,
+      errors,
+    };
+  }
+
+  /** XML autorizado de una factura, con el ambiente que dice su clave. */
+  private async fetchFromSri(accessKey: string): Promise<SriInvoiceData> {
+    if (!/^\d{49}$/.test(accessKey)) {
+      throw new Error('clave de acceso no válida');
+    }
+    const environment = accessKey[23] === '2' ? 'PRODUCTION' : 'TEST';
+    const auth = await this.sriService.checkAuthorization(accessKey, environment);
+    if (classifyAuthorizationState(auth.estado) !== 'AUTHORIZED') {
+      throw new Error(
+        auth.estado === 'NO_AUTORIZADA' ? 'el SRI no la tiene registrada' : `el SRI la tiene como ${auth.estado}`,
+      );
+    }
+    if (!auth.comprobante) {
+      throw new Error('el SRI no devolvió el comprobante');
+    }
+    return {
+      ...readSriAuthorizedInvoice(auth.comprobante),
+      authorizationNumber: auth.numeroAutorizacion ?? accessKey,
+      authorizationDate: auth.fechaAutorizacion ?? null,
+    };
   }
 
   private async getEstablishmentAndEmissionPoint(companyId: string) {

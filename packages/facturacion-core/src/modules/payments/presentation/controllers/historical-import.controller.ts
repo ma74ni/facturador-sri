@@ -63,6 +63,15 @@ export class HistoricalImportController {
     );
   }
 
+  @Post('invoices/enrich-from-sri')
+  @ApiOperation({
+    summary: 'Completar desde el SRI las facturas ya importadas (contacto del cliente, IVA, autorización)',
+  })
+  async enrichFromSri(@Request() req: any) {
+    const companyId = await this.getCompanyId(req.user.userId);
+    return this.historicalImportService.enrichImportedFromSri(companyId);
+  }
+
   @Post('payments')
   @ApiOperation({ summary: 'Importar pagos históricos (CSV propio, aplica a facturas ya importadas)' })
   @ApiConsumes('multipart/form-data')

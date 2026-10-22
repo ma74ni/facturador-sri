@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft } from 'lucide-react';
 import { ImportBlock } from '@/components/payments/import-block';
+import { EnrichFromSri } from '@/components/payments/enrich-from-sri';
 import { historicalImportApi } from '@/lib/api/historical-import';
 
 export default function ImportarHistoricoPage() {
@@ -33,7 +34,7 @@ export default function ImportarHistoricoPage() {
             se sube tal cual, sin editar nada.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <ImportBlock
             title="Export de comprobantes del SRI"
             description="Archivo .txt con columnas FECHA_EMISION, COMPROBANTE, NUMERO_COMPROBANTE, IDENTIFICACION_RECEPTOR, RAZON_SOCIAL, CLAVE_ACCESO, VALOR_TOTAL."
@@ -42,6 +43,7 @@ export default function ImportarHistoricoPage() {
             onPreview={(file) => historicalImportApi.importInvoices(file, true)}
             onConfirm={(file) => historicalImportApi.importInvoices(file, false)}
           />
+          <EnrichFromSri />
         </CardContent>
       </Card>
 

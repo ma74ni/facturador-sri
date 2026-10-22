@@ -10,6 +10,8 @@ import { useToast } from '@/hooks/use-toast';
 import { usePagination } from '@/lib/hooks/use-pagination';
 import { Pagination } from '@/components/ui/pagination';
 
+const MAX_WARNINGS = 10;
+
 interface ImportBlockProps {
   title: string;
   description: string;
@@ -162,6 +164,25 @@ export function ImportBlock({
 
               <Pagination {...errorsPage} onPageChange={errorsPage.setPage} />
             </>
+          )}
+
+          {report.warnings && report.warnings.length > 0 && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>{report.warnings.length} importadas con datos incompletos</AlertTitle>
+              <AlertDescription>
+                <ul className="mt-1 space-y-1 text-sm">
+                  {report.warnings.slice(0, MAX_WARNINGS).map((w) => (
+                    <li key={`${w.row}-${w.message}`} className="break-words">
+                      Fila {w.row}: {w.message}
+                    </li>
+                  ))}
+                </ul>
+                {report.warnings.length > MAX_WARNINGS && (
+                  <p className="mt-1 text-sm">y {report.warnings.length - MAX_WARNINGS} más.</p>
+                )}
+              </AlertDescription>
+            </Alert>
           )}
         </div>
       )}
