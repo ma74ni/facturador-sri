@@ -59,7 +59,9 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
         email: customer.email || '',
         phone: customer.phone || '',
         address: customer.address || '',
-        retentionPercentage: customer.retentionPercentage ?? undefined,
+        // la API devuelve el Decimal como texto ("2")
+        retentionPercentage:
+          customer.retentionPercentage != null ? Number(customer.retentionPercentage) : undefined,
       });
     } else {
       setFormData({
