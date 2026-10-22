@@ -1,3 +1,9 @@
+/** 01-24 = provincias; 30 = ecuatorianos registrados en el exterior */
+function provinciaValida(identificacion: string): boolean {
+  const provincia = parseInt(identificacion.substring(0, 2));
+  return (provincia >= 1 && provincia <= 24) || provincia === 30;
+}
+
 /**
  * Validar cédula ecuatoriana
  * @param cedula - Número de cédula (10 dígitos)
@@ -6,11 +12,10 @@
 export function validarCedula(cedula: string): boolean {
   if (!cedula || cedula.length !== 10) return false;
 
+  if (!/^\d+$/.test(cedula)) return false;
   const digitos = cedula.split('').map(Number);
-  const provincia = parseInt(cedula.substring(0, 2));
 
-  // Verificar código de provincia válido (01-24)
-  if (provincia < 1 || provincia > 24) return false;
+  if (!provinciaValida(cedula)) return false;
 
   const coeficientes = [2, 1, 2, 1, 2, 1, 2, 1, 2];
   let suma = 0;
@@ -36,44 +41,20 @@ export function validarRUC(ruc: string): boolean {
   // Verificar que sean solo números
   if (!/^\d+$/.test(ruc)) return false;
 
-  const provincia = parseInt(ruc.substring(0, 2));
-  if (provincia < 1 || provincia > 24) return false;
+  if (!provinciaValida(ruc)) return false;
+  if (!ruc.endsWith('001')) return false;
 
   const tipo = parseInt(ruc.substring(2, 3));
 
-  // RUC persona natural (tercer dígito < 6)
+  // RUC persona natural (tercer dígito < 6): la cédula sí trae dígito verificador fiable
   if (tipo < 6) {
-    const cedula = ruc.substring(0, 10);
-    return validarCedula(cedula) && ruc.substring(10) === '001';
+    return validarCedula(ruc.substring(0, 10));
   }
 
-  // RUC sociedad privada (tipo 9)
-  if (tipo === 9) {
-    const coeficientes = [4, 3, 2, 7, 6, 5, 4, 3, 2];
-    let suma = 0;
-
-    for (let i = 0; i < 9; i++) {
-      suma += parseInt(ruc[i]) * coeficientes[i];
-    }
-
-    const verificador = suma % 11 === 0 ? 0 : 11 - (suma % 11);
-    return verificador === parseInt(ruc[9]) && ruc.substring(10) === '001';
-  }
-
-  // RUC institución pública (tipo 6)
-  if (tipo === 6) {
-    const coeficientes = [3, 2, 7, 6, 5, 4, 3, 2];
-    let suma = 0;
-
-    for (let i = 0; i < 8; i++) {
-      suma += parseInt(ruc[i]) * coeficientes[i];
-    }
-
-    const verificador = suma % 11 === 0 ? 0 : 11 - (suma % 11);
-    return verificador === parseInt(ruc[8]) && ruc.substring(9) === '0001';
-  }
-
-  return false;
+  // Sociedades privadas (9) y entidades públicas (6): el SRI emite RUC que no
+  // cumplen el módulo 11 (ej. 1793207110001, una S.A.S. real), así que solo se
+  // valida la estructura; exigir el dígito rechazaba clientes válidos.
+  return tipo === 9 || tipo === 6;
 }
 
 /**
