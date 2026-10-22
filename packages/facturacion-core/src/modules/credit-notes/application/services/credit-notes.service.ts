@@ -20,6 +20,11 @@ import {
   toBadRequest,
 } from '../../../tax-codes/application/services/line-iva-resolver.service';
 import { availableForCreditNote, exceedsAvailable } from '../../domain/credit-note-limit';
+import {
+  SignatureStatus,
+  signatureWarning,
+  unusableCertificateReason,
+} from '../../../invoices/domain/signing-status';
 import { syncInvoicePaymentStatus } from '../../../payments/application/services/invoice-payment-status';
 
 @Injectable()
@@ -97,6 +102,10 @@ export class CreditNotesService {
 
     if (!company) {
       throw new NotFoundException('Compañía no encontrada');
+    }
+    const certificateProblem = unusableCertificateReason(company);
+    if (certificateProblem) {
+      throw new BadRequestException(certificateProblem);
     }
 
     // 5. IVA por línea: la tarifa de la línea, la de la misma línea de la
@@ -215,7 +224,8 @@ export class CreditNotesService {
     // ==================== GENERAR Y FIRMAR XML ====================
     let xmlPath: string | undefined;
     let xmlSignedPath: string | undefined;
-    let signatureStatus = 'sin_firma';
+    let signatureStatus: SignatureStatus = 'sin_certificado';
+    let signatureDetail: string | undefined;
 
     try {
       // 10. Generar XML
@@ -236,42 +246,34 @@ export class CreditNotesService {
           this.logger.log(`✅ XML firmado digitalmente con XAdES-BES: ${xmlSignedPath}`);
           signatureStatus = 'firmado';
         } catch (signError: any) {
-          this.logger.error('❌ Error al firmar XML:', signError.message);
+          this.logger.error(`❌ No se pudo firmar la nota de crédito ${sequential}: ${signError.message}`);
           signatureStatus = 'error_firma';
-
-          if (signError.message.includes('no está disponible')) {
-            this.logger.error('⚠️ El microservicio de firma digital no responde');
-          } else if (signError.message.includes('certificado')) {
-            this.logger.error('⚠️ Problema con el certificado digital');
-          }
+          signatureDetail = signError.message;
         }
       } else {
         this.logger.warn('⚠️ La empresa no tiene certificado digital configurado');
-        signatureStatus = 'sin_certificado';
       }
 
-      // 12. Actualizar nota de crédito con rutas de archivos
+      // 12. Actualizar nota de crédito con rutas de archivos (y el motivo si no se firmó)
       await this.prisma.creditNote.update({
         where: { id: creditNote.id },
         data: {
           xmlPath,
           xmlSignedPath,
+          ...(signatureDetail ? { sriErrors: { errors: [`Firma: ${signatureDetail}`] } } : {}),
         },
       });
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error('❌ Error generando/firmando XML:', error);
       signatureStatus = 'error_generacion';
+      signatureDetail = error.message;
     }
 
+    const warning = signatureWarning('La nota de crédito', signatureStatus, signatureDetail);
     return {
       message: 'Nota de crédito creada exitosamente',
       signatureStatus,
-      warnings:
-        signatureStatus !== 'firmado'
-          ? [
-              'La nota de crédito no está firmada digitalmente. Sube un certificado para firmarlas.',
-            ]
-          : [],
+      warnings: warning ? [warning] : [],
       creditNote: {
         ...creditNote,
         formattedNumber: `${establishment.code}-${emissionPoint.code}-${sequential}`,
