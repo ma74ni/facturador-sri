@@ -12,6 +12,7 @@ import { EmailService } from '../../../../shared/email/email.service';
 import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
 import { TaxCalculatorService } from '../../../tax-codes/domain/services/tax-calculator.service';
 import { availableForCreditNote } from '../../../credit-notes/domain/credit-note-limit';
+import { SignatureStatus, signatureWarning, unusableCertificateReason } from '../../domain/signing-status';
 import {
   LineIvaResolverService,
   toBadRequest,
@@ -65,6 +66,10 @@ export class InvoicesService {
     });
     if (!company) {
       throw new NotFoundException('Compañía no encontrada');
+    }
+    const certificateProblem = unusableCertificateReason(company);
+    if (certificateProblem) {
+      throw new BadRequestException(certificateProblem);
     }
 
     // 4. IVA por línea (tarifa de la línea o de su producto) y totales
@@ -156,7 +161,8 @@ export class InvoicesService {
     // ==================== GENERAR Y FIRMAR XML ====================
     let xmlPath: string | undefined;
     let xmlSignedPath: string | undefined;
-    let signatureStatus = 'sin_firma';
+    let signatureStatus: SignatureStatus = 'sin_certificado';
+    let signatureDetail: string | undefined;
 
     try {
       // 8. Generar XML
@@ -175,18 +181,20 @@ export class InvoicesService {
 
         } catch (signError: any) {
           signatureStatus = 'error_firma';
+          signatureDetail = signError.message;
+          this.logger.error(`❌ No se pudo firmar la factura ${sequential}: ${signError.message}`);
         }
-      } else {
-        signatureStatus = 'sin_certificado';
       }
 
-      // 10. Guardar archivos; PENDING solo si quedó firmada
+      // 10. Guardar archivos; PENDING solo si quedó firmada. El motivo de un
+      // borrador queda en sriErrors para poder diagnosticarlo después.
       await this.prisma.invoice.update({
         where: { id: invoice.id },
         data: {
           xmlPath,
           xmlSignedPath,
           sriStatus: xmlSignedPath ? 'PENDING' : 'DRAFT',
+          ...(signatureDetail ? { sriErrors: { errors: [`Firma: ${signatureDetail}`] } } : {}),
         },
       });
 
@@ -194,17 +202,17 @@ export class InvoicesService {
     } catch (error) {
       this.logger.error(`❌ Error en generación/firma: ${error.message}`);
       signatureStatus = 'error_generacion';
+      signatureDetail = error.message;
 
       // Conserva su número: la siguiente factura usa otro. Se puede cancelar.
       this.logger.warn(`⚠️ Factura ${invoice.id} quedó en estado DRAFT con el secuencial ${sequential}.`);
     }
 
+    const warning = signatureWarning('La factura', signatureStatus, signatureDetail);
     return {
       message: 'Factura creada exitosamente',
       signatureStatus,
-      warnings: signatureStatus !== 'firmado'
-        ? ['La factura no está firmada digitalmente. Sube un certificado para firmar facturas.']
-        : [],
+      warnings: warning ? [warning] : [],
       invoice: {
         ...invoice,
         formattedNumber: `${establishment.code}-${emissionPoint.code}-${sequential}`,

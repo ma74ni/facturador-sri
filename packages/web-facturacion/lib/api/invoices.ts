@@ -185,10 +185,16 @@ export const invoicesApi = {
   },
 
   // Crear nueva factura
-  create: async (data: CreateInvoiceDto): Promise<Invoice> => {
+  // warnings trae el motivo cuando la factura quedó sin firmar
+  create: async (
+    data: CreateInvoiceDto,
+  ): Promise<{ invoice: Invoice; signatureStatus: string; warnings: string[] }> => {
     const response = await apiClient.post('/invoices', data);
-    // El backend retorna { message, signatureStatus, warnings, invoice }
-    return response.data.invoice || response.data;
+    return {
+      invoice: response.data.invoice,
+      signatureStatus: response.data.signatureStatus,
+      warnings: response.data.warnings ?? [],
+    };
   },
 
   // Obtener estadísticas
