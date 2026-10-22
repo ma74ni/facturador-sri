@@ -65,11 +65,15 @@ export class HistoricalImportController {
 
   @Post('invoices/enrich-from-sri')
   @ApiOperation({
-    summary: 'Completar desde el SRI las facturas ya importadas (contacto del cliente, IVA, autorización)',
+    summary:
+      'Completar desde el SRI lo ya importado: mode=customers (contacto, una consulta por cliente) o mode=taxes (IVA de cada factura)',
   })
-  async enrichFromSri(@Request() req: any) {
+  async enrichFromSri(@Query('mode') mode: string, @Request() req: any) {
     const companyId = await this.getCompanyId(req.user.userId);
-    return this.historicalImportService.enrichImportedFromSri(companyId);
+    return this.historicalImportService.enrichImportedFromSri(
+      companyId,
+      mode === 'taxes' ? 'taxes' : 'customers',
+    );
   }
 
   @Post('payments')

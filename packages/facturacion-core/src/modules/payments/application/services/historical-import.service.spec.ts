@@ -141,7 +141,7 @@ function createFakePrisma() {
 }
 
 /** XML autorizado mínimo, como lo devuelve autorizacionComprobante. */
-function authorizedXml(total: number, email = 'contabilidad@cliente.ec') {
+function authorizedXml(total: number, email: string | null = 'contabilidad@cliente.ec') {
   const subtotal = (total / 1.15).toFixed(2);
   const iva = (total - Number(subtotal)).toFixed(2);
   return `<factura id="comprobante"><infoFactura>
@@ -150,11 +150,11 @@ function authorizedXml(total: number, email = 'contabilidad@cliente.ec') {
     <totalSinImpuestos>${subtotal}</totalSinImpuestos><totalDescuento>0.00</totalDescuento>
     <totalConImpuestos><totalImpuesto><codigo>2</codigo><valor>${iva}</valor></totalImpuesto></totalConImpuestos>
     <importeTotal>${total.toFixed(2)}</importeTotal></infoFactura>
-    <infoAdicional><campoAdicional nombre="Email">${email}</campoAdicional></infoAdicional></factura>`;
+    ${email ? `<infoAdicional><campoAdicional nombre="Email">${email}</campoAdicional></infoAdicional>` : ''}</factura>`;
 }
 
-/** SRI falso: autoriza las claves que conoce y responde con su XML. */
-function fakeSri(totals: Map<string, number> | 'down') {
+/** SRI falso: autoriza las claves que conoce y responde con su XML (sin correo para las de withoutEmail). */
+function fakeSri(totals: Map<string, number> | 'down', withoutEmail: Set<string> | 'all' = new Set()) {
   return {
     checkAuthorization: jest.fn(async (accessKey: string) => {
       if (totals === 'down') throw new Error('ETIMEDOUT');
@@ -165,7 +165,10 @@ function fakeSri(totals: Map<string, number> | 'down') {
         numeroAutorizacion: accessKey,
         fechaAutorizacion: new Date('2026-02-27T15:00:00Z'),
         ambiente: 'PRODUCCIÓN',
-        comprobante: authorizedXml(total),
+        comprobante: authorizedXml(
+          total,
+          withoutEmail === 'all' || withoutEmail.has(accessKey) ? null : 'contabilidad@cliente.ec',
+        ),
       };
     }),
   } as any;
@@ -197,27 +200,40 @@ describe('HistoricalImportService', () => {
     service = new HistoricalImportService(prisma, paymentsService, fakeSri('down'));
   });
 
-  describe('importInvoices completando desde el SRI', () => {
-    it('guarda IVA, subtotal, autorización y el contacto del cliente desde el XML autorizado', async () => {
-      service = new HistoricalImportService(prisma, paymentsService, fakeSri(fixtureTotals()));
+  describe('importInvoices completando el contacto desde el SRI', () => {
+    const SRI_DOWN_KEY = '2602202601170931416300120010010000001536145933211'; // la más reciente de ALIMAG
+
+    it('consulta una factura por cliente y le completa correo y dirección', async () => {
+      const sri = fakeSri(fixtureTotals());
+      service = new HistoricalImportService(prisma, paymentsService, sri);
       const report = await service.importInvoices(companyId, fs.readFileSync(SRI_FIXTURE_PATH), 'user_1', false);
 
       expect(report.created).toBe(11);
       expect(report.warnings).toHaveLength(0);
+      expect(sri.checkAuthorization).toHaveBeenCalledTimes(2); // dos clientes, no once facturas
+      expect(sri.checkAuthorization).toHaveBeenCalledWith(SRI_DOWN_KEY, 'PRODUCTION');
 
+      for (const customer of prisma.__db.customers.values()) {
+        expect(customer.email).toBe('contabilidad@cliente.ec');
+        expect(customer.address).toBe('Av. Amazonas N34-12');
+      }
       const invoice = [...prisma.__db.invoices.values()].find((i) => i.sequential === '000000153');
       expect(invoice.total).toBe(480);
-      expect(invoice.subtotal).toBe(417.39);
-      expect(invoice.ivaValue).toBe(62.61);
+      expect(invoice.ivaValue).toBe(0); // el IVA de cada factura se completa aparte
       expect(invoice.authorizationNumber).toBe(invoice.accessKey);
-      expect(invoice.metadata.sriEnrichedAt).toBeDefined();
-
-      const customer = prisma.__db.customers.get(invoice.customerId);
-      expect(customer.email).toBe('contabilidad@cliente.ec');
-      expect(customer.address).toBe('Av. Amazonas N34-12');
     });
 
-    it('no pisa el correo que el cliente ya tenía', async () => {
+    it('si la factura más reciente no trae correo, prueba con la anterior del mismo cliente', async () => {
+      const sri = fakeSri(fixtureTotals(), new Set([SRI_DOWN_KEY]));
+      service = new HistoricalImportService(prisma, paymentsService, sri);
+      await service.importInvoices(companyId, fs.readFileSync(SRI_FIXTURE_PATH), 'user_1', false);
+
+      const alimag = [...prisma.__db.customers.values()].find((c) => c.identification === '1793207110001');
+      expect(alimag.email).toBe('contabilidad@cliente.ec');
+      expect(sri.checkAuthorization).toHaveBeenCalledTimes(3);
+    });
+
+    it('no consulta al cliente que ya tiene correo, ni se lo pisa', async () => {
       prisma.__db.customers.set('c_1', {
         id: 'c_1',
         companyId,
@@ -225,36 +241,20 @@ describe('HistoricalImportService', () => {
         email: 'mio@cliente.ec',
         address: null,
       });
-      service = new HistoricalImportService(prisma, paymentsService, fakeSri(fixtureTotals()));
+      const sri = fakeSri(fixtureTotals());
+      service = new HistoricalImportService(prisma, paymentsService, sri);
       await service.importInvoices(companyId, fs.readFileSync(SRI_FIXTURE_PATH), 'user_1', false);
 
       expect(prisma.__db.customers.get('c_1').email).toBe('mio@cliente.ec');
-      expect(prisma.__db.customers.get('c_1').address).toBe('Av. Amazonas N34-12');
+      expect(sri.checkAuthorization).toHaveBeenCalledTimes(1); // solo PROCAR
     });
 
-    it('si el SRI no responde importa igual, con el total del archivo, y lo avisa por fila', async () => {
+    it('si el SRI no responde importa igual y avisa una vez por cliente', async () => {
       const report = await service.importInvoices(companyId, fs.readFileSync(SRI_FIXTURE_PATH), 'user_1', false);
 
       expect(report.created).toBe(11);
-      expect(report.warnings).toHaveLength(11);
-      expect(report.warnings![0].message).toContain('No se pudo completar desde el SRI (ETIMEDOUT)');
-      const invoice = [...prisma.__db.invoices.values()][0];
-      expect(Number(invoice.subtotal)).toBe(Number(invoice.total));
-      expect(invoice.ivaValue).toBe(0);
-    });
-
-    it('si el total del SRI no coincide con el del archivo, conserva el del archivo', async () => {
-      const totals = fixtureTotals();
-      const key = '2602202601170931416300120010010000001536145933211';
-      totals.set(key, 999);
-      service = new HistoricalImportService(prisma, paymentsService, fakeSri(totals));
-      const report = await service.importInvoices(companyId, fs.readFileSync(SRI_FIXTURE_PATH), 'user_1', false);
-
-      expect(report.warnings).toHaveLength(1);
-      expect(report.warnings![0].message).toContain('999.00');
-      const invoice = [...prisma.__db.invoices.values()].find((i) => i.accessKey === key);
-      expect(invoice.total).toBe(480);
-      expect(invoice.ivaValue).toBe(0);
+      expect(report.warnings).toHaveLength(2);
+      expect(report.warnings![0].message).toContain('(ETIMEDOUT); queda sin correo');
     });
 
     it('el dry-run no consulta el SRI', async () => {
@@ -265,33 +265,54 @@ describe('HistoricalImportService', () => {
     });
   });
 
-  describe('enrichImportedFromSri (facturas ya importadas)', () => {
-    it('completa IVA y contacto de lo importado sin SRI, y no repite lo ya completado', async () => {
+  describe('enrichImportedFromSri (lo ya importado)', () => {
+    beforeEach(async () => {
+      // importado sin SRI: clientes sin correo y facturas con IVA 0
       await service.importInvoices(companyId, fs.readFileSync(SRI_FIXTURE_PATH), 'user_1', false);
-
-      const sri = fakeSri(fixtureTotals());
-      service = new HistoricalImportService(prisma, paymentsService, sri);
-      const report = await service.enrichImportedFromSri(companyId);
-
-      expect(report).toEqual({ total: 11, invoicesUpdated: 11, customersUpdated: 2, errors: [] });
-      const invoice = [...prisma.__db.invoices.values()].find((i) => i.sequential === '000000153');
-      expect(invoice.ivaValue).toBe(62.61);
-      expect(prisma.__db.customers.get(invoice.customerId).email).toBe('contabilidad@cliente.ec');
-
-      const again = await service.enrichImportedFromSri(companyId);
-      expect(again.total).toBe(0);
-      expect(sri.checkAuthorization).toHaveBeenCalledTimes(11);
     });
 
-    it('reporta las que el SRI no tiene y no cambia importes si el total difiere', async () => {
-      await service.importInvoices(companyId, fs.readFileSync(SRI_FIXTURE_PATH), 'user_1', false);
+    it("'customers': una consulta por cliente sin correo, y nada la segunda vez", async () => {
+      const sri = fakeSri(fixtureTotals());
+      service = new HistoricalImportService(prisma, paymentsService, sri);
+
+      const report = await service.enrichImportedFromSri(companyId, 'customers');
+      expect(report).toEqual({ total: 2, invoicesUpdated: 0, customersUpdated: 2, errors: [] });
+      expect(sri.checkAuthorization).toHaveBeenCalledTimes(2);
+
+      const again = await service.enrichImportedFromSri(companyId, 'customers');
+      expect(again.total).toBe(0);
+      expect(sri.checkAuthorization).toHaveBeenCalledTimes(2);
+    });
+
+    it("'customers': avisa el cliente cuyas facturas no traen correo", async () => {
+      service = new HistoricalImportService(prisma, paymentsService, fakeSri(fixtureTotals(), 'all'));
+      const report = await service.enrichImportedFromSri(companyId, 'customers');
+
+      expect(report.errors).toHaveLength(2);
+      expect(report.errors[0].message).toBe('sus facturas en el SRI no traen correo');
+    });
+
+    it("'taxes': completa el IVA de cada factura una sola vez", async () => {
+      const sri = fakeSri(fixtureTotals());
+      service = new HistoricalImportService(prisma, paymentsService, sri);
+
+      const report = await service.enrichImportedFromSri(companyId, 'taxes');
+      expect(report).toEqual({ total: 11, invoicesUpdated: 11, customersUpdated: 0, errors: [] });
+      const invoice = [...prisma.__db.invoices.values()].find((i) => i.sequential === '000000153');
+      expect(invoice.subtotal).toBe(417.39);
+      expect(invoice.ivaValue).toBe(62.61);
+
+      expect((await service.enrichImportedFromSri(companyId, 'taxes')).total).toBe(0);
+    });
+
+    it("'taxes': reporta las que el SRI no tiene y no cambia importes si el total difiere", async () => {
       const totals = fixtureTotals();
       const [missingKey, differentKey] = [...totals.keys()];
       totals.delete(missingKey);
       totals.set(differentKey, 1);
 
       service = new HistoricalImportService(prisma, paymentsService, fakeSri(totals));
-      const report = await service.enrichImportedFromSri(companyId);
+      const report = await service.enrichImportedFromSri(companyId, 'taxes');
 
       expect(report.invoicesUpdated).toBe(10);
       expect(report.errors.map((e) => e.message)).toEqual([
