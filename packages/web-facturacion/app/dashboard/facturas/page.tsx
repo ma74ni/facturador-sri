@@ -116,11 +116,15 @@ export default function FacturasPage() {
   // Handlers
   const handleCreateInvoice = async (data: CreateInvoiceDto) => {
     try {
-      const invoice = await invoicesApi.create(data);
+      const { invoice, signatureStatus, warnings } = await invoicesApi.create(data);
 
       // Si se solicitó enviar al SRI, hacerlo automáticamente
       const sendToSri = (data as any).metadata?.sendToSri;
-      if (sendToSri) {
+      if (warnings.length > 0) {
+        // Sin firma no se puede enviar: mostrar el motivo real
+        if (signatureStatus === 'sin_certificado') setCertificateDialogOpen(true);
+        toast({ variant: 'destructive', title: 'Factura creada sin firmar', description: warnings[0] });
+      } else if (sendToSri) {
         try {
           toast(sriResultToast(await invoicesApi.sendToSri(invoice.id)));
         } catch (sriError: any) {
