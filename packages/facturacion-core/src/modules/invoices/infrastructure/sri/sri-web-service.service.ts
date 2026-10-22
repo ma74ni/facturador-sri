@@ -158,6 +158,8 @@ export class SriWebServiceService {
     fechaAutorizacion?: Date;
     ambiente: string;
     mensajes?: any[];
+    /** XML del comprobante tal como lo autorizó el SRI */
+    comprobante?: string;
   }> {
     const maxRetries = 3;
     const retryDelay = 2000;
@@ -221,6 +223,7 @@ export class SriWebServiceService {
           ambiente: autorizacion.ambiente,
           // El SRI manda un objeto cuando hay un solo mensaje
           mensajes: ([] as any[]).concat(autorizacion.mensajes?.mensaje ?? []),
+          comprobante: autorizacion.comprobante ? String(autorizacion.comprobante) : undefined,
         };
 
       } catch (error) {

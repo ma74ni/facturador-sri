@@ -4,10 +4,11 @@ import { HistoricalImportController } from './presentation/controllers/historica
 import { PaymentsService } from './application/services/payments.service';
 import { HistoricalImportService } from './application/services/historical-import.service';
 import { PrismaService } from '../../shared/database/prisma.service';
+import { SriWebServiceService } from '../invoices/infrastructure/sri/sri-web-service.service';
 
 @Module({
   controllers: [PaymentsController, HistoricalImportController],
-  providers: [PaymentsService, HistoricalImportService, PrismaService],
+  providers: [PaymentsService, HistoricalImportService, PrismaService, SriWebServiceService],
   exports: [PaymentsService],
 })
 export class PaymentsModule {}
