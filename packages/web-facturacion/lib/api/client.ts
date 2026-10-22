@@ -27,6 +27,12 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    // La validación del backend devuelve una lista de mensajes; las pantallas
+    // muestran data.message tal cual y una lista sale pegada en una sola línea
+    if (Array.isArray(error.response?.data?.message)) {
+      error.response.data.message = error.response.data.message.join('. ');
+    }
+
     if (error.response?.status === 401) {
       // No cerrar sesión si es un error de verificación de email o login
       const isVerifyEmailRequest =
