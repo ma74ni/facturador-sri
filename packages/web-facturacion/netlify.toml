@@ -2,7 +2,7 @@
   # Directorio base del frontend
   base = "packages/web-facturacion"
 
-  # Comando de build - primero instalamos shared-types, luego el frontend
+  # Comando de build: instala el workspace y compila el frontend
   command = "cd ../.. && pnpm install && pnpm --filter web-facturacion build"
 
   # Directorio de publicación (relativo al base)
