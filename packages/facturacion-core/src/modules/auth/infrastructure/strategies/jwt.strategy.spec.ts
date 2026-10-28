@@ -17,6 +17,7 @@ describe('JwtStrategy.validate', () => {
       id: 'u1',
       email: 'ana@empresa.ec',
       companyId: 'c1',
+      isActive: true,
       passwordChangedAt: null,
     });
 
@@ -40,11 +41,26 @@ describe('JwtStrategy.validate', () => {
       id: 'u1',
       email: 'ana@empresa.ec',
       companyId: 'c1',
+      isActive: true,
       passwordChangedAt: new Date('2026-10-01T12:00:00Z'),
     });
     const issuedBefore = Math.floor(new Date('2026-10-01T11:00:00Z').getTime() / 1000);
 
     await expect(strategy.validate({ sub: 'u1', iat: issuedBefore })).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+  });
+
+  it('rechaza el token de un usuario desactivado aunque la sesión siga abierta', async () => {
+    findUnique.mockResolvedValue({
+      id: 'u1',
+      email: 'ana@empresa.ec',
+      companyId: 'c1',
+      isActive: false,
+      passwordChangedAt: null,
+    });
+
+    await expect(strategy.validate({ sub: 'u1', iat: 1_700_000_000 })).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
   });
