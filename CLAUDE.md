@@ -15,6 +15,16 @@ The POS (Lattia) lives in a separate repository (`new-lattia-pos`) and consumes 
 
 **Package Manager:** pnpm with workspaces
 
+**Branches:** short branches from `dev`, one small PR each. `dev` deploys to staging (Netlify `dev--facturador-siete8`, Render `facturador-core-dev`); `main` is production. Prisma migrations run automatically on deploy (`render-start.sh`), so a merged migration reaches staging immediately.
+
+## Claude Code tooling (`.claude/`, `.mcp.json`)
+
+- **Skills:** `new-api-endpoint` (endpoint end to end with tenant isolation), `prisma-migration` (backward-compatible migrations for Neon), `ship-pr` (checks, push, PR to `dev`).
+- **Agents:** `sri-compliance-reviewer` (anything touching emission: access key, XML, signing, SRI, RIDE), `tenant-security-reviewer` (endpoints, Prisma queries, uploads, secrets), `test-writer` (Jest tests in the repo's conventions). Run the reviewers before opening a PR in their area.
+- **Hook:** every file Claude edits under `packages/` is formatted with Prettier (`.claude/hooks/format-edited-file.sh`).
+- **Permissions:** `.claude/settings.json` blocks reading `.env`/`.p12`, `prisma migrate reset`, `prisma db push` and force pushes.
+- **MCP servers:** `context7` (current library docs), `sentry` (production errors; OAuth on first use), `render` (logs and deploys; needs `RENDER_API_KEY` in your environment), `postgres-local` (read-only queries to the local `facturador-postgres` via Docker; override with `FACTURADOR_LOCAL_DATABASE_URL`). Never point an MCP or command at the Neon databases.
+
 ## Common Commands
 
 ### Development
