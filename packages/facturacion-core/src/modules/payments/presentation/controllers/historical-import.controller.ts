@@ -18,6 +18,7 @@ import { RequireModuleGuard } from '../../../auth/infrastructure/guards/require-
 import { RequireModule } from '../../../auth/infrastructure/decorators/require-module.decorator';
 import { COBRANZA_MODULE } from '../../../companies/domain/product-modules.catalog';
 import { PrismaService } from '../../../../shared/database/prisma.service';
+import { IMPORT_UPLOAD } from '../../../../shared/http/upload-limits';
 
 @ApiTags('payments-import')
 @Controller('payments/import')
@@ -45,7 +46,7 @@ export class HistoricalImportController {
   @ApiOperation({ summary: 'Importar facturas históricas desde el export de comprobantes del SRI' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({ schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } } })
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', IMPORT_UPLOAD))
   async importInvoices(
     @UploadedFile() file: Express.Multer.File,
     @Query('dryRun') dryRun: string,
@@ -80,7 +81,7 @@ export class HistoricalImportController {
   @ApiOperation({ summary: 'Importar pagos históricos (CSV propio, aplica a facturas ya importadas)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({ schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } } })
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', IMPORT_UPLOAD))
   async importPayments(
     @UploadedFile() file: Express.Multer.File,
     @Query('dryRun') dryRun: string,

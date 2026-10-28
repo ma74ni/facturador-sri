@@ -23,6 +23,7 @@ import { Response } from 'express';
 import { EmailService } from '@/shared/email/email.service';
 import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
 import { sealSecret } from '../../../../shared/crypto/secret-cipher';
+import { CERTIFICATE_UPLOAD, LOGO_UPLOAD } from '../../../../shared/http/upload-limits';
 
 @ApiTags('companies')
 @Controller('companies')
@@ -71,7 +72,7 @@ export class CompaniesController {
       },
     },
   })
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', CERTIFICATE_UPLOAD))
   async uploadCertificate(
     @UploadedFile() file: Express.Multer.File,
     @Body('password') password: string,
@@ -133,7 +134,7 @@ export class CompaniesController {
       },
     },
   })
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', LOGO_UPLOAD))
   async uploadLogo(
     @UploadedFile() file: Express.Multer.File,
     @Request() req: any,
