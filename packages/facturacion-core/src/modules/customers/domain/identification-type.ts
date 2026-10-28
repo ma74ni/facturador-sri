@@ -35,3 +35,10 @@ export function toIdentificationTypeCode(value: unknown): IdentificationTypeCode
 export function buyerIdentificationTypeForSri(value: unknown): IdentificationTypeCode {
   return toIdentificationTypeCode(value) ?? IDENTIFICATION_TYPE.CONSUMIDOR_FINAL;
 }
+
+/** Tipo de una identificación que llega sin tipo (export del SRI): por su largo. */
+export function inferIdentificationType(identification: string): IdentificationTypeCode {
+  if (identification.length === 13) return IDENTIFICATION_TYPE.RUC;
+  if (identification.length === 10) return IDENTIFICATION_TYPE.CEDULA;
+  return IDENTIFICATION_TYPE.PASAPORTE; // Pasaporte / otro
+}

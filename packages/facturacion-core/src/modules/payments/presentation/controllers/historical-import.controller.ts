@@ -10,6 +10,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { HistoricalImportService } from '../../application/services/historical-import.service';
+import { ImportedInvoicesEnrichmentService } from '../../application/services/imported-invoices-enrichment.service';
 import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
 import { EmailVerifiedGuard } from '../../../auth/infrastructure/guards/email-verified.guard';
 import { RequireModuleGuard } from '../../../auth/infrastructure/guards/require-module.guard';
@@ -27,7 +28,10 @@ import {
 @RequireModule(COBRANZA_MODULE)
 @ApiBearerAuth()
 export class HistoricalImportController {
-  constructor(private readonly historicalImportService: HistoricalImportService) {}
+  constructor(
+    private readonly historicalImportService: HistoricalImportService,
+    private readonly enrichmentService: ImportedInvoicesEnrichmentService,
+  ) {}
 
   @Post('invoices')
   @ApiOperation({ summary: 'Importar facturas históricas desde el export de comprobantes del SRI' })
@@ -60,7 +64,7 @@ export class HistoricalImportController {
   })
   async enrichFromSri(@Query('mode') mode: string, @CurrentUser() user: AuthenticatedUser) {
     const { companyId } = user;
-    return this.historicalImportService.enrichImportedFromSri(
+    return this.enrichmentService.enrichImportedFromSri(
       companyId,
       mode === 'taxes' ? 'taxes' : 'customers',
     );
