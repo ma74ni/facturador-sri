@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 import { create } from 'xmlbuilder2';
 
+import { buyerIdentificationTypeForSri } from '../../../customers/domain/identification-type';
+
 import { SRI_IVA_TAX_CODE } from '../../../tax-codes/domain/iva-rate.catalog';
 import {
   IvaGroup,
@@ -66,7 +68,8 @@ export class CreditNoteXmlGeneratorService {
     // Tipo identificación comprador
     infoNotaCredito
       .ele('tipoIdentificacionComprador')
-      .txt(creditNote.customer.identificationType);
+      // El cliente puede tener guardado el nombre (CEDULA…): el SRI solo acepta el código.
+      .txt(buyerIdentificationTypeForSri(creditNote.customer.identificationType));
     infoNotaCredito
       .ele('razonSocialComprador')
       .txt(

@@ -28,15 +28,14 @@ import { usePagination } from '@/lib/hooks/use-pagination';
 import { Pagination } from '@/components/ui/pagination';
 import { FilterBar, FilterField } from '@/components/ui/filter-bar';
 import { NativeSelect } from '@/components/ui/native-select';
+import {
+  ID_TYPE,
+  identificationTypeLabel,
+  toIdentificationTypeCode,
+} from '@/lib/identification-types';
 
 type CustomerSort = 'recent' | 'name';
 
-const ID_TYPE_LABEL: Record<string, string> = {
-  CEDULA: 'Cédula',
-  RUC: 'RUC',
-  PASAPORTE: 'Pasaporte',
-  CONSUMIDOR_FINAL: 'Consumidor final',
-};
 
 export default function ClientesPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -100,7 +99,10 @@ export default function ClientesPage() {
     customer.businessName || `${customer.firstName} ${customer.lastName}`;
 
   // Solo los tipos que efectivamente tiene algún cliente
-  const idTypeOptions = Array.from(new Set(customers.map((c) => c.identificationType))).sort();
+  // Clientes antiguos guardan el nombre (CEDULA…): todo se compara por código SRI
+  const idTypeOf = (customer: Customer) =>
+    toIdentificationTypeCode(customer.identificationType) ?? customer.identificationType;
+  const idTypeOptions = Array.from(new Set(customers.map(idTypeOf))).sort();
 
   const filteredCustomers = customers.filter(customer => {
     const searchLower = searchTerm.toLowerCase();
@@ -108,7 +110,7 @@ export default function ClientesPage() {
       getNombre(customer).toLowerCase().includes(searchLower) ||
       customer.identification.includes(searchLower) ||
       customer.email?.toLowerCase().includes(searchLower);
-    const matchesType = idTypeFilter === 'all' || customer.identificationType === idTypeFilter;
+    const matchesType = idTypeFilter === 'all' || idTypeOf(customer) === idTypeFilter;
     return matchesSearch && matchesType;
   }).sort((a, b) =>
     sortBy === 'name'
@@ -166,7 +168,7 @@ export default function ClientesPage() {
                 <NativeSelect value={idTypeFilter} onChange={(e) => setIdTypeFilter(e.target.value)}>
                   <option value="all">Todos</option>
                   {idTypeOptions.map((type) => (
-                    <option key={type} value={type}>{ID_TYPE_LABEL[type] ?? type}</option>
+                    <option key={type} value={type}>{identificationTypeLabel(type)}</option>
                   ))}
                 </NativeSelect>
               </FilterField>
@@ -218,8 +220,8 @@ export default function ClientesPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 space-y-1">
                         <div className="flex items-center gap-2">
-                          <Badge variant={customer.identificationType === 'RUC' ? 'default' : 'secondary'} className="text-xs">
-                            {customer.identificationType}
+                          <Badge variant={idTypeOf(customer) === ID_TYPE.RUC ? 'default' : 'secondary'} className="text-xs">
+                            {identificationTypeLabel(customer.identificationType)}
                           </Badge>
                           <span className="font-mono text-xs text-muted-foreground truncate">
                             {customer.identification}
@@ -293,8 +295,8 @@ export default function ClientesPage() {
                         <TableCell>
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2">
-                              <Badge variant={customer.identificationType === 'RUC' ? 'default' : 'secondary'} className="text-xs">
-                                {customer.identificationType}
+                              <Badge variant={idTypeOf(customer) === ID_TYPE.RUC ? 'default' : 'secondary'} className="text-xs">
+                                {identificationTypeLabel(customer.identificationType)}
                               </Badge>
                               <span className="font-mono text-xs text-muted-foreground">
                                 {customer.identification}
@@ -388,7 +390,7 @@ export default function ClientesPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {customers.filter(c => c.identificationType === 'RUC').length}
+                {customers.filter((c) => idTypeOf(c) === ID_TYPE.RUC).length}
               </div>
               <p className="text-xs text-muted-foreground">
                 clientes corporativos
@@ -404,7 +406,7 @@ export default function ClientesPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {customers.filter(c => c.identificationType === 'CEDULA').length}
+                {customers.filter((c) => idTypeOf(c) === ID_TYPE.CEDULA).length}
               </div>
               <p className="text-xs text-muted-foreground">
                 clientes individuales
