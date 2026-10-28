@@ -9,8 +9,8 @@
   publish = ".next"
 
 [build.environment]
-  # Usar Node 18+
-  NODE_VERSION = "18"
+  # Node 20 LTS (Next 15 necesita >= 18.18; Node 18 ya no tiene soporte)
+  NODE_VERSION = "20"
 
   # Habilitar pnpm
   NPM_FLAGS = "--version"
