@@ -1,13 +1,14 @@
 import { Injectable, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
-import { parse } from 'csv-parse/sync';
-import { Customer, Invoice } from '@prisma/client';
 import { PrismaService } from '../../../../shared/database/prisma.service';
+import { mapWithConcurrency } from '../../../../shared/async/map-with-concurrency';
 import { PaymentsService } from './payments.service';
 import { CreateHistoricalInvoiceDto } from '../dto/create-historical-invoice.dto';
 import { MONEY_TOLERANCE, settledAmount } from '../../domain/invoice-balance';
-import { readSriAuthorizedInvoice, SriAuthorizedInvoice } from '../../domain/sri-authorized-invoice';
-import { SriWebServiceService } from '../../../invoices/infrastructure/sri/sri-web-service.service';
-import { classifyAuthorizationState } from '../../../invoices/infrastructure/sri/sri-authorization-state';
+import { contactData, missingContact, newestFirst } from '../../domain/buyer-contact';
+import { parseDdMmYyyy, parseIsoDate } from '../../domain/import-dates';
+import { readPaymentsCsv, readSriInvoicesExport } from '../import-files';
+import { SRI_CONCURRENCY, SriInvoiceLookupService } from './sri-invoice-lookup.service';
+import { inferIdentificationType } from '../../../customers/domain/identification-type';
 
 export interface ImportRowError {
   row: number;
@@ -23,21 +24,6 @@ export interface ImportReport {
   warnings?: ImportRowError[];
 }
 
-export interface EnrichError {
-  /** El cliente o la factura */
-  label: string;
-  message: string;
-}
-
-export type EnrichMode = 'customers' | 'taxes';
-
-export interface EnrichReport {
-  total: number;
-  invoicesUpdated: number;
-  customersUpdated: number;
-  errors: EnrichError[];
-}
-
 interface ValidSriRow {
   row: number;
   accessKey: string;
@@ -50,136 +36,18 @@ interface ValidSriRow {
   businessName?: string;
 }
 
-type SriInvoiceData = SriAuthorizedInvoice & {
-  authorizationNumber: string;
-  authorizationDate: Date | null;
-};
-
-type Contact = Pick<SriAuthorizedInvoice['buyer'], 'email' | 'phone' | 'address'>;
-
-type ImportedInvoice = Invoice & { customer: Customer };
-
-// El SRI responde lento (crea el cliente SOAP en cada consulta); unas pocas a
-// la vez acortan un archivo grande sin saturarlo.
-const SRI_CONCURRENCY = 4;
-const CONTACT_TRIES = 3;
-
-function newestFirst<T extends { issueDate: Date }>(items: T[]): T[] {
-  return [...items].sort((a, b) => b.issueDate.getTime() - a.issueDate.getTime());
-}
-
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T) => Promise<R>,
-): Promise<({ ok: true; value: R } | { ok: false; error: string })[]> {
-  const results: ({ ok: true; value: R } | { ok: false; error: string })[] = new Array(items.length);
-  let next = 0;
-  const worker = async () => {
-    while (next < items.length) {
-      const index = next++;
-      try {
-        results[index] = { ok: true, value: await fn(items[index]) };
-      } catch (e: any) {
-        results[index] = { ok: false, error: e?.message ?? 'error desconocido' };
-      }
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return results;
-}
-
-function contactData(buyer: Contact) {
-  return {
-    email: buyer.email ?? undefined,
-    phone: buyer.phone ?? undefined,
-    address: buyer.address ?? undefined,
-  };
-}
-
-/** Solo los datos que el cliente no tiene: nunca pisa lo cargado a mano. */
-function missingContact(customer: Partial<Record<keyof Contact, string | null>>, buyer: Contact) {
-  const data: Partial<Record<keyof Contact, string>> = {};
-  for (const field of ['email', 'phone', 'address'] as const) {
-    if (!customer[field]?.trim() && buyer[field]) data[field] = buyer[field]!;
-  }
-  return data;
-}
-
-interface SriInvoiceRow {
-  FECHA_EMISION?: string;
-  COMPROBANTE?: string;
-  NUMERO_COMPROBANTE?: string;
-  IDENTIFICACION_RECEPTOR?: string;
-  RAZON_SOCIAL?: string;
-  CLAVE_ACCESO?: string;
-  VALOR_TOTAL?: string;
-}
-
-interface HistoricalPaymentRow {
-  identificacion?: string;
-  referencia?: string;
-  fechaPago?: string;
-  numeroFactura?: string;
-  montoAplicado?: string;
-  retencion?: string;
-}
-
-function parseDdMmYyyy(value: string | undefined): Date | null {
-  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec((value ?? '').trim());
-  if (!match) return null;
-  const [, dd, mm, yyyy] = match;
-  const date = new Date(Date.UTC(Number(yyyy), Number(mm) - 1, Number(dd)));
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function parseIsoDate(value: string | undefined): Date | null {
-  if (!value?.trim()) return null;
-  const date = new Date(value.trim());
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function inferIdentificationType(identification: string): string {
-  if (identification.length === 13) return '04'; // RUC
-  if (identification.length === 10) return '05'; // Cédula
-  return '06'; // Pasaporte / otro
-}
-
+/**
+ * Importa facturas (export del SRI o alta manual) y pagos (CSV propio) emitidos antes de usar la
+ * app, para llevar la cobranza. Completar lo importado desde el SRI vive en
+ * `ImportedInvoicesEnrichmentService`.
+ */
 @Injectable()
 export class HistoricalImportService {
   constructor(
     private prisma: PrismaService,
     private paymentsService: PaymentsService,
-    private sriService: SriWebServiceService,
+    private sriLookup: SriInvoiceLookupService,
   ) {}
-
-  private parseSriInvoicesExport(buffer: Buffer): SriInvoiceRow[] {
-    const text = buffer.toString('utf-8');
-    try {
-      return parse(text, {
-        delimiter: '\t',
-        columns: true,
-        skip_empty_lines: true,
-        trim: true,
-      });
-    } catch (e: any) {
-      throw new BadRequestException(`No se pudo leer el archivo del SRI: ${e.message}`);
-    }
-  }
-
-  private parsePaymentsCsv(buffer: Buffer): HistoricalPaymentRow[] {
-    const text = buffer.toString('utf-8');
-    try {
-      return parse(text, {
-        delimiter: ',',
-        columns: true,
-        skip_empty_lines: true,
-        trim: true,
-      });
-    } catch (e: any) {
-      throw new BadRequestException(`No se pudo leer el CSV de pagos: ${e.message}`);
-    }
-  }
 
   async importInvoices(
     companyId: string,
@@ -187,7 +55,7 @@ export class HistoricalImportService {
     createdById: string,
     dryRun: boolean,
   ): Promise<ImportReport> {
-    const rows = this.parseSriInvoicesExport(buffer);
+    const rows = readSriInvoicesExport(buffer);
     const { establishment, emissionPoint } = await this.getEstablishmentAndEmissionPoint(companyId);
 
     let skipped = 0;
@@ -283,7 +151,7 @@ export class HistoricalImportService {
     const contacts = new Map(
       (
         await mapWithConcurrency(toLookUp, SRI_CONCURRENCY, ([, items]) =>
-          this.findContact(newestFirst(items).map((item) => item.accessKey)),
+          this.sriLookup.findContact(newestFirst(items).map((item) => item.accessKey)),
         )
       ).map((lookup, i) => [toLookUp[i][0], lookup]),
     );
@@ -350,150 +218,6 @@ export class HistoricalImportService {
     }
 
     return { total: rows.length, created, skipped, errors, warnings };
-  }
-
-  /**
-   * "Completar desde el SRI" para lo ya importado con el .txt. Solo llena lo
-   * que está vacío: nunca pisa un dato que el usuario cargó a mano.
-   *
-   * - 'customers' (rápido): el contacto de cada cliente sin correo, con una
-   *   consulta por cliente (su factura más reciente).
-   * - 'taxes' (lento): subtotal, descuento e IVA de cada factura, una consulta
-   *   por factura. Los importes cambian solo si el total del SRI coincide con
-   *   el guardado, para no mover saldos con pagos ya aplicados.
-   */
-  async enrichImportedFromSri(companyId: string, mode: EnrichMode = 'customers'): Promise<EnrichReport> {
-    const imported = await this.prisma.invoice.findMany({
-      where: { companyId, metadata: { path: ['imported'], equals: true } },
-      include: { customer: true },
-      orderBy: { issueDate: 'asc' },
-    });
-    return mode === 'taxes' ? this.enrichTaxes(imported) : this.enrichCustomers(imported);
-  }
-
-  private async enrichCustomers(imported: ImportedInvoice[]): Promise<EnrichReport> {
-    const byCustomer = new Map<string, ImportedInvoice[]>();
-    for (const invoice of imported) {
-      if (invoice.customer.email) continue;
-      byCustomer.set(invoice.customer.id, [...(byCustomer.get(invoice.customer.id) ?? []), invoice]);
-    }
-    const groups = [...byCustomer.values()];
-    const lookups = await mapWithConcurrency(groups, SRI_CONCURRENCY, (invoices) =>
-      this.findContact(newestFirst(invoices).map((invoice) => invoice.accessKey)),
-    );
-
-    let customersUpdated = 0;
-    const errors: EnrichError[] = [];
-    for (let i = 0; i < groups.length; i++) {
-      const customer = groups[i][0].customer;
-      const label = customer.businessName || customer.identification;
-      const lookup = lookups[i];
-      if (!lookup.ok) {
-        errors.push({ label, message: lookup.error });
-        continue;
-      }
-      const missing = missingContact(customer, lookup.value);
-      if (Object.keys(missing).length > 0) {
-        await this.prisma.customer.update({ where: { id: customer.id }, data: missing });
-        customersUpdated++;
-      }
-      if (!missing.email) {
-        errors.push({ label, message: 'sus facturas en el SRI no traen correo' });
-      }
-    }
-
-    return { total: groups.length, invoicesUpdated: 0, customersUpdated, errors };
-  }
-
-  private async enrichTaxes(imported: ImportedInvoice[]): Promise<EnrichReport> {
-    const pending = imported.filter(
-      (invoice) => !(invoice.metadata as any)?.sriEnrichedAt && /^\d{49}$/.test(invoice.accessKey),
-    );
-    const fromSri = await mapWithConcurrency(pending, SRI_CONCURRENCY, (invoice) =>
-      this.fetchFromSri(invoice.accessKey),
-    );
-
-    let invoicesUpdated = 0;
-    const errors: EnrichError[] = [];
-    for (let i = 0; i < pending.length; i++) {
-      const invoice = pending[i];
-      const label = `${invoice.establishmentCode}-${invoice.emissionPointCode}-${invoice.sequential}`;
-      const lookup = fromSri[i];
-      if (!lookup.ok) {
-        errors.push({ label, message: lookup.error });
-        continue;
-      }
-      const sri = lookup.value;
-
-      const sameTotal = Math.abs(sri.total - Number(invoice.total)) <= MONEY_TOLERANCE;
-      if (!sameTotal) {
-        errors.push({
-          label,
-          message: `El SRI tiene un total de ${sri.total.toFixed(2)} y la app ${Number(invoice.total).toFixed(2)}; no se cambiaron los importes`,
-        });
-      }
-      await this.prisma.invoice.update({
-        where: { id: invoice.id },
-        data: {
-          ...(sameTotal
-            ? { subtotal: sri.subtotal, totalDiscount: sri.totalDiscount, ivaValue: sri.ivaValue }
-            : {}),
-          authorizationNumber: invoice.authorizationNumber ?? sri.authorizationNumber,
-          authorizationDate: invoice.authorizationDate ?? sri.authorizationDate,
-          metadata: { ...((invoice.metadata as object) ?? {}), sriEnrichedAt: new Date().toISOString() },
-        },
-      });
-      invoicesUpdated++;
-    }
-
-    return { total: pending.length, invoicesUpdated, customersUpdated: 0, errors };
-  }
-
-  /**
-   * Contacto del comprador en el XML de sus facturas, de la más reciente hacia
-   * atrás: se detiene en la primera que trae correo, y prueba como mucho
-   * CONTACT_TRIES (una factura vieja rara vez trae lo que la nueva no).
-   */
-  private async findContact(accessKeys: string[]): Promise<Contact> {
-    const found: Contact = { email: null, phone: null, address: null };
-    let lastError = 'ninguna factura con clave de acceso válida';
-    let anyAnswer = false;
-    for (const accessKey of accessKeys.filter((key) => /^\d{49}$/.test(key)).slice(0, CONTACT_TRIES)) {
-      try {
-        const { buyer } = await this.fetchFromSri(accessKey);
-        anyAnswer = true;
-        found.email ??= buyer.email;
-        found.phone ??= buyer.phone;
-        found.address ??= buyer.address;
-        if (found.email) break;
-      } catch (e: any) {
-        lastError = e?.message ?? 'error desconocido';
-      }
-    }
-    if (!anyAnswer) throw new Error(lastError);
-    return found;
-  }
-
-  /** XML autorizado de una factura, con el ambiente que dice su clave. */
-  private async fetchFromSri(accessKey: string): Promise<SriInvoiceData> {
-    if (!/^\d{49}$/.test(accessKey)) {
-      throw new Error('clave de acceso no válida');
-    }
-    const environment = accessKey[23] === '2' ? 'PRODUCTION' : 'TEST';
-    const auth = await this.sriService.checkAuthorization(accessKey, environment);
-    if (classifyAuthorizationState(auth.estado) !== 'AUTHORIZED') {
-      throw new Error(
-        auth.estado === 'NO_AUTORIZADA' ? 'el SRI no la tiene registrada' : `el SRI la tiene como ${auth.estado}`,
-      );
-    }
-    if (!auth.comprobante) {
-      throw new Error('el SRI no devolvió el comprobante');
-    }
-    return {
-      ...readSriAuthorizedInvoice(auth.comprobante),
-      authorizationNumber: auth.numeroAutorizacion ?? accessKey,
-      authorizationDate: auth.fechaAutorizacion ?? null,
-    };
   }
 
   private async getEstablishmentAndEmissionPoint(companyId: string) {
@@ -574,7 +298,7 @@ export class HistoricalImportService {
     createdById: string,
     dryRun: boolean,
   ): Promise<ImportReport> {
-    const rows = this.parsePaymentsCsv(buffer);
+    const rows = readPaymentsCsv(buffer);
 
     type Group = {
       identificacion: string;
