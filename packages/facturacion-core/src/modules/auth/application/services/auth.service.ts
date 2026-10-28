@@ -237,6 +237,13 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
+    // Después de la contraseña: el estado de la cuenta solo se revela a quien ya la conoce.
+    if (!user.isActive) {
+      throw new UnauthorizedException(
+        'Tu usuario está desactivado. Contacta al administrador de tu empresa.',
+      );
+    }
+
     // Generar token
     const token = this.generateToken(user.id);
 
@@ -299,7 +306,9 @@ export class AuthService {
 
     if (!user) {
       // Token no encontrado - puede ser inválido, expirado o ya utilizado
-      throw new UnauthorizedException('Token de verificación inválido o ya utilizado. Si ya verificaste tu email, puedes iniciar sesión normalmente.');
+      throw new UnauthorizedException(
+        'Token de verificación inválido o ya utilizado. Si ya verificaste tu email, puedes iniciar sesión normalmente.',
+      );
     }
 
     // Verificar si el token está expirado
@@ -463,7 +472,9 @@ export class AuthService {
     });
 
     if (!result.success) {
-      this.logger.error(`No se pudo enviar el correo de recuperación a ${user.email}: ${result.error}`);
+      this.logger.error(
+        `No se pudo enviar el correo de recuperación a ${user.email}: ${result.error}`,
+      );
     }
 
     if (process.env.NODE_ENV === 'development') {
@@ -484,9 +495,7 @@ export class AuthService {
 
     // BadRequest y no Unauthorized: la web cierra la sesión ante un 401.
     if (!user || !user.isActive) {
-      throw new BadRequestException(
-        'El enlace no es válido o ya fue usado. Solicita uno nuevo.',
-      );
+      throw new BadRequestException('El enlace no es válido o ya fue usado. Solicita uno nuevo.');
     }
 
     if (!user.passwordResetExpiry || user.passwordResetExpiry < new Date()) {
