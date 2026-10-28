@@ -33,8 +33,6 @@ export class CreditNoteRideGeneratorService {
 
   // Calcula altura de texto
   private getTextHeight(doc: PDFKit.PDFDocument, text: string, width: number): number {
-    const currentFont = doc.font;
-    const currentSize = doc.fontSize;
     return doc.heightOfString(text, { width });
   }
 

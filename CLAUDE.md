@@ -55,11 +55,12 @@ pnpm --filter facturacion-core test:watch
 # Run test coverage
 pnpm --filter facturacion-core test:cov
 
-# Run e2e tests
-pnpm --filter facturacion-core test:e2e
-
-# Lint all packages
+# Lint all packages (ESLint: quality rules only; `any` and unused vars in web are warnings for now)
 pnpm lint:all
+
+# Format specific files with Prettier (single quotes, width 100). Format only files you touch:
+# the codebase is not mass-formatted to keep diffs reviewable.
+pnpm format <files...>
 
 # Lint backend
 pnpm --filter facturacion-core lint

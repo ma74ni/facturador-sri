@@ -5,7 +5,6 @@ import { AccessKeyService } from '../../domain/services/access-key.service';
 import { XmlGeneratorService } from '../../infrastructure/xml/xml-generator.service';
 import { XmlStorageService } from '../../infrastructure/xml/xml-storage.service';
 import { DigitalSignatureService } from '../../infrastructure/xml/digital-signature.service';
-import { Decimal } from '@prisma/client/runtime/library';
 import { SriWebServiceService } from '../../infrastructure/sri/sri-web-service.service';
 import { RideGeneratorService } from '../../infrastructure/pdf/ride-generator.service';
 import { EmailService } from '../../../../shared/email/email.service';

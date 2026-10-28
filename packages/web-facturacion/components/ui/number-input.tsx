@@ -22,7 +22,7 @@ const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
     }, [value]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      let newValue = e.target.value;
+      const newValue = e.target.value;
 
       // Permitir valor vacío temporalmente
       if (newValue === '') {

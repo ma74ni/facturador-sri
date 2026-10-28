@@ -859,7 +859,7 @@ export function InvoiceDialog({
               <div className="rounded-lg bg-blue-50 border border-blue-200 p-4 mt-4">
                 <p className="text-sm text-blue-800">
                   <strong>Nota RIMPE:</strong> Esta factura incluirá la leyenda
-                  "CONTRIBUYENTE NEGOCIO POPULAR - RÉGIMEN RIMPE" en la
+                  &ldquo;CONTRIBUYENTE NEGOCIO POPULAR - RÉGIMEN RIMPE&rdquo; en la
                   información adicional del XML. No se aplicará retención de IVA
                   ni renta.
                 </p>
