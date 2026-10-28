@@ -3,6 +3,10 @@ import { create } from 'xmlbuilder2';
 
 import { SRI_IVA_TAX_CODE } from '../../../tax-codes/domain/iva-rate.catalog';
 import { TaxCalculatorService } from '../../../tax-codes/domain/services/tax-calculator.service';
+import {
+  buyerIdentificationTypeForSri,
+  IDENTIFICATION_TYPE,
+} from '../../../customers/domain/identification-type';
 
 @Injectable()
 export class XmlGeneratorService {
@@ -23,34 +27,11 @@ export class XmlGeneratorService {
   }
 
   /**
-   * Mapea el tipo de identificación del cliente al código del SRI
-   */
-  private mapIdentificationType(type: string): string {
-    // Ya viene como código del catálogo SRI (04/05/06/07/08): usarlo tal cual.
-    // Sin esto, un cliente creado con identificationType "05" caía al default
-    // '07' y el SRI rechazaba con error 69 (tipo 07 exige identificación
-    // 9999999999999).
-    if (['04', '05', '06', '07', '08'].includes(type)) {
-      return type;
-    }
-
-    const mapping: Record<string, string> = {
-      'CEDULA': '05',
-      'RUC': '04',
-      'PASAPORTE': '06',
-      'CONSUMIDOR_FINAL': '07',
-      'IDENTIFICACION_EXTERIOR': '08',
-    };
-
-    return mapping[type] || '07'; // Default: Consumidor final
-  }
-
-  /**
    * Valida y ajusta la identificación según el tipo
    */
   private normalizeIdentification(identification: string, type: string): string {
     // Venta a consumidor final: 13 dígitos de nueve
-    if (type === 'CONSUMIDOR_FINAL' || type === '07') {
+    if (buyerIdentificationTypeForSri(type) === IDENTIFICATION_TYPE.CONSUMIDOR_FINAL) {
       return '9999999999999';
     }
 
@@ -97,7 +78,7 @@ export class XmlGeneratorService {
     infoFactura.ele('obligadoContabilidad').txt('SI');
 
     // Tipo identificación comprador - Usar código del SRI
-    const tipoIdentificacionCodigo = this.mapIdentificationType(invoice.customer.identificationType);
+    const tipoIdentificacionCodigo = buyerIdentificationTypeForSri(invoice.customer.identificationType);
     const identificacionNormalizada = this.normalizeIdentification(
       invoice.customer.identification,
       invoice.customer.identificationType

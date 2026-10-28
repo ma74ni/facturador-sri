@@ -25,6 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Customer, CreateCustomerDto } from '@/lib/api/customers';
 import { validarCedula, validarRUC, validarEmail, validarTelefono } from '@/lib/validations/ecuador';
 import { AlertCircle } from 'lucide-react';
+import { ID_TYPE, IDENTIFICATION_TYPES, toIdentificationTypeCode } from '@/lib/identification-types';
 
 interface CustomerDialogProps {
   open: boolean;
@@ -37,7 +38,7 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState<CreateCustomerDto>({
-    identificationType: 'CEDULA',
+    identificationType: ID_TYPE.CEDULA,
     identification: '',
     businessName: '',
     firstName: '',
@@ -51,7 +52,9 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
   useEffect(() => {
     if (customer) {
       setFormData({
-        identificationType: customer.identificationType,
+        // Clientes antiguos guardan el nombre (CEDULA…): el select trabaja con el código
+        identificationType:
+          toIdentificationTypeCode(customer.identificationType) ?? customer.identificationType,
         identification: customer.identification,
         businessName: customer.businessName || '',
         firstName: customer.firstName || '',
@@ -65,7 +68,7 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
       });
     } else {
       setFormData({
-        identificationType: 'CEDULA',
+        identificationType: ID_TYPE.CEDULA,
         identification: '',
         businessName: '',
         firstName: '',
@@ -85,22 +88,22 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
     // Validar identificación
     if (!formData.identification) {
       newErrors.identification = 'La identificación es requerida';
-    } else if (formData.identificationType === 'CEDULA') {
+    } else if (formData.identificationType === ID_TYPE.CEDULA) {
       if (!validarCedula(formData.identification)) {
         newErrors.identification = 'Cédula inválida. Debe ser una cédula ecuatoriana válida de 10 dígitos';
       }
-    } else if (formData.identificationType === 'RUC') {
+    } else if (formData.identificationType === ID_TYPE.RUC) {
       if (!validarRUC(formData.identification)) {
         newErrors.identification = 'RUC inválido. Debe ser un RUC ecuatoriano válido de 13 dígitos';
       }
-    } else if (formData.identificationType === 'PASAPORTE') {
+    } else if (formData.identificationType === ID_TYPE.PASAPORTE) {
       if (formData.identification.length < 5) {
         newErrors.identification = 'Pasaporte debe tener al menos 5 caracteres';
       }
     }
 
     // Validar nombre según tipo
-    if (formData.identificationType === 'RUC') {
+    if (formData.identificationType === ID_TYPE.RUC) {
       if (!formData.businessName?.trim()) {
         newErrors.businessName = 'La razón social es requerida';
       }
@@ -145,7 +148,7 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
     }
   };
 
-  const isCompany = formData.identificationType === 'RUC';
+  const isCompany = formData.identificationType === ID_TYPE.RUC;
 
   const handleIdentificationChange = (value: string) => {
     setFormData({ ...formData, identification: value });
@@ -185,9 +188,11 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="CEDULA">Cédula</SelectItem>
-                  <SelectItem value="RUC">RUC</SelectItem>
-                  <SelectItem value="PASAPORTE">Pasaporte</SelectItem>
+                  {IDENTIFICATION_TYPES.map((type) => (
+                    <SelectItem key={type.code} value={type.code}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -201,7 +206,7 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
                 id="identification"
                 value={formData.identification}
                 onChange={(e) => handleIdentificationChange(e.target.value)}
-                maxLength={isCompany ? 13 : formData.identificationType === 'CEDULA' ? 10 : 20}
+                maxLength={isCompany ? 13 : formData.identificationType === ID_TYPE.CEDULA ? 10 : 20}
                 className={errors.identification ? 'border-red-500' : ''}
               />
               {errors.identification && (

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { User, Mail, Phone, MapPin, FileText, Edit, X } from 'lucide-react';
+import { identificationTypeLabel } from '@/lib/identification-types';
 
 interface CustomerInfoCardProps {
   customer: Customer;
@@ -13,18 +14,13 @@ interface CustomerInfoCardProps {
   compact?: boolean;
 }
 
-const IDENTIFICATION_TYPES = {
-  RUC: 'RUC',
-  CEDULA: 'Cédula',
-  PASAPORTE: 'Pasaporte',
-};
 
 export function CustomerInfoCard({ customer, onEdit, onClose, compact = false }: CustomerInfoCardProps) {
   const displayName = customer.businessName ||
     (customer.firstName && customer.lastName ? `${customer.firstName} ${customer.lastName}` :
     customer.firstName || customer.lastName || 'Sin nombre');
 
-  const identificationLabel = IDENTIFICATION_TYPES[customer.identificationType as keyof typeof IDENTIFICATION_TYPES] || customer.identificationType;
+  const identificationLabel = identificationTypeLabel(customer.identificationType);
 
   if (compact) {
     return (
