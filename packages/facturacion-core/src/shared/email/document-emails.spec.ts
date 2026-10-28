@@ -116,6 +116,11 @@ function creditNoteService(stored: Record<string, unknown> | null, send?: { succ
   return { service, prisma, ...d };
 }
 
+// 18:49:21 UTC son las 13:49:21 en Ecuador, sin importar la zona del servidor que corre el test.
+const AUTHORIZED_AT_ECUADOR = new Date('2026-10-28T18:49:21.000Z').toLocaleString('es-EC', {
+  timeZone: 'America/Guayaquil',
+});
+
 const baseContext = {
   companyName: 'Heladería Lattia',
   customerName: 'Diego Paredes',
@@ -134,6 +139,10 @@ const baseContext = {
 };
 
 describe('Envío por email de comprobantes', () => {
+  it('la fecha de autorización va en hora de Ecuador', () => {
+    expect(AUTHORIZED_AT_ECUADOR).toContain('1:49:21');
+  });
+
   describe('factura', () => {
     it('manda el RIDE y el XML firmado al email del cliente y deja el log', async () => {
       const { service, prisma, emailService, r2Storage } = invoiceService({ ...document });
@@ -149,7 +158,7 @@ describe('Envío por email de comprobantes', () => {
         context: {
           ...baseContext,
           invoiceNumber: '001-002-000000015',
-          authorizationDate: document.authorizationDate.toLocaleString('es-EC'),
+          authorizationDate: AUTHORIZED_AT_ECUADOR,
         },
         company,
         attachments: [
@@ -256,7 +265,7 @@ describe('Envío por email de comprobantes', () => {
           creditNoteNumber: '001-002-000000015',
           modifiedInvoiceNumber: '001-002-000000010',
           reason: 'Devolución',
-          authorizationDate: document.authorizationDate.toLocaleString('es-EC'),
+          authorizationDate: AUTHORIZED_AT_ECUADOR,
         },
         company,
         attachments: [

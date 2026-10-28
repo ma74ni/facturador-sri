@@ -77,8 +77,11 @@ export class ElectronicDocumentMailer {
         day: 'numeric',
         timeZone: 'UTC',
       }),
+      // En hora de Ecuador: el servidor (Render) corre en UTC, cinco horas adelantado.
       authorizationDate: email.authorizationDate
-        ? new Date(email.authorizationDate).toLocaleString('es-EC')
+        ? new Date(email.authorizationDate).toLocaleString('es-EC', {
+            timeZone: 'America/Guayaquil',
+          })
         : null,
       authorizationNumber: email.authorizationNumber,
       accessKey: email.accessKey,
