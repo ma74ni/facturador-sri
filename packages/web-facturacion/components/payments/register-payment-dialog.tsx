@@ -228,7 +228,7 @@ export function RegisterPaymentDialog({
                   ))
                 ) : (
                   <div className="px-3 py-2 text-sm text-muted-foreground">
-                    Ninguna factura pendiente coincide con "{query}"
+                    Ninguna factura pendiente coincide con &ldquo;{query}&rdquo;
                   </div>
                 )}
               </div>

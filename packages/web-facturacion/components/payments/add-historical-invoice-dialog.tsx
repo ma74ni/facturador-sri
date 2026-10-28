@@ -68,7 +68,7 @@ export function AddHistoricalInvoiceDialog({
           <DialogTitle>Agregar factura histórica</DialogTitle>
           <DialogDescription>
             Para una factura vieja suelta que falta — si tenés varias, es más rápido importar el
-            archivo del SRI desde "Importar histórico".
+            archivo del SRI desde &ldquo;Importar histórico&rdquo;.
           </DialogDescription>
         </DialogHeader>
 

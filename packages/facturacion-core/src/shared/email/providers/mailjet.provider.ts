@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { openSecret } from '../../crypto/secret-cipher';
+// node-mailjet no expone un default compatible sin esModuleInterop.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const Mailjet = require('node-mailjet');
 
 // Interfaces para la respuesta de Mailjet

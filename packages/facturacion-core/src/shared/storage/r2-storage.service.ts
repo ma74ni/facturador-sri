@@ -264,28 +264,4 @@ export class R2StorageService {
     const result = await this.downloadFile(key);
     return result.buffer;
   }
-
-  /**
-   * Construir la key de R2 a partir de un path local antiguo (para migración)
-   */
-  parseLocalPath(localPath: string, companyId: string): string | null {
-    // Ejemplo: storage/certificates/company123_123456.p12 -> certificates/company123/company123_123456.p12
-    // Ejemplo: storage/logos/company123.png -> logos/company123/company123.png
-    // Ejemplo: storage/xml/company123/accesskey.xml -> xml/company123/accesskey.xml
-
-    if (!localPath) return null;
-
-    // Normalizar path
-    const normalized = localPath.replace(/\\/g, '/');
-
-    // Si ya tiene el formato de R2 (no tiene "storage/" al inicio), retornar tal cual
-    if (!normalized.includes('storage/')) {
-      return normalized;
-    }
-
-    // Remover prefijo "storage/" y reconstruir con companyId si es necesario
-    const withoutStorage = normalized.split('storage/')[1];
-
-    return withoutStorage;
-  }
 }
