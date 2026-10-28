@@ -111,7 +111,8 @@ npx tsx scripts/verify-user-email.ts <userId>
 
 **API Structure:**
 - Base URL: `http://localhost:3000/api/v1`
-- Swagger docs: `http://localhost:3000/api/docs`
+- Swagger docs: `http://localhost:3000/api/docs` (off when `NODE_ENV=production` unless `SWAGGER_ENABLED=true`)
+- Auth routes are rate limited per IP (`@nestjs/throttler` in `AuthModule`); uploads have multer size caps in `shared/http/upload-limits.ts`
 - All routes use `/api/v1` prefix
 - Authentication via Bearer token
 
