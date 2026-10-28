@@ -3,11 +3,46 @@ import * as PDFDocument from 'pdfkit';
 import * as bwipjs from 'bwip-js';
 import { ivaSubtotalLabel, IvaTreatment } from '../../modules/tax-codes/domain/iva-rate.catalog';
 import { TaxCalculatorService } from '../../modules/tax-codes/domain/services/tax-calculator.service';
-import { RideCustomer, RideDocument, RideItem } from './ride-document';
+import { RideDocument, RideItem } from './ride-document';
+
+type Doc = PDFKit.PDFDocument;
+
+// Página A4 y márgenes (puntos).
+const PAGE_TOP = 30;
+const PAGE_BOTTOM = 842 - 30;
+const LEFT = 40;
+const RIGHT = 555;
+const WIDTH = RIGHT - LEFT;
+
+const GAP = 10;
+const RADIUS = 6;
+const PAD = 8;
+const BORDER = '#000000';
+const HEADER_FILL = '#eeeeee';
+const MISSING_LOGO_COLOR = '#e00000';
+
+const FONT = 'Helvetica';
+const FONT_BOLD = 'Helvetica-Bold';
+
+/** Columnas del detalle; la descripción toma el ancho que sobra. */
+const ITEM_COLUMNS = [
+  { key: 'code', label: 'Cod. Principal', width: 65, align: 'left' },
+  { key: 'quantity', label: 'Cant.', width: 50, align: 'right' },
+  { key: 'description', label: 'Descripción', width: 0, align: 'left' },
+  { key: 'unitPrice', label: 'Precio Unitario', width: 70, align: 'right' },
+  { key: 'discount', label: 'Descuento', width: 60, align: 'right' },
+  { key: 'total', label: 'Precio Total', width: 70, align: 'right' },
+] as const;
+
+const ECUADOR_TZ = 'America/Guayaquil';
+const pad2 = (n: number) => String(n).padStart(2, '0');
 
 /**
  * Dibuja el RIDE (representación impresa) de cualquier comprobante electrónico.
  * No sabe de R2 ni de Prisma: recibe el comprobante ya traducido y el logo, y devuelve el PDF.
+ *
+ * Diseño: logo (o "NO TIENE LOGO") y datos del emisor a la izquierda, cuadro tributario a la
+ * derecha, comprador, detalle y, abajo, información adicional + forma de pago junto a los totales.
  */
 @Injectable()
 export class RidePdfRenderer {
@@ -19,7 +54,7 @@ export class RidePdfRenderer {
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({
         size: 'A4',
-        margins: { top: 30, bottom: 30, left: 40, right: 40 },
+        margins: { top: PAGE_TOP, bottom: 30, left: LEFT, right: 40 },
       });
 
       const chunks: Buffer[] = [];
@@ -40,226 +75,266 @@ export class RidePdfRenderer {
     });
   }
 
-  // ========================= Helpers =========================
-  private money(v: unknown): string {
-    return `$${Number(v || 0).toFixed(2)}`;
+  // ========================= Formatos =========================
+
+  private text(value: unknown): string {
+    return (value ?? '').toString().trim();
   }
 
-  private pad(s: unknown): string {
-    return (s ?? '').toString().trim();
+  /** `$1,200.00` */
+  private money(value: unknown): string {
+    const amount = Number(value || 0);
+    return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
-  private hrule(doc: PDFKit.PDFDocument, x1: number, y: number, x2: number): void {
-    doc.moveTo(x1, y).lineTo(x2, y).stroke();
+  /** Cantidades: al menos 2 decimales, hasta 6 si los tiene. */
+  private quantity(value: unknown): string {
+    return Number(value ?? 0).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 6,
+    });
   }
 
-  private box(doc: PDFKit.PDFDocument, x: number, y: number, w: number, h: number): void {
-    doc.rect(x, y, w, h).stroke();
+  /** Fecha de emisión: se guarda como fecha sin hora (medianoche UTC). */
+  private date(value: Date | string): string {
+    const d = new Date(value);
+    return `${pad2(d.getUTCDate())}/${pad2(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`;
   }
 
-  private getTextHeight(doc: PDFKit.PDFDocument, text: string, width: number): number {
-    return doc.heightOfString(text, { width });
+  /** Fecha y hora de autorización en hora de Ecuador, sin importar dónde corra el servidor. */
+  private dateTime(value: Date | string): string {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: ECUADOR_TZ,
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(new Date(value));
+    const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value;
+    return `${get('day')}/${get('month')}/${get('year')} ${get('hour')}:${get('minute')}:${get('second')}`;
   }
 
-  // ========================= Layout principal =========================
-  private async drawContent(
-    doc: PDFKit.PDFDocument,
+  // ========================= Primitivas =========================
+
+  private roundedBox(doc: Doc, x: number, y: number, w: number, h: number): void {
+    doc.lineWidth(0.8).roundedRect(x, y, w, h, RADIUS).stroke(BORDER);
+  }
+
+  private cell(doc: Doc, x: number, y: number, w: number, h: number, fill?: string): void {
+    doc.lineWidth(0.5);
+    if (fill) doc.rect(x, y, w, h).fillAndStroke(fill, BORDER);
+    else doc.rect(x, y, w, h).stroke(BORDER);
+    doc.fillColor('#000000');
+  }
+
+  /** Etiqueta en negrita y valor a su derecha; devuelve la altura usada. */
+  private labeled(
+    doc: Doc,
+    label: string,
+    value: string,
+    x: number,
+    y: number,
+    labelWidth: number,
+    valueWidth: number,
+    size = 8,
+  ): number {
+    doc.fontSize(size).font(FONT_BOLD);
+    const labelHeight = doc.heightOfString(label, { width: labelWidth });
+    doc.text(label, x, y, { width: labelWidth });
+    doc.font(FONT);
+    const valueHeight = doc.heightOfString(value || ' ', { width: valueWidth });
+    doc.text(value, x + labelWidth, y, { width: valueWidth });
+    return Math.max(labelHeight, valueHeight);
+  }
+
+  /** Salta de página si lo que sigue no entra; devuelve la Y donde dibujar. */
+  private ensureSpace(doc: Doc, y: number, needed: number): number {
+    if (y + needed <= PAGE_BOTTOM) return y;
+    doc.addPage();
+    return PAGE_TOP;
+  }
+
+  // ========================= Layout =========================
+
+  private async drawContent(doc: Doc, document: RideDocument, logo: Buffer | null): Promise<void> {
+    let y = await this.drawHeader(doc, document, logo, PAGE_TOP);
+    y = this.drawBuyer(doc, document, y + GAP);
+    y = this.drawItems(doc, document.items, y + GAP);
+    this.drawFooter(doc, document, y + GAP);
+  }
+
+  /** Logo y emisor (izquierda) + cuadro tributario (derecha), ambos hasta la misma altura. */
+  private async drawHeader(
+    doc: Doc,
     document: RideDocument,
     logo: Buffer | null,
-  ): Promise<void> {
-    let y = 30;
-
-    // Header izquierdo + Cuadro derecho
-    const afterHeader = await this.drawHeaderAndTaxBox(doc, document, logo, y);
-    y = afterHeader + 10;
-
-    this.hrule(doc, 40, y, 555);
-    y += 10;
-
-    y = this.drawDocumentInfo(doc, document, y);
-    y = this.drawCustomerInfo(doc, document.customer, y);
-
-    this.hrule(doc, 40, y, 555);
-    y += 10;
-
-    y = this.drawItemsTable(doc, document.items, y);
-
-    // Info adicional + Forma de pago (izq) || Subtotales + Total (der)
-    this.drawAdditionalInfoAndTotals(doc, document, y);
-  }
-
-  // ========================= Bloques de dibujo =========================
-
-  /**
-   * Header: Logo arriba, luego info empresa (izquierda) + cuadro tributario (derecha)
-   */
-  private async drawHeaderAndTaxBox(
-    doc: PDFKit.PDFDocument,
-    document: RideDocument,
-    logo: Buffer | null,
-    startY: number,
+    top: number,
   ): Promise<number> {
-    const { issuer } = document;
-    const leftX = 40;
-    const rightX = 330;
-    const boxW = 225;
-    let leftY = startY;
+    const leftW = 255;
+    const rightX = LEFT + leftW + GAP;
+    const rightW = RIGHT - rightX;
+    const logoH = 80;
 
-    // ========== IZQUIERDA: LOGO Y DATOS EMPRESA ==========
+    // ---- Logo o aviso ----
+    let hasLogo = false;
     if (logo) {
       try {
-        doc.image(logo, leftX, leftY, { fit: [120, 70], align: 'center' });
-        leftY += 75;
+        doc.image(logo, LEFT, top, { fit: [leftW, logoH], align: 'center', valign: 'center' });
+        hasLogo = true;
       } catch (error) {
         this.logger.warn('⚠️ Logo inválido, el RIDE sale sin logo:', error);
       }
     }
+    if (!hasLogo) {
+      doc
+        .fontSize(20)
+        .font(FONT_BOLD)
+        .fillColor(MISSING_LOGO_COLOR)
+        .text('NO TIENE LOGO', LEFT, top + logoH / 2 - 10, { width: leftW, align: 'center' });
+      doc.fillColor('#000000');
+    }
 
-    // Razón social
-    doc
-      .fontSize(11)
-      .font('Helvetica-Bold')
-      .text(this.pad(issuer.businessName), leftX, leftY, { width: 280 });
-    leftY += 16;
+    // ---- Emisor ----
+    const { issuer } = document;
+    const issuerTop = top + logoH + GAP;
+    const innerX = LEFT + PAD;
+    const innerW = leftW - 2 * PAD;
+    let ly = issuerTop + PAD;
 
-    // Nombre comercial
+    doc.fontSize(9).font(FONT_BOLD);
+    doc.text(this.text(issuer.businessName), innerX, ly, { width: innerW });
+    ly += doc.heightOfString(this.text(issuer.businessName) || ' ', { width: innerW }) + 4;
+
     if (issuer.tradeName && issuer.tradeName !== issuer.businessName) {
-      doc
-        .fontSize(9)
-        .font('Helvetica')
-        .text(this.pad(issuer.tradeName), leftX, leftY, { width: 280 });
-      leftY += 13;
+      doc.fontSize(8).font(FONT);
+      doc.text(this.text(issuer.tradeName), innerX, ly, { width: innerW });
+      ly += doc.heightOfString(this.text(issuer.tradeName), { width: innerW }) + 6;
     }
 
-    // Dirección matriz
-    doc.fontSize(7).font('Helvetica');
-    doc.text(`Dir. Matriz: ${this.pad(issuer.address)}`, leftX, leftY, { width: 280 });
-    leftY += 10;
-
+    const labelW = 70;
+    ly +=
+      this.labeled(
+        doc,
+        'Dirección Matriz:',
+        this.text(issuer.address),
+        innerX,
+        ly,
+        labelW,
+        innerW - labelW,
+        7,
+      ) + 6;
     if (issuer.branchAddress) {
-      doc.text(`Dir. Sucursal: ${this.pad(issuer.branchAddress)}`, leftX, leftY, {
-        width: 280,
-      });
-      leftY += 10;
+      ly +=
+        this.labeled(
+          doc,
+          'Dirección Sucursal:',
+          this.text(issuer.branchAddress),
+          innerX,
+          ly,
+          labelW,
+          innerW - labelW,
+          7,
+        ) + 6;
     }
-
     if (issuer.specialTaxpayer) {
-      doc.text(`Contribuyente Especial Nro: ${this.pad(issuer.specialTaxpayer)}`, leftX, leftY, {
-        width: 280,
-      });
-      leftY += 10;
+      ly +=
+        this.labeled(
+          doc,
+          'Contribuyente Especial Nro.:',
+          this.text(issuer.specialTaxpayer),
+          innerX,
+          ly,
+          115,
+          innerW - 115,
+          7,
+        ) + 6;
     }
-
     const obligado = issuer.accountingRequired !== false ? 'SI' : 'NO';
-    doc.text(`OBLIGADO A LLEVAR CONTABILIDAD: ${obligado}`, leftX, leftY, { width: 280 });
-    leftY += 10;
+    ly += this.labeled(
+      doc,
+      'OBLIGADO A LLEVAR CONTABILIDAD:',
+      obligado,
+      innerX,
+      ly,
+      145,
+      innerW - 145,
+      7,
+    );
+    const leftBottom = ly + PAD;
 
-    const leftHeight = leftY - startY;
+    // ---- Cuadro tributario ----
+    const rx = rightX + PAD;
+    const rw = rightW - 2 * PAD;
+    let ry = top + PAD;
 
-    // ========== DERECHA: CUADRO TRIBUTARIO ==========
-    let boxY = startY;
-    const boxHeight = 190; // Altura fija del cuadro
-    this.box(doc, rightX, boxY, boxW, boxHeight);
-
-    boxY += 8;
-
-    // RUC
     doc
-      .fontSize(8)
-      .font('Helvetica-Bold')
-      .text('R.U.C:', rightX + 10, boxY);
-    doc.font('Helvetica').text(this.pad(issuer.ruc), rightX + 50, boxY);
-    boxY += 14;
-
-    // Tipo de comprobante
+      .fontSize(10)
+      .font(FONT_BOLD)
+      .text('R.U.C.:', rx, ry + 2, { width: 50 });
     doc
-      .fontSize(14)
-      .font('Helvetica-Bold')
-      .text(document.title, rightX, boxY, { width: boxW, align: 'center' });
-    boxY += 18;
+      .fontSize(12)
+      .font(FONT)
+      .text(this.text(issuer.ruc), rx + 50, ry, { width: rw - 50 });
+    ry += 20;
 
-    // Número
-    const documentNumber = `${this.pad(document.establishmentCode)}-${this.pad(
+    doc.fontSize(14).font(FONT_BOLD).text(document.title, rx, ry, { width: rw });
+    ry += 20;
+
+    const number = `${this.text(document.establishmentCode)}-${this.text(
       document.emissionPointCode,
-    )}-${this.pad(document.sequential)}`;
-    doc
-      .fontSize(11)
-      .font('Helvetica-Bold')
-      .text(documentNumber, rightX, boxY, { width: boxW, align: 'center' });
-    boxY += 18;
+    )}-${this.text(document.sequential)}`;
+    ry += this.labeled(doc, 'No.', number, rx, ry, 25, rw - 25, 9) + 8;
 
-    // Número de autorización
+    doc.fontSize(8).font(FONT_BOLD).text('NÚMERO DE AUTORIZACIÓN', rx, ry, { width: rw });
+    ry += 11;
     doc
       .fontSize(7)
-      .font('Helvetica-Bold')
-      .text('NÚMERO DE AUTORIZACIÓN', rightX + 10, boxY);
-    boxY += 9;
+      .font(FONT)
+      .text(this.text(document.authorizationNumber || document.accessKey), rx, ry, { width: rw });
+    ry += 14;
 
-    const authNumber = document.authorizationNumber || document.accessKey;
-    doc
-      .fontSize(6)
-      .font('Helvetica')
-      .text(this.pad(authNumber), rightX + 10, boxY, { width: boxW - 20 });
-    boxY += 16;
-
-    // Fecha y hora de autorización
     if (document.authorizationDate) {
-      doc
-        .fontSize(7)
-        .font('Helvetica-Bold')
-        .text('FECHA Y HORA DE AUTORIZACIÓN:', rightX + 10, boxY);
-      boxY += 9;
-      doc
-        .font('Helvetica')
-        .text(new Date(document.authorizationDate).toLocaleString('es-EC'), rightX + 10, boxY, {
-          width: boxW - 20,
-        });
-      boxY += 12;
+      ry +=
+        this.labeled(
+          doc,
+          'FECHA Y HORA DE AUTORIZACIÓN:',
+          this.dateTime(document.authorizationDate),
+          rx,
+          ry,
+          95,
+          rw - 95,
+          8,
+        ) + 6;
     }
 
-    // Ambiente
-    const ambiente = document.environment === 'PRODUCTION' ? 'PRODUCCIÓN' : 'PRUEBAS';
-    doc
-      .fontSize(7)
-      .font('Helvetica-Bold')
-      .text('AMBIENTE:', rightX + 10, boxY);
-    doc.font('Helvetica').text(ambiente, rightX + 60, boxY);
-    boxY += 10;
+    const environment = document.environment === 'PRODUCTION' ? 'PRODUCCIÓN' : 'PRUEBAS';
+    ry += this.labeled(doc, 'AMBIENTE:', environment, rx, ry, 95, rw - 95, 8) + 6;
+    ry += this.labeled(doc, 'EMISIÓN:', 'NORMAL', rx, ry, 95, rw - 95, 8) + 8;
 
-    // Emisión
-    doc.font('Helvetica-Bold').text('EMISIÓN:', rightX + 10, boxY);
-    doc.font('Helvetica').text('NORMAL', rightX + 60, boxY);
-    boxY += 12;
-
-    // Clave de acceso
-    doc.font('Helvetica-Bold').text('CLAVE DE ACCESO', rightX + 10, boxY);
-    boxY += 9;
-
+    doc.fontSize(8).font(FONT_BOLD).text('CLAVE DE ACCESO', rx, ry, { width: rw });
+    ry += 11;
     try {
-      const barcodeBuffer = await this.generateBarcode(document.accessKey);
-      doc.image(barcodeBuffer, rightX + 10, boxY, { width: boxW - 20, height: 30 });
-      boxY += 32;
-
-      // Número debajo del código de barras
-      doc
-        .fontSize(6)
-        .font('Helvetica')
-        .text(this.pad(document.accessKey), rightX + 10, boxY, {
-          width: boxW - 20,
-          align: 'center',
-        });
-      boxY += 10;
+      const barcode = await this.generateBarcode(document.accessKey);
+      doc.image(barcode, rx, ry, { width: rw, height: 34 });
+      ry += 36;
     } catch (error) {
       this.logger.warn('⚠️ Error generando código de barras:', error);
-      // Sin código de barras queda al menos la clave en texto
-      doc
-        .fontSize(6)
-        .font('Helvetica')
-        .text(this.pad(document.accessKey), rightX + 10, boxY, { width: boxW - 20 });
-      boxY += 12;
     }
+    doc
+      .fontSize(7)
+      .font(FONT)
+      .text(this.text(document.accessKey), rx, ry, { width: rw, align: 'center' });
+    ry += 10;
+    const rightBottom = ry + PAD;
 
-    return Math.max(leftHeight + startY, startY + boxHeight);
+    // Los dos lados terminan a la misma altura.
+    const bottom = Math.max(leftBottom, rightBottom);
+    this.roundedBox(doc, LEFT, issuerTop, leftW, bottom - issuerTop);
+    this.roundedBox(doc, rightX, top, rightW, bottom - top);
+    return bottom;
   }
 
   /** Código de barras CODE128 de la clave de acceso. */
@@ -277,299 +352,239 @@ export class RidePdfRenderer {
   }
 
   /** Comprador, fecha de emisión y, en notas de crédito, el comprobante que se modifica. */
-  private drawDocumentInfo(doc: PDFKit.PDFDocument, document: RideDocument, y: number): number {
+  private drawBuyer(doc: Doc, document: RideDocument, top: number): number {
     const { customer } = document;
-    doc.fontSize(8).font('Helvetica-Bold');
+    const x = LEFT + PAD;
+    const w = WIDTH - 2 * PAD;
+    const half = w / 2;
+    let y = top + PAD;
 
-    doc.text('Razón Social / Nombres y Apellidos:', 40, y);
-
-    const customerName =
+    const name =
       customer?.businessName ||
-      `${this.pad(customer?.firstName)} ${this.pad(customer?.lastName)}`.trim();
+      `${this.text(customer?.firstName)} ${this.text(customer?.lastName)}`.trim();
+    y += this.labeled(doc, 'Razón Social / Nombres y Apellidos:', name, x, y, 160, w - 160) + 5;
 
-    doc.font('Helvetica').text(customerName, 200, y, { width: 300 });
-
-    const idType =
-      customer?.identificationType === '04'
-        ? 'RUC'
-        : customer?.identificationType === '05'
-          ? 'Cédula'
-          : 'Pasaporte';
-
-    doc.font('Helvetica-Bold').text(`${idType}:`, 40, y + 12);
-    doc.font('Helvetica').text(this.pad(customer?.identification), 200, y + 12);
-
-    doc.font('Helvetica-Bold').text('Fecha de Emisión:', 40, y + 24);
-    doc
-      .font('Helvetica')
-      .text(
-        new Date(document.issueDate).toLocaleDateString('es-EC', { timeZone: 'UTC' }),
-        200,
-        y + 24,
-      );
-
-    const modified = document.modifiedDocument;
-    if (!modified) {
-      return y + 36;
-    }
-
-    doc.font('Helvetica-Bold').text('Comprobante que se modifica:', 40, y + 36);
-    doc.font('Helvetica').text(`${modified.type} ${this.pad(modified.number)}`, 200, y + 36);
-
-    doc.font('Helvetica-Bold').text('Motivo:', 40, y + 48);
-    const reasonHeight = this.getTextHeight(doc, this.pad(modified.reason), 350);
-    doc.font('Helvetica').text(this.pad(modified.reason), 200, y + 48, { width: 350 });
-
-    return y + 48 + Math.max(10, reasonHeight) + 12;
-  }
-
-  /** Dirección y teléfono del comprador. */
-  private drawCustomerInfo(
-    doc: PDFKit.PDFDocument,
-    customer: RideCustomer | null | undefined,
-    y: number,
-  ): number {
-    doc.fontSize(7).font('Helvetica');
-
-    let currentY = y;
+    const idHeight = this.labeled(
+      doc,
+      'Identificación:',
+      this.text(customer?.identification),
+      x,
+      y,
+      160,
+      half - 160,
+    );
+    const dateHeight = this.labeled(
+      doc,
+      'Fecha Emisión:',
+      this.date(document.issueDate),
+      x + half,
+      y,
+      75,
+      half - 75,
+    );
+    y += Math.max(idHeight, dateHeight) + 5;
 
     if (customer?.address) {
-      doc.font('Helvetica-Bold').text('Dirección:', 40, currentY);
-      doc.font('Helvetica').text(this.pad(customer.address), 100, currentY, { width: 450 });
-      currentY += 10;
+      y += this.labeled(doc, 'Dirección:', this.text(customer.address), x, y, 160, w - 160) + 5;
     }
 
-    if (customer?.phone) {
-      doc.font('Helvetica-Bold').text('Teléfono:', 40, currentY);
-      doc.font('Helvetica').text(this.pad(customer.phone), 100, currentY);
-      currentY += 10;
+    const modified = document.modifiedDocument;
+    if (modified) {
+      y += 2;
+      doc
+        .lineWidth(0.5)
+        .moveTo(x, y)
+        .lineTo(x + w, y)
+        .stroke(BORDER);
+      y += 7;
+      y +=
+        this.labeled(
+          doc,
+          'Comprobante que se modifica:',
+          `${modified.type} ${this.text(modified.number)}`,
+          x,
+          y,
+          160,
+          w - 160,
+        ) + 5;
+      y +=
+        this.labeled(
+          doc,
+          'Razón de Modificación:',
+          this.text(modified.reason),
+          x,
+          y,
+          160,
+          w - 160,
+        ) + 5;
     }
 
-    return currentY;
+    const bottom = y - 5 + PAD;
+    this.roundedBox(doc, LEFT, top, WIDTH, bottom - top);
+    return bottom;
   }
 
-  /** Detalle con filas de altura variable según la descripción. */
-  private drawItemsTable(doc: PDFKit.PDFDocument, items: RideItem[], y: number): number {
-    const tableLeft = 40;
-    const tableRight = 555;
-    const tableWidth = tableRight - tableLeft;
+  /** Detalle con filas de altura variable; repite el encabezado al cambiar de página. */
+  private drawItems(doc: Doc, items: RideItem[], top: number): number {
+    const fixed = ITEM_COLUMNS.reduce((sum, col) => sum + col.width, 0);
+    let cx = LEFT;
+    const columns = ITEM_COLUMNS.map((col) => {
+      const width = col.width || WIDTH - fixed;
+      const placed = { ...col, x: cx, width };
+      cx += width;
+      return placed;
+    });
 
-    const cols = {
-      code: { x: tableLeft, w: 70 },
-      desc: { x: tableLeft + 70, w: 190 },
-      qty: { x: tableLeft + 260, w: 45 },
-      unit: { x: tableLeft + 305, w: 60 },
-      disc: { x: tableLeft + 365, w: 60 },
-      total: { x: tableLeft + 425, w: 90 },
+    const headerH = 22;
+    const drawHeaderRow = (y: number) => {
+      doc.fontSize(7.5).font(FONT_BOLD);
+      for (const col of columns) {
+        this.cell(doc, col.x, y, col.width, headerH, HEADER_FILL);
+        doc.text(col.label, col.x + 3, y + 4, { width: col.width - 6, align: 'center' });
+      }
+      return y + headerH;
     };
 
-    doc.fontSize(8).font('Helvetica-Bold');
-
-    const headerY = y;
-    doc.rect(tableLeft, headerY, tableWidth, 18).fillAndStroke('#e0e0e0', '#000000');
-
-    doc.fillColor('#000000');
-    doc.text('Cod. Principal', cols.code.x + 3, headerY + 5, {
-      width: cols.code.w - 6,
-      align: 'left',
-    });
-    doc.text('Descripción', cols.desc.x + 3, headerY + 5, {
-      width: cols.desc.w - 6,
-      align: 'left',
-    });
-    doc.text('Cant.', cols.qty.x + 3, headerY + 5, { width: cols.qty.w - 6, align: 'right' });
-    doc.text('P. Unit.', cols.unit.x + 3, headerY + 5, {
-      width: cols.unit.w - 6,
-      align: 'right',
-    });
-    doc.text('Desc.', cols.disc.x + 3, headerY + 5, { width: cols.disc.w - 6, align: 'right' });
-    doc.text('Precio Total', cols.total.x + 3, headerY + 5, {
-      width: cols.total.w - 6,
-      align: 'right',
-    });
-
-    y = headerY + 18;
-
-    doc.fontSize(7).font('Helvetica');
+    let y = drawHeaderRow(this.ensureSpace(doc, top, headerH + 16));
 
     for (const item of items) {
-      if (y > 700) {
+      const values: Record<(typeof ITEM_COLUMNS)[number]['key'], string> = {
+        code: this.text(item.mainCode || item.code),
+        quantity: this.quantity(item.quantity),
+        description: this.text(item.description),
+        unitPrice: this.money(item.unitPrice),
+        discount: this.money(item.discount),
+        total: this.money(
+          item.subtotal ??
+            Number(item.quantity || 0) * Number(item.unitPrice || 0) - Number(item.discount || 0),
+        ),
+      };
+
+      doc.fontSize(7.5).font(FONT);
+      const rowH = Math.max(
+        16,
+        ...columns.map(
+          (col) => doc.heightOfString(values[col.key] || ' ', { width: col.width - 6 }) + 8,
+        ),
+      );
+
+      if (y + rowH > PAGE_BOTTOM) {
         doc.addPage();
-        y = 40;
+        y = drawHeaderRow(PAGE_TOP);
+        doc.fontSize(7.5).font(FONT);
       }
 
-      const description = this.pad(item?.description);
-      const descHeight = this.getTextHeight(doc, description, cols.desc.w - 6);
-      const rowHeight = Math.max(14, descHeight + 6);
-
-      const rowTop = y;
-      const rowBottom = y + rowHeight;
-
-      // Líneas verticales
-      doc.moveTo(tableLeft, rowTop).lineTo(tableLeft, rowBottom).stroke();
-      doc.moveTo(cols.desc.x, rowTop).lineTo(cols.desc.x, rowBottom).stroke();
-      doc.moveTo(cols.qty.x, rowTop).lineTo(cols.qty.x, rowBottom).stroke();
-      doc.moveTo(cols.unit.x, rowTop).lineTo(cols.unit.x, rowBottom).stroke();
-      doc.moveTo(cols.disc.x, rowTop).lineTo(cols.disc.x, rowBottom).stroke();
-      doc.moveTo(cols.total.x, rowTop).lineTo(cols.total.x, rowBottom).stroke();
-      doc.moveTo(tableRight, rowTop).lineTo(tableRight, rowBottom).stroke();
-
-      // Línea horizontal inferior
-      doc.moveTo(tableLeft, rowBottom).lineTo(tableRight, rowBottom).stroke();
-
-      const textY = rowTop + 3;
-
-      doc.text(this.pad(item?.mainCode || item?.code), cols.code.x + 3, textY, {
-        width: cols.code.w - 6,
-      });
-
-      doc.text(description, cols.desc.x + 3, textY, {
-        width: cols.desc.w - 6,
-        lineGap: 1,
-      });
-
-      doc.text(String(item?.quantity ?? 0), cols.qty.x + 3, textY, {
-        width: cols.qty.w - 6,
-        align: 'right',
-      });
-      doc.text(this.money(item?.unitPrice), cols.unit.x + 3, textY, {
-        width: cols.unit.w - 6,
-        align: 'right',
-      });
-      doc.text(this.money(item?.discount || 0), cols.disc.x + 3, textY, {
-        width: cols.disc.w - 6,
-        align: 'right',
-      });
-
-      const subtotalCalc =
-        Number(item?.quantity || 0) * Number(item?.unitPrice || 0) - Number(item?.discount || 0);
-      doc.text(this.money(item?.subtotal ?? subtotalCalc), cols.total.x + 3, textY, {
-        width: cols.total.w - 6,
-        align: 'right',
-      });
-
-      y = rowBottom;
+      for (const col of columns) {
+        this.cell(doc, col.x, y, col.width, rowH);
+        doc.text(values[col.key], col.x + 3, y + 4, { width: col.width - 6, align: col.align });
+      }
+      y += rowH;
     }
 
-    return y + 10;
+    return y;
   }
 
-  /** Información adicional + forma de pago (izquierda) || subtotales + total (derecha). */
-  private drawAdditionalInfoAndTotals(
-    doc: PDFKit.PDFDocument,
-    document: RideDocument,
-    y: number,
-  ): number {
-    const { customer, payment } = document;
-    const leftX = 40;
-    const rightX = 320;
-    const startY = y;
+  /** Información adicional + forma de pago (izquierda) || totales (derecha). */
+  private drawFooter(doc: Doc, document: RideDocument, top: number): void {
+    const rows = this.totalRows(document);
+    const rowH = 15;
+    const totalsH = rows.length * rowH;
 
-    let leftY = startY;
-    let rightY = startY;
+    const infoRows = [
+      ['Email', this.text(document.customer?.email)],
+      ['Teléfono', this.text(document.customer?.phone)],
+    ].filter(([, value]) => value);
+    const infoH = infoRows.length ? 18 + infoRows.length * 14 + 4 : 0;
+    const paymentH = document.payment ? 18 + 24 : 0;
 
-    // ========== IZQUIERDA: INFORMACIÓN ADICIONAL ==========
-    if (customer?.email || customer?.phone) {
-      doc.fontSize(8).font('Helvetica-Bold').text('Información Adicional', leftX, leftY);
-      leftY += 12;
+    const needed = Math.max(totalsH, infoH + (infoH && paymentH ? GAP : 0) + paymentH);
+    const y0 = this.ensureSpace(doc, top, needed);
 
-      doc.fontSize(7).font('Helvetica');
-
-      if (customer?.email) {
-        doc.text(`Email: ${this.pad(customer.email)}`, leftX, leftY, { width: 250 });
-        leftY += 10;
-      }
-
-      if (customer?.phone) {
-        doc.text(`Teléfono: ${this.pad(customer.phone)}`, leftX, leftY, { width: 250 });
-        leftY += 10;
-      }
-
-      if (payment) leftY += 5; // Espacio antes de Forma de Pago
+    // ---- Derecha: totales ----
+    const tw = 225;
+    const tx = RIGHT - tw;
+    const valueW = 75;
+    let ty = y0;
+    for (const [label, value, bold] of rows) {
+      this.cell(doc, tx, ty, tw - valueW, rowH);
+      this.cell(doc, tx + tw - valueW, ty, valueW, rowH);
+      doc.fontSize(bold ? 8.5 : 7.5).font(bold ? FONT_BOLD : FONT);
+      doc.text(label, tx + 4, ty + 4, { width: tw - valueW - 8 });
+      doc.text(this.money(value), tx + tw - valueW + 3, ty + 4, {
+        width: valueW - 7,
+        align: 'right',
+      });
+      ty += rowH;
     }
 
-    // ========== IZQUIERDA: FORMA DE PAGO ==========
-    if (payment) {
-      const paymentBoxX = leftX;
-      const paymentBoxWidth = 250;
-      const headerColWidth = 150;
-      const valueColWidth = 100;
-
-      const paymentHeaderY = leftY;
-      doc.fontSize(7).font('Helvetica-Bold');
-      doc.text('Forma de Pago', paymentBoxX + 2, paymentHeaderY + 2, {
-        width: headerColWidth - 4,
-      });
-      doc.text('Valor', paymentBoxX + headerColWidth + 2, paymentHeaderY + 2, {
-        width: valueColWidth - 4,
-      });
-
-      leftY += 12;
-      this.hrule(doc, paymentBoxX, leftY, paymentBoxX + paymentBoxWidth);
-      leftY += 4;
-
-      doc.font('Helvetica');
-      const formaPago = payment.method || 'SIN UTILIZACION DEL SISTEMA FINANCIERO';
-
-      const paymentTextHeight = this.getTextHeight(doc, formaPago, headerColWidth - 4);
-      const rowHeight = Math.max(14, paymentTextHeight + 4);
-
-      const rowStartY = leftY;
-
-      doc.text(formaPago, paymentBoxX + 2, rowStartY, { width: headerColWidth - 4 });
-      doc.text(this.money(document.total), paymentBoxX + headerColWidth + 2, rowStartY, {
-        width: valueColWidth - 4,
-      });
-
-      leftY += rowHeight;
-      this.hrule(doc, paymentBoxX, leftY, paymentBoxX + paymentBoxWidth);
-      leftY += 10;
+    // ---- Izquierda: información adicional ----
+    const lw = tx - LEFT - GAP;
+    let ly = y0;
+    if (infoRows.length) {
+      const boxTop = ly;
+      doc
+        .fontSize(8)
+        .font(FONT_BOLD)
+        .text('Información Adicional', LEFT, ly + 6, { width: lw, align: 'center' });
+      ly += 18;
+      doc
+        .lineWidth(0.5)
+        .moveTo(LEFT, ly)
+        .lineTo(LEFT + lw, ly)
+        .stroke(BORDER);
+      ly += 4;
+      for (const [label, value] of infoRows) {
+        this.labeled(doc, `${label}:`, value, LEFT + PAD, ly, 50, lw - 50 - 2 * PAD, 7.5);
+        ly += 14;
+      }
+      this.roundedBox(doc, LEFT, boxTop, lw, ly - boxTop + 4);
+      ly += 4 + GAP;
     }
 
-    // ========== DERECHA: SUBTOTALES ==========
-    const labelX = rightX;
-    const valueX = 485;
-    const valueW = 70; // Alcanza para valores hasta $999,999.99
+    // ---- Izquierda: forma de pago ----
+    if (document.payment) {
+      const valueColW = 75;
+      const methodW = lw - valueColW;
+      doc.fontSize(7.5).font(FONT_BOLD);
+      this.cell(doc, LEFT, ly, methodW, 18, HEADER_FILL);
+      this.cell(doc, LEFT + methodW, ly, valueColW, 18, HEADER_FILL);
+      doc.text('Forma de Pago', LEFT + 3, ly + 5, { width: methodW - 6, align: 'center' });
+      doc.text('Valor', LEFT + methodW + 3, ly + 5, { width: valueColW - 6, align: 'center' });
+      ly += 18;
 
-    doc.fontSize(7).font('Helvetica');
+      const method = this.text(document.payment.method) || 'SIN UTILIZACION DEL SISTEMA FINANCIERO';
+      doc.font(FONT);
+      const methodH = Math.max(24, doc.heightOfString(method, { width: methodW - 6 }) + 8);
+      this.cell(doc, LEFT, ly, methodW, methodH);
+      this.cell(doc, LEFT + methodW, ly, valueColW, methodH);
+      doc.text(method, LEFT + 3, ly + 4, { width: methodW - 6 });
+      doc.text(this.money(document.total), LEFT + methodW + 3, ly + 4, {
+        width: valueColW - 7,
+        align: 'right',
+      });
+    }
+  }
 
-    const addRow = (label: string, value: unknown) => {
-      doc.text(label, labelX, rightY, { width: 160 });
-      doc.text(this.money(value), valueX, rightY, { width: valueW, align: 'right' });
-      rightY += 10;
-    };
-
-    // Subtotales e IVA por tarifa, desde el IVA guardado en cada línea.
+  /** Filas de totales en el orden del SRI; solo las que tienen valor, más el total. */
+  private totalRows(document: RideDocument): Array<[string, unknown, boolean?]> {
     const taxes = this.taxCalculator.summarize(document.items);
+    const rows: Array<[string, unknown, boolean?]> = [];
+
     for (const group of taxes.groups) {
-      addRow(ivaSubtotalLabel(group), group.taxBase.toNumber());
+      rows.push([ivaSubtotalLabel(group), group.taxBase.toNumber()]);
+    }
+    rows.push(['SUBTOTAL SIN IMPUESTOS', taxes.totalWithoutTaxes.toNumber()]);
+    if (taxes.totalDiscount.gt(0)) rows.push(['TOTAL DESCUENTO', taxes.totalDiscount.toNumber()]);
+    if (Number(document.iceValue || 0) > 0) rows.push(['ICE', document.iceValue]);
+
+    const taxed = taxes.groups.filter((group) => group.treatment === IvaTreatment.TAXED);
+    for (const group of taxed) {
+      rows.push([`IVA ${group.percentage}%`, group.ivaValue.toNumber()]);
     }
 
-    addRow('SUBTOTAL SIN IMPUESTOS', taxes.totalWithoutTaxes.toNumber());
-
-    if (taxes.totalDiscount.gt(0)) addRow('TOTAL DESCUENTO', taxes.totalDiscount.toNumber());
-    if (document.iceValue) addRow('ICE', document.iceValue);
-    if (document.irbpnrValue) addRow('IRBPNR', document.irbpnrValue);
-
-    const taxedGroups = taxes.groups.filter((group) => group.treatment === IvaTreatment.TAXED);
-    for (const group of taxedGroups) {
-      addRow(`IVA ${group.percentage}%`, group.ivaValue.toNumber());
-    }
-    if (taxedGroups.length === 0) addRow('IVA', 0);
-
-    if (document.tip) addRow('PROPINA', document.tip);
-
-    rightY += 2;
-
-    // ========== DERECHA: LÍNEA Y TOTAL ==========
-    this.hrule(doc, labelX, rightY, valueX + valueW);
-    rightY += 8;
-
-    doc.fontSize(10).font('Helvetica-Bold');
-    doc.text('VALOR TOTAL', labelX, rightY, { width: 160 });
-    doc.text(this.money(document.total), valueX, rightY, { width: valueW, align: 'right' });
-    rightY += 15;
-
-    return Math.max(leftY, rightY) + 10;
+    if (Number(document.irbpnrValue || 0) > 0) rows.push(['IRBPNR', document.irbpnrValue]);
+    if (Number(document.tip || 0) > 0) rows.push(['PROPINA', document.tip]);
+    rows.push(['VALOR TOTAL', document.total, true]);
+    return rows;
   }
 }

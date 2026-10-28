@@ -8,6 +8,7 @@ import { TaxCalculatorService } from '../../modules/tax-codes/domain/services/ta
 import { RideDocument } from './ride-document';
 import { RidePdfRenderer } from './ride-pdf.renderer';
 import { RidePublisher } from './ride-publisher.service';
+import { inflateSync } from 'zlib';
 
 const company: CompanyRideSource = {
   id: 'c1',
@@ -45,6 +46,28 @@ const invoice: InvoiceRideSource = {
 };
 
 const pageCount = (pdf: Buffer) => pdf.toString('latin1').match(/\/Type \/Page\b/g)?.length ?? 0;
+
+/** Texto dibujado en el PDF (pdfkit escribe cada trozo de texto como `<hex>` en streams comprimidos). */
+const pdfText = (pdf: Buffer): string => {
+  const raw = pdf.toString('latin1');
+  let text = '';
+  for (const match of raw.matchAll(/stream\n([\s\S]*?)\nendstream/g)) {
+    let content: string;
+    try {
+      content = inflateSync(Buffer.from(match[1], 'latin1')).toString('latin1');
+    } catch {
+      continue;
+    }
+    for (const line of content.split('\n')) {
+      if (!/T[Jj]$/.test(line)) continue;
+      const chunks = [...line.matchAll(/<([0-9a-f]+)>/gi)].map((m) =>
+        Buffer.from(m[1], 'hex').toString('latin1'),
+      );
+      text += chunks.join('') + '\n';
+    }
+  }
+  return text;
+};
 
 describe('RIDE', () => {
   describe('traducción de comprobantes', () => {
@@ -98,7 +121,67 @@ describe('RIDE', () => {
     it('un logo que no es una imagen no impide generar el RIDE', async () => {
       const pdf = await renderer.render(ride, Buffer.from('no soy un png'));
 
-      expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+      expect(pdfText(pdf)).toContain('NO TIENE LOGO');
+    });
+
+    it('sin logo avisa "NO TIENE LOGO"', async () => {
+      expect(pdfText(await renderer.render(ride, null))).toContain('NO TIENE LOGO');
+    });
+
+    it('escribe los montos con $ y separador de miles', async () => {
+      const big = {
+        ...item(1),
+        quantity: 100,
+        unitPrice: 12,
+        subtotal: '1200.00',
+        ivaValue: '180.00',
+      };
+      const text = pdfText(
+        await renderer.render({ ...ride, items: [big], total: '1380.00' }, null),
+      );
+
+      expect(text).toContain('$1,200.00');
+      expect(text).toContain('$1,380.00');
+      expect(text).toContain('100.00');
+    });
+
+    it('fechas en dd/mm/aaaa y la autorización en hora de Ecuador', async () => {
+      const text = pdfText(
+        await renderer.render({ ...ride, authorizationDate: '2026-04-21T17:21:50.000Z' }, null),
+      );
+
+      expect(text).toContain('21/04/2026 12:21:50');
+      expect(text).toContain('21/04/2026');
+    });
+
+    it('en los totales solo aparecen las filas con valor', async () => {
+      const text = pdfText(await renderer.render(ride, null));
+
+      expect(text).toContain('SUBTOTAL 15%');
+      expect(text).toContain('IVA 15%');
+      expect(text).toContain('VALOR TOTAL');
+      expect(text).not.toContain('ICE');
+      expect(text).not.toContain('PROPINA');
+      expect(text).not.toContain('TOTAL DESCUENTO');
+    });
+
+    it('la factura lleva forma de pago; la nota de crédito, el comprobante que modifica', async () => {
+      const invoiceText = pdfText(await renderer.render(ride, null));
+      const creditNoteText = pdfText(
+        await renderer.render(
+          toCreditNoteRide(
+            { ...invoice, modifiedNumber: '001-001-000000150', reason: 'Devolución' },
+            company,
+          ),
+          null,
+        ),
+      );
+
+      expect(invoiceText).toContain('Forma de Pago');
+      expect(invoiceText).not.toContain('Comprobante que se modifica');
+      expect(creditNoteText).toContain('NOTA DE CR');
+      expect(creditNoteText).toContain('FACTURA 001-001-000000150');
+      expect(creditNoteText).not.toContain('Forma de Pago');
     });
   });
 
@@ -144,7 +227,9 @@ describe('RIDE', () => {
     });
 
     it('si R2 rechaza la subida, el error llega a quien pidió el RIDE', async () => {
-      const { publisher } = setup({ uploadRide: jest.fn().mockRejectedValue(new Error('R2 caído')) });
+      const { publisher } = setup({
+        uploadRide: jest.fn().mockRejectedValue(new Error('R2 caído')),
+      });
 
       await expect(publisher.publish(ride)).rejects.toThrow('R2 caído');
     });
