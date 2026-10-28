@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,8 +31,8 @@ const STATUS_VARIANT: Record<InvoicePaymentStatus, 'secondary' | 'warning' | 'su
   PAID: 'success',
 };
 
-export default function CobranzaClientePage({ params }: { params: { customerId: string } }) {
-  const { customerId } = params;
+export default function CobranzaClientePage() {
+  const { customerId } = useParams<{ customerId: string }>();
   const { data: statement, isLoading } = useAccountStatement(customerId);
   const deletePayment = useDeletePayment(customerId);
   const [dialogOpen, setDialogOpen] = useState(false);

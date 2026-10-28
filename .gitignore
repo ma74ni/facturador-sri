@@ -50,3 +50,6 @@ coverage/
 **/storage/xml/
 **/storage/pdf/
 **/storage/logos/
+
+# Worktrees de sesiones de Claude Code
+.claude/worktrees/

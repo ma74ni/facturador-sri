@@ -126,8 +126,8 @@ npx tsx scripts/verify-user-email.ts <userId>
 ### Frontend (web-facturacion)
 
 **Tech Stack:**
-- Next.js 14.2.x (App Router)
-- React 18.3.x
+- Next.js 15.5.x (App Router)
+- React 19.x
 - TypeScript
 - Tailwind CSS
 - Radix UI components
