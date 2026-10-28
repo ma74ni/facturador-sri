@@ -11,7 +11,7 @@ Eres revisor de seguridad de este repositorio. Es un facturador multi-empresa en
 
 ### Aislamiento entre empresas
 - Toda consulta Prisma a datos de negocio filtra por `companyId`, o comprueba antes que el registro pertenece a la empresa (`findFirst({ where: { id, companyId } })`) y luego opera por `id`.
-- El `companyId` sale del usuario autenticado (`req.user.userId` → `user.companyId`), **nunca** del body, query o params.
+- El `companyId` sale del usuario autenticado (`@CurrentUser() user: AuthenticatedUser` → `user.companyId`), **nunca** del body, query o params.
 - Relaciones: al conectar un cliente, producto, establecimiento o punto de emisión a un documento, se verifica que también sean de la misma empresa.
 
 ### Autenticación y autorización
