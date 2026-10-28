@@ -16,6 +16,7 @@ import { MailjetProvider } from '../../shared/email/providers/mailjet.provider';
 import { TaxCodesModule } from '../tax-codes/tax-codes.module';
 import { RidePdfRenderer } from '../../shared/ride/ride-pdf.renderer';
 import { RidePublisher } from '../../shared/ride/ride-publisher.service';
+import { ElectronicDocumentMailer } from '../../shared/email/electronic-document-mailer';
 
 @Module({
   imports: [TaxCodesModule],
@@ -27,6 +28,7 @@ import { RidePublisher } from '../../shared/ride/ride-publisher.service';
     CreditNoteRideGeneratorService,
     RidePdfRenderer,
     RidePublisher,
+    ElectronicDocumentMailer,
     PrismaService,
     EmailService,
     MailjetProvider,
