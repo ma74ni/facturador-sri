@@ -11,7 +11,10 @@ import { CreditNoteXmlGeneratorService } from '../../infrastructure/xml/xml-gene
 import { CreditNoteXmlStorageService } from '../../infrastructure/xml/xml-storage.service';
 import { DigitalSignatureService } from '../../../invoices/infrastructure/xml/digital-signature.service';
 import { SriWebServiceService } from '../../../invoices/infrastructure/sri/sri-web-service.service';
-import { EmailService } from '../../../../shared/email/email.service';
+import {
+  documentNumber,
+  ElectronicDocumentMailer,
+} from '../../../../shared/email/electronic-document-mailer';
 import { CreditNoteRideGeneratorService } from '../../infrastructure/pdf/ride-generator.service';
 import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
 import { TaxCalculatorService } from '../../../tax-codes/domain/services/tax-calculator.service';
@@ -27,6 +30,28 @@ import {
 } from '../../../invoices/domain/signing-status';
 import { syncInvoicePaymentStatus } from '../../../payments/application/services/invoice-payment-status';
 
+/** Lo que necesita el envío por email: cliente, factura modificada y la configuración de email. */
+const CREDIT_NOTE_EMAIL_INCLUDE = {
+  customer: true,
+  modifiedInvoice: {
+    select: { establishmentCode: true, emissionPointCode: true, sequential: true },
+  },
+  company: {
+    select: {
+      id: true,
+      businessName: true,
+      tradeName: true,
+      email: true,
+      replyToEmail: true,
+      emailProvider: true,
+      mailjetApiKey: true,
+      mailjetSecretKey: true,
+      mailjetFromEmail: true,
+      mailjetFromName: true,
+    },
+  },
+} as const;
+
 @Injectable()
 export class CreditNotesService {
   private readonly logger = new Logger(CreditNotesService.name);
@@ -38,7 +63,7 @@ export class CreditNotesService {
     private xmlStorage: CreditNoteXmlStorageService,
     private digitalSignature: DigitalSignatureService,
     private sriWebService: SriWebServiceService,
-    private emailService: EmailService,
+    private documentMailer: ElectronicDocumentMailer,
     private rideGenerator: CreditNoteRideGeneratorService,
     private r2Storage: R2StorageService,
     private taxCalculator: TaxCalculatorService,
@@ -654,91 +679,28 @@ export class CreditNotesService {
     companyId: string,
     recipientEmail?: string,
   ) {
-    // 1. Obtener la nota de crédito completa
-    const creditNote = await this.prisma.creditNote.findFirst({
+    let creditNote = await this.prisma.creditNote.findFirst({
       where: { id: creditNoteId, companyId },
-      include: {
-        items: true,
-        customer: true,
-        establishment: true,
-        emissionPoint: true,
-        modifiedInvoice: {
-          select: {
-            establishmentCode: true,
-            emissionPointCode: true,
-            sequential: true,
-          },
-        },
-        company: {
-          select: {
-            id: true,
-            businessName: true,
-            tradeName: true,
-            email: true,
-            replyToEmail: true,
-            emailProvider: true,
-            mailjetApiKey: true,
-            mailjetSecretKey: true,
-            mailjetFromEmail: true,
-            mailjetFromName: true,
-          },
-        },
-      },
+      include: CREDIT_NOTE_EMAIL_INCLUDE,
     });
 
     if (!creditNote) {
       throw new NotFoundException('Nota de crédito no encontrada');
     }
 
-    // 2. Verificar que esté autorizada
     if (creditNote.sriStatus !== 'AUTHORIZED') {
-      throw new BadRequestException(
-        'Solo se pueden enviar notas de crédito autorizadas por el SRI',
-      );
+      throw new BadRequestException('Solo se pueden enviar notas de crédito autorizadas por el SRI');
     }
 
-    // 3. Verificar que tenga RIDE y XML
     if (!creditNote.ridePdfPath) {
-      // Generar RIDE si no existe
       await this.generateRide(creditNoteId, companyId);
-
-      // Recargar creditNote
-      const updatedCreditNote = await this.prisma.creditNote.findUnique({
+      creditNote = await this.prisma.creditNote.findUnique({
         where: { id: creditNoteId },
-        include: {
-          items: true,
-          customer: true,
-          establishment: true,
-          emissionPoint: true,
-          modifiedInvoice: {
-            select: {
-              establishmentCode: true,
-              emissionPointCode: true,
-              sequential: true,
-            },
-          },
-          company: {
-            select: {
-              id: true,
-              businessName: true,
-              tradeName: true,
-              email: true,
-              replyToEmail: true,
-              emailProvider: true,
-              mailjetApiKey: true,
-              mailjetSecretKey: true,
-              mailjetFromEmail: true,
-              mailjetFromName: true,
-            },
-          },
-        },
+        include: CREDIT_NOTE_EMAIL_INCLUDE,
       });
-
-      if (!updatedCreditNote) {
+      if (!creditNote) {
         throw new NotFoundException('Error recargando nota de crédito');
       }
-
-      Object.assign(creditNote, updatedCreditNote);
     }
 
     if (!creditNote.xmlSignedPath) {
@@ -749,7 +711,6 @@ export class CreditNotesService {
       throw new NotFoundException('RIDE (PDF) no encontrado');
     }
 
-    // 4. Determinar email del destinatario
     const emailTo = recipientEmail || creditNote.customer.email;
 
     if (!emailTo) {
@@ -758,77 +719,36 @@ export class CreditNotesService {
       );
     }
 
-    // 5. Preparar datos para el template
-    const customerName =
-      creditNote.customer.businessName ||
-      `${creditNote.customer.firstName || ''} ${creditNote.customer.lastName || ''}`.trim() ||
-      'Cliente';
-
-    const creditNoteNumber = `${creditNote.establishmentCode}-${creditNote.emissionPointCode}-${creditNote.sequential}`;
-
+    const creditNoteNumber = documentNumber(creditNote);
     const modifiedInvoiceNumber = creditNote.modifiedInvoice
-      ? `${creditNote.modifiedInvoice.establishmentCode}-${creditNote.modifiedInvoice.emissionPointCode}-${creditNote.modifiedInvoice.sequential}`
+      ? documentNumber(creditNote.modifiedInvoice)
       : creditNote.modifiedNumber;
-
-    const templateData = {
-      companyName: creditNote.company.businessName,
-      customerName,
-      creditNoteNumber,
-      modifiedInvoiceNumber,
-      reason: creditNote.reason,
-      issueDate: new Date(creditNote.issueDate).toLocaleDateString('es-EC', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        timeZone: 'UTC',
-      }),
-      authorizationDate: creditNote.authorizationDate
-        ? new Date(creditNote.authorizationDate).toLocaleString('es-EC')
-        : null,
-      authorizationNumber: creditNote.authorizationNumber,
-      accessKey: creditNote.accessKey,
-      total: creditNote.total.toFixed(2),
-      authorized: creditNote.sriStatus === 'AUTHORIZED',
-      viewUrl: null, // Puedes agregar URL del frontend aquí
-      year: new Date().getFullYear(),
-    };
-
-    // 6. Descargar archivos desde R2 para adjuntos
-    this.logger.log(`📥 Descargando archivos desde R2 para adjuntos...`);
-    const [pdfBuffer, xmlContent] = await Promise.all([
-      this.r2Storage.downloadRide(creditNote.ridePdfPath),
-      this.r2Storage.downloadXml(creditNote.xmlSignedPath),
-    ]);
-
-    // 7. Enviar email con adjuntos
     this.logger.log(`📧 Enviando nota de crédito ${creditNoteNumber} a ${emailTo}...`);
 
-    const result = await this.emailService.sendEmail({
-      to: emailTo,
-      subject: `Nota de Crédito Electrónica ${creditNoteNumber} - ${creditNote.company.businessName}`,
+    const result = await this.documentMailer.send({
       template: 'credit-note',
-      context: templateData,
+      title: 'Nota de Crédito Electrónica',
+      filePrefix: 'NotaCredito',
+      recipient: emailTo,
       company: creditNote.company,
-      attachments: [
-        {
-          filename: `NotaCredito_${creditNoteNumber}.pdf`,
-          content: pdfBuffer,
-          contentType: 'application/pdf',
-        },
-        {
-          filename: `NotaCredito_${creditNoteNumber}.xml`,
-          content: Buffer.from(xmlContent, 'utf-8'),
-          contentType: 'application/xml',
-        },
-      ],
+      customer: creditNote.customer,
+      number: creditNoteNumber,
+      issueDate: creditNote.issueDate,
+      authorizationDate: creditNote.authorizationDate,
+      authorizationNumber: creditNote.authorizationNumber,
+      accessKey: creditNote.accessKey,
+      total: creditNote.total,
+      authorized: creditNote.sriStatus === 'AUTHORIZED',
+      ridePdfPath: creditNote.ridePdfPath,
+      xmlSignedPath: creditNote.xmlSignedPath,
+      context: { creditNoteNumber, modifiedInvoiceNumber, reason: creditNote.reason },
     });
 
-    // 8. Guardar log del envío
     await this.prisma.creditNoteEmailLog.create({
       data: {
         creditNoteId: creditNote.id,
         recipient: emailTo,
-        subject: `Nota de Crédito Electrónica ${creditNoteNumber}`,
+        subject: result.logSubject,
         status: result.success ? 'SENT' : 'FAILED',
         sentAt: result.success ? new Date() : null,
         error: result.error || null,
