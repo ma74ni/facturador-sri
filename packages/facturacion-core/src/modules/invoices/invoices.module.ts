@@ -9,6 +9,8 @@ import { PrismaService } from '../../shared/database/prisma.service';
 import { SriWebServiceService } from './infrastructure/sri/sri-web-service.service';
 import { RideGeneratorService } from './infrastructure/pdf/ride-generator.service';
 import { TaxCodesModule } from '../tax-codes/tax-codes.module';
+import { RidePdfRenderer } from '../../shared/ride/ride-pdf.renderer';
+import { RidePublisher } from '../../shared/ride/ride-publisher.service';
 
 @Module({
   imports: [TaxCodesModule],
@@ -21,7 +23,9 @@ import { TaxCodesModule } from '../tax-codes/tax-codes.module';
     DigitalSignatureService,
     SriWebServiceService,
     PrismaService,
-    RideGeneratorService
+    RideGeneratorService,
+    RidePdfRenderer,
+    RidePublisher,
   ],
   exports: [InvoicesService],
 })
