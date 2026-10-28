@@ -130,6 +130,21 @@ export const invoicesApi = {
       totalTax: Number(invoice.ivaValue || 0),
       totalAmount: Number(invoice.total || 0),
       status: invoice.sriStatus || 'PENDING', // Mapear sriStatus a status
+      // Decimal de Prisma llega como string; la línea no trae taxValue/total,
+      // se derivan de ivaValue y subtotal (base imponible).
+      items: (invoice.items || []).map((item: any) => {
+        const subtotal = Number(item.subtotal || 0);
+        const taxValue = Number(item.ivaValue || 0);
+        return {
+          ...item,
+          quantity: Number(item.quantity || 0),
+          unitPrice: Number(item.unitPrice || 0),
+          discount: Number(item.discount || 0),
+          subtotal,
+          taxValue,
+          total: subtotal + taxValue,
+        };
+      }),
     }));
   },
 
