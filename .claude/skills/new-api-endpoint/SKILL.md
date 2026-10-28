@@ -17,7 +17,7 @@ Sigue la arquitectura del módulo (`presentation/` → `application/` → `domai
    - Usa `$transaction` cuando escribe en varias tablas.
 4. **Controlador** en `presentation/controllers/`:
    - `@UseGuards(JwtAuthGuard, ...)` en la clase. Añade `EmailVerifiedGuard` si crea datos de negocio y `RequireModuleGuard` + `@RequireModule(...)` si pertenece a un módulo de pago.
-   - El `companyId` sale del usuario autenticado (`req.user.userId` → `user.companyId`), nunca del body/query/params. Hoy cada controlador tiene su `getCompanyId` privado; reutiliza el del controlador.
+   - El `companyId` sale del usuario autenticado: `@CurrentUser() user: AuthenticatedUser` (`modules/auth/infrastructure/decorators/current-user.decorator.ts`) y pasa `user.companyId` / `user.userId` al servicio. Nunca lo tomes del body, query o params, y no vuelvas a consultar el usuario en el controlador.
    - Subidas: `FileInterceptor('file', <constante de shared/http/upload-limits.ts>)`.
    - `@ApiOperation` y `@ApiResponse` en cada ruta.
 5. **Tests**: el dominio con casos concretos; el servicio con `PrismaService` mockeado, incluyendo el caso "registro de otra empresa → 404".

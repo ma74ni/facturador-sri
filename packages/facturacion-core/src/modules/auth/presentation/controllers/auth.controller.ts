@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, UseGuards, Request, Query, HttpCode } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Query, HttpCode } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { SkipThrottle, Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from '../../application/services/auth.service';
@@ -8,6 +8,10 @@ import { LoginDto } from '../../application/dto/login.dto';
 import { ForgotPasswordDto, ResetPasswordDto } from '../../application/dto/password-reset.dto';
 import { JwtAuthGuard } from '../../infrastructure/guards/jwt-auth.guard';
 import { AdminGuard } from '../../infrastructure/guards/admin.guard';
+import {
+  AuthenticatedUser,
+  CurrentUser,
+} from '../../infrastructure/decorators/current-user.decorator';
 
 // Las rutas que envían emails admiten menos intentos que el límite por defecto del módulo.
 const EMAIL_SENDING_LIMIT = { default: { limit: 5, ttl: 15 * 60_000 } };
@@ -30,8 +34,8 @@ export class AuthController {
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Registrar un usuario en la empresa del administrador' })
-  async registerUser(@Body() dto: RegisterDto, @Request() req: any) {
-    return this.authService.registerUser(dto, req.user.userId);
+  async registerUser(@Body() dto: RegisterDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.authService.registerUser(dto, user.userId);
   }
 
   @Post('login')
@@ -45,8 +49,8 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Obtener perfil del usuario (requiere autenticación)' })
-  async getProfile(@Request() req: any) {
-    return this.authService.getProfile(req.user.userId);
+  async getProfile(@CurrentUser() user: AuthenticatedUser) {
+    return this.authService.getProfile(user.userId);
   }
 
   @Get('verify-email')

@@ -19,7 +19,9 @@ export class AdminGuard implements CanActivate {
     });
 
     if (!user || user.role !== 'ADMIN') {
-      throw new ForbiddenException('Solo un administrador de la empresa puede realizar esta acción');
+      throw new ForbiddenException(
+        'Solo un administrador de la empresa puede realizar esta acción',
+      );
     }
 
     return true;

@@ -212,8 +212,8 @@ The system is multi-tenant at the Company level:
 
 ### Authentication Guards
 - `@UseGuards(JwtAuthGuard)` on protected routes
-- `@CurrentUser()` decorator to get authenticated user from request
-- Role-based access via custom decorators (if implemented)
+- `@CurrentUser() user: AuthenticatedUser` (`modules/auth/infrastructure/decorators/current-user.decorator.ts`) gives `userId`, `email` and `companyId`, loaded fresh by `JwtStrategy` on every request. Pass `user.companyId` to services; never read the company from the body, query or params, and don't re-query the user in controllers.
+- Other guards: `EmailVerifiedGuard`, `AdminGuard` (company admin), `PlatformAdminGuard`, `RequireModuleGuard` + `@RequireModule(...)`
 
 ### Database Queries
 - Use Prisma Client via injected `PrismaService`
