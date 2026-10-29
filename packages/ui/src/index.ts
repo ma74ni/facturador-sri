@@ -12,6 +12,8 @@ export { cn } from './lib/cn';
 export { Button, buttonVariants, type ButtonProps } from './atoms/button';
 export { Badge, badgeVariants, type BadgeProps } from './atoms/badge';
 export { Input, type InputProps } from './atoms/input';
+export { NumberInput, type NumberInputProps } from './atoms/number-input';
+export { fieldStyles } from './atoms/field-styles';
 export { Textarea } from './atoms/textarea';
 export { NativeSelect } from './atoms/native-select';
 export { Label } from './atoms/label';
