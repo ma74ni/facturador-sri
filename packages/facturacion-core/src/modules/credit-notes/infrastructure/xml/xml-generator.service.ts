@@ -145,7 +145,8 @@ export class CreditNoteXmlGeneratorService {
       detalle.ele('codigoInterno').txt(item.mainCode);
       detalle.ele('codigoAdicional').txt(item.mainCode); // Mismo código como adicional
       detalle.ele('descripcion').txt(item.description);
-      detalle.ele('cantidad').txt(item.quantity.toString());
+      // Mismo formato que precioUnitario: 6 decimales fijos (nota de crédito 1.1.0).
+      detalle.ele('cantidad').txt(item.quantity.toFixed(6));
       detalle.ele('precioUnitario').txt(item.unitPrice.toFixed(6));
       detalle.ele('descuento').txt(item.discount.toFixed(2));
       detalle.ele('precioTotalSinImpuesto').txt(item.subtotal.toFixed(2));

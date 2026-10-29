@@ -97,4 +97,25 @@ describe('XmlGeneratorService', () => {
     expect(sumBase.toFixed(2)).toBe(info.totalSinImpuestos);
     expect(sumIva.toFixed(2)).toBe(totalIva.toFixed(2));
   });
+
+  describe('cantidad con decimales (venta por peso)', () => {
+    // 1.005 kg a $4.00 = $4.02.
+    const byWeight = { ...line('QUESO-KG', 4, 0, '4', 15), quantity: d(1.005), subtotal: d(4.02) };
+    const weightXml = generator.generateInvoiceXml(
+      { ...invoice, items: [byWeight] } as never,
+      company as never,
+    );
+    const detail = new XMLParser({ parseTagValue: false }).parse(weightXml).factura.detalles
+      .detalle;
+
+    it('escribe la cantidad con sus 6 decimales, sin redondear a 2', () => {
+      expect(detail.cantidad).toBe('1.005000');
+    });
+
+    it('cantidad × precio − descuento cuadra con precioTotalSinImpuesto', () => {
+      const base =
+        Number(detail.cantidad) * Number(detail.precioUnitario) - Number(detail.descuento);
+      expect(base.toFixed(2)).toBe(detail.precioTotalSinImpuesto);
+    });
+  });
 });

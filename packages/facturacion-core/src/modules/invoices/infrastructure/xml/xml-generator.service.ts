@@ -153,7 +153,9 @@ export class XmlGeneratorService {
       detalle.ele('codigoPrincipal').txt(item.mainCode);
       detalle.ele('codigoAuxiliar').txt(item.mainCode); // Mismo código como auxiliar
       detalle.ele('descripcion').txt(item.description);
-      detalle.ele('cantidad').txt(parseFloat(item.quantity.toString()).toFixed(2));
+      // Hasta 6 decimales (factura 2.1.0): con 2, una venta por peso (1.005 kg) salía como 1.00
+      // y cantidad × precio dejaba de cuadrar con precioTotalSinImpuesto.
+      detalle.ele('cantidad').txt(item.quantity.toFixed(6));
       detalle.ele('precioUnitario').txt(parseFloat(item.unitPrice.toString()).toFixed(6));
       detalle.ele('descuento').txt(parseFloat(item.discount.toString()).toFixed(2));
 
