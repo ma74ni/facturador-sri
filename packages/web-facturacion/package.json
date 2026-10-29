@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@facturador-sri/ui": "workspace:*",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-alert-dialog": "^1.2.1",
     "@radix-ui/react-avatar": "^1.3.1",
