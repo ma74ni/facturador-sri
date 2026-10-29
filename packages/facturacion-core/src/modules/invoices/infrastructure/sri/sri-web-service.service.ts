@@ -4,6 +4,14 @@ import { DOMParser } from '@xmldom/xmldom';
 import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
 import { classifyAuthorizationState, isAlreadyReceived } from './sri-authorization-state';
 
+/** Un mensaje del SRI (recepción o autorización): motivo de un rechazo o una advertencia. */
+export interface SriMessage {
+  identificador?: string;
+  mensaje?: string;
+  informacionAdicional?: string;
+  tipo?: string;
+}
+
 @Injectable()
 export class SriWebServiceService {
   private readonly logger = new Logger(SriWebServiceService.name);
@@ -45,7 +53,7 @@ export class SriWebServiceService {
     claveAcceso: string;
     estado: string;
     mensaje?: string;
-    comprobantes?: any[];
+    comprobantes?: unknown[];
   }> {
     const maxRetries = 3;
     const retryDelay = 2000; // 2 segundos entre reintentos
@@ -157,7 +165,7 @@ export class SriWebServiceService {
     numeroAutorizacion?: string;
     fechaAutorizacion?: Date;
     ambiente: string;
-    mensajes?: any[];
+    mensajes?: SriMessage[];
     /** XML del comprobante tal como lo autorizó el SRI */
     comprobante?: string;
   }> {
@@ -222,7 +230,7 @@ export class SriWebServiceService {
             : undefined,
           ambiente: autorizacion.ambiente,
           // El SRI manda un objeto cuando hay un solo mensaje
-          mensajes: ([] as any[]).concat(autorizacion.mensajes?.mensaje ?? []),
+          mensajes: ([] as SriMessage[]).concat(autorizacion.mensajes?.mensaje ?? []),
           comprobante: autorizacion.comprobante ? String(autorizacion.comprobante) : undefined,
         };
 

@@ -4,6 +4,7 @@ import { PrismaService } from '../../../../shared/database/prisma.service';
 import { CreatePaymentDto } from '../dto/create-payment.dto';
 import { creditedAmount, MONEY_TOLERANCE, settledAmount } from '../../domain/invoice-balance';
 import { syncInvoicePaymentStatus } from './invoice-payment-status';
+import { Decimal } from '@prisma/client/runtime/library';
 
 // Lo que hace falta de cada factura para calcular su saldo.
 const BALANCE_INCLUDE = {
@@ -170,11 +171,14 @@ export class PaymentsService {
 
   // Prisma serializa Decimal como string por default en JSON; el frontend
   // espera number (usa .toFixed en la UI de cobranza).
-  private serializePayment(payment: any) {
+  private serializePayment<
+    A extends { amount: Decimal; retentionAmount: Decimal },
+    P extends { totalAmount: Decimal; allocations: A[] },
+  >(payment: P) {
     return {
       ...payment,
       totalAmount: Number(payment.totalAmount),
-      allocations: payment.allocations.map((allocation: any) => ({
+      allocations: payment.allocations.map((allocation) => ({
         ...allocation,
         amount: Number(allocation.amount),
         retentionAmount: Number(allocation.retentionAmount),

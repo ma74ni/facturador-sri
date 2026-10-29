@@ -1,3 +1,5 @@
+import { errorMessage } from '../errors/error-message';
+
 export type Settled<R> = { ok: true; value: R } | { ok: false; error: string };
 
 /**
@@ -16,8 +18,8 @@ export async function mapWithConcurrency<T, R>(
       const index = next++;
       try {
         results[index] = { ok: true, value: await fn(items[index]) };
-      } catch (e: any) {
-        results[index] = { ok: false, error: e?.message ?? 'error desconocido' };
+      } catch (e: unknown) {
+        results[index] = { ok: false, error: errorMessage(e) };
       }
     }
   };

@@ -7,6 +7,16 @@ import {
   buyerIdentificationTypeForSri,
   IDENTIFICATION_TYPE,
 } from '../../../customers/domain/identification-type';
+import { Company, Prisma } from '@prisma/client';
+
+/** La factura con sus líneas y su cliente, tal como sale de Prisma. */
+export type InvoiceForXml = Prisma.InvoiceGetPayload<{ include: { items: true; customer: true } }>;
+
+/** Lo que el XML lee del emisor. */
+export type CompanyForXml = Pick<
+  Company,
+  'environment' | 'businessName' | 'tradeName' | 'ruc' | 'address'
+>;
 
 @Injectable()
 export class XmlGeneratorService {
@@ -42,7 +52,7 @@ export class XmlGeneratorService {
    * Genera el XML de una factura según esquema SRI v2.32
    * Estructura basada en ANEXO 1 - Ficha Técnica SRI
    */
-  generateInvoiceXml(invoice: any, company: any): string {
+  generateInvoiceXml(invoice: InvoiceForXml, company: CompanyForXml): string {
     const root = create({ version: '1.0', encoding: 'UTF-8' })
       .ele('factura', {
         id: 'comprobante',
@@ -143,20 +153,20 @@ export class XmlGeneratorService {
       detalle.ele('codigoPrincipal').txt(item.mainCode);
       detalle.ele('codigoAuxiliar').txt(item.mainCode); // Mismo código como auxiliar
       detalle.ele('descripcion').txt(item.description);
-      detalle.ele('cantidad').txt(parseFloat(item.quantity).toFixed(2));
-      detalle.ele('precioUnitario').txt(parseFloat(item.unitPrice).toFixed(6));
-      detalle.ele('descuento').txt(parseFloat(item.discount).toFixed(2));
+      detalle.ele('cantidad').txt(parseFloat(item.quantity.toString()).toFixed(2));
+      detalle.ele('precioUnitario').txt(parseFloat(item.unitPrice.toString()).toFixed(6));
+      detalle.ele('descuento').txt(parseFloat(item.discount.toString()).toFixed(2));
 
       // precioTotalSinImpuesto e IVA de la línea: lo que se guardó al emitir.
-      detalle.ele('precioTotalSinImpuesto').txt(parseFloat(item.subtotal).toFixed(2));
+      detalle.ele('precioTotalSinImpuesto').txt(parseFloat(item.subtotal.toString()).toFixed(2));
 
       const impuestos = detalle.ele('impuestos');
       const impuesto = impuestos.ele('impuesto');
       impuesto.ele('codigo').txt(SRI_IVA_TAX_CODE);
       impuesto.ele('codigoPorcentaje').txt(item.ivaCode);
-      impuesto.ele('tarifa').txt(parseFloat(item.ivaRate).toFixed(2));
-      impuesto.ele('baseImponible').txt(parseFloat(item.subtotal).toFixed(2));
-      impuesto.ele('valor').txt(parseFloat(item.ivaValue).toFixed(2));
+      impuesto.ele('tarifa').txt(parseFloat(item.ivaRate.toString()).toFixed(2));
+      impuesto.ele('baseImponible').txt(parseFloat(item.subtotal.toString()).toFixed(2));
+      impuesto.ele('valor').txt(parseFloat(item.ivaValue.toString()).toFixed(2));
     }
 
     // ==================== INFO ADICIONAL (OPCIONAL) ====================

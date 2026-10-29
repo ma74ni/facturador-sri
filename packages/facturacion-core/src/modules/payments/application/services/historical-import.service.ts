@@ -9,6 +9,8 @@ import { parseDdMmYyyy, parseIsoDate } from '../../domain/import-dates';
 import { readPaymentsCsv, readSriInvoicesExport } from '../import-files';
 import { SRI_CONCURRENCY, SriInvoiceLookupService } from './sri-invoice-lookup.service';
 import { inferIdentificationType } from '../../../customers/domain/identification-type';
+import { errorMessage } from '../../../../shared/errors/error-message';
+import { CreatePaymentDto } from '../dto/create-payment.dto';
 
 export interface ImportRowError {
   row: number;
@@ -418,7 +420,7 @@ export class HistoricalImportService {
       }
 
       const totalAmount = allocations.reduce((sum, a) => sum + a.amount, 0);
-      const dto = {
+      const dto: CreatePaymentDto = {
         customerId: customer.id,
         paymentDate: paymentDate.toISOString().slice(0, 10),
         totalAmount,
@@ -453,10 +455,10 @@ export class HistoricalImportService {
       }
 
       try {
-        await this.paymentsService.create(dto as any, companyId, createdById);
+        await this.paymentsService.create(dto, companyId, createdById);
         created++;
-      } catch (e: any) {
-        errors.push({ row: group.firstRow, message: e.message ?? 'Error desconocido' });
+      } catch (e: unknown) {
+        errors.push({ row: group.firstRow, message: errorMessage(e, 'Error desconocido') });
       }
     }
 

@@ -90,7 +90,7 @@ export class R2StorageService {
 
       // Convertir stream a buffer
       const chunks: Uint8Array[] = [];
-      for await (const chunk of response.Body as any) {
+      for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
         chunks.push(chunk);
       }
       const buffer = Buffer.concat(chunks);

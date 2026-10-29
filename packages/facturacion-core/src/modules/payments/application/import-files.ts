@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { parse } from 'csv-parse/sync';
+import { errorMessage } from '../../../shared/errors/error-message';
 
 /** Una fila del export "Comprobantes electrónicos recibidos/emitidos" del SRI (.txt con tabs). */
 export interface SriInvoiceRow {
@@ -30,8 +31,8 @@ function readTable<T>(buffer: Buffer, delimiter: string, what: string): T[] {
       skip_empty_lines: true,
       trim: true,
     });
-  } catch (e: any) {
-    throw new BadRequestException(`No se pudo leer ${what}: ${e.message}`);
+  } catch (e: unknown) {
+    throw new BadRequestException(`No se pudo leer ${what}: ${errorMessage(e)}`);
   }
 }
 

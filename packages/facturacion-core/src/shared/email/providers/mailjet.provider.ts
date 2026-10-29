@@ -1,9 +1,49 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { openSecret } from '../../crypto/secret-cipher';
+import { errorMessage } from '../../errors/error-message';
 // node-mailjet no expone un default compatible sin esModuleInterop.
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const Mailjet = require('node-mailjet');
+
+type Text = string | null | undefined;
+
+/** La configuración de email de una empresa, como la guarda `Company`. */
+export interface EmailCompanyConfig {
+  emailProvider: string;
+  businessName: string;
+  email?: Text;
+  replyToEmail?: Text;
+  mailjetApiKey?: Text;
+  mailjetSecretKey?: Text;
+  mailjetFromEmail?: Text;
+  mailjetFromName?: Text;
+}
+
+interface MailjetRecipient {
+  Email: string;
+  Name?: string;
+}
+
+/** Lo que usamos del cliente de node-mailjet (no publica tipos con este import). */
+interface MailjetClient {
+  post(resource: string, options?: { version: string }): MailjetRequest;
+  get(resource: string, options?: { version: string }): MailjetRequest;
+}
+
+interface MailjetRequest {
+  request(body?: unknown): Promise<unknown>;
+}
+
+interface MailjetMessage {
+  From: MailjetRecipient;
+  To: MailjetRecipient[];
+  Subject: string;
+  HTMLPart: string;
+  TextPart?: string;
+  ReplyTo?: MailjetRecipient;
+  Attachments?: { ContentType: string; Filename: string; Base64Content: string }[];
+}
 
 // Interfaces para la respuesta de Mailjet
 interface MailjetResponse {
@@ -17,8 +57,8 @@ interface MailjetResponse {
         MessageUUID: string;
         MessageHref: string;
       }>;
-      Cc?: any[];
-      Bcc?: any[];
+      Cc?: MailjetRecipient[];
+      Bcc?: MailjetRecipient[];
     }>;
   };
 }
@@ -26,7 +66,7 @@ interface MailjetResponse {
 @Injectable()
 export class MailjetProvider {
   private readonly logger = new Logger(MailjetProvider.name);
-  private defaultClient: any;
+  private defaultClient: MailjetClient;
 
   constructor(private configService: ConfigService) {
     // Cliente por defecto del sistema
@@ -45,7 +85,7 @@ export class MailjetProvider {
    * Crea un cliente de Mailjet para una empresa específica. La secret key
    * llega cifrada desde la base (o en claro al validar una nueva).
    */
-  private createCompanyClient(apiKey: string, secretKey: string): any {
+  private createCompanyClient(apiKey: string, secretKey: string): MailjetClient {
     return Mailjet.apiConnect(apiKey, openSecret(secretKey));
   }
 
@@ -58,16 +98,7 @@ export class MailjetProvider {
     subject: string;
     htmlContent: string;
     textContent?: string;
-    company?: {
-      emailProvider: string;
-      mailjetApiKey?: string;
-      mailjetSecretKey?: string;
-      mailjetFromEmail?: string;
-      mailjetFromName?: string;
-      businessName: string;
-      replyToEmail?: string;
-      email?: string;
-    };
+    company?: EmailCompanyConfig;
     attachments?: Array<{
       filename: string;
       contentType: string;
@@ -75,7 +106,7 @@ export class MailjetProvider {
     }>;
   }): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
-      let client: any;
+      let client: MailjetClient;
       let fromEmail: string;
       let fromName: string;
       let replyToEmail: string | undefined;
@@ -106,7 +137,7 @@ export class MailjetProvider {
           options.company?.businessName ||
           this.configService.get<string>('MAILJET_FROM_NAME') ||
           'Facturación Electrónica';
-        replyToEmail = options.company?.replyToEmail || options.company?.email;
+        replyToEmail = options.company?.replyToEmail || options.company?.email || undefined;
 
         this.logger.log(`📧 Usando Mailjet del sistema para: ${fromName}`);
       }
@@ -117,7 +148,7 @@ export class MailjetProvider {
       }
 
       // Preparar mensaje
-      const message: any = {
+      const message: MailjetMessage = {
         From: {
           Email: fromEmail,
           Name: fromName,
@@ -184,18 +215,22 @@ export class MailjetProvider {
           error: `Error en Mailjet: ${result.Status}`,
         };
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error(`❌ Error enviando email con Mailjet:`, error);
 
-      // Intentar extraer mensaje de error útil
-      const errorMessage =
-        error.response?.body?.ErrorMessage || 
-        error.message || 
+      // El SDK de Mailjet trae el motivo en response.body.ErrorMessage
+      const response =
+        typeof error === 'object' && error !== null
+          ? (error as { response?: { body?: { ErrorMessage?: string } } }).response
+          : undefined;
+      const message =
+        response?.body?.ErrorMessage ||
+        errorMessage(error, '') ||
         'Error desconocido al enviar email';
 
       return {
         success: false,
-        error: errorMessage,
+        error: message,
       };
     }
   }
@@ -213,7 +248,7 @@ export class MailjetProvider {
 
       this.logger.log('✅ Conexión Mailjet verificada');
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error('❌ Error verificando conexión Mailjet:', error);
       return false;
     }

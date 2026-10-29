@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 import { R2StorageService } from '../storage/r2-storage.service';
 import { EmailService } from './email.service';
+import { EmailCompanyConfig } from './providers/mailjet.provider';
 
 type Text = string | null | undefined;
 
@@ -24,7 +25,7 @@ export interface ElectronicDocumentEmail {
   filePrefix: string;
   recipient: string;
   /** La empresa con su configuración de email (proveedor, remitente…). */
-  company: { businessName: string } & Record<string, unknown>;
+  company: EmailCompanyConfig;
   customer: { businessName?: Text; firstName?: Text; lastName?: Text };
   number: string;
   issueDate: Date;

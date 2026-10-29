@@ -2,7 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as handlebars from 'handlebars';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
-import { MailjetProvider } from './providers/mailjet.provider';
+import { EmailCompanyConfig, MailjetProvider } from './providers/mailjet.provider';
+import { errorMessage } from '../errors/error-message';
 
 @Injectable()
 export class EmailService {
@@ -17,8 +18,8 @@ export class EmailService {
     to: string;
     subject: string;
     template: string;
-    context: any;
-    company?: any;
+    context: Record<string, unknown>;
+    company?: EmailCompanyConfig;
     attachments?: Array<{
       filename: string;
       path?: string;
@@ -63,11 +64,11 @@ export class EmailService {
         company: options.company,
         attachments: mailjetAttachments,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error(`❌ Error en EmailService:`, error);
       return {
         success: false,
-        error: error.message,
+        error: errorMessage(error),
       };
     }
   }
@@ -75,11 +76,13 @@ export class EmailService {
   /**
    * Verifica la conexión
    */
-  async verifyConnection(company?: any): Promise<boolean> {
+  async verifyConnection(
+    company?: Pick<EmailCompanyConfig, 'emailProvider' | 'mailjetApiKey' | 'mailjetSecretKey'>,
+  ): Promise<boolean> {
     if (company?.emailProvider === 'MAILJET' && company.mailjetApiKey) {
       return this.mailjetProvider.verifyConnection(
         company.mailjetApiKey,
-        company.mailjetSecretKey,
+        company.mailjetSecretKey ?? undefined,
       );
     }
     return this.mailjetProvider.verifyConnection();
