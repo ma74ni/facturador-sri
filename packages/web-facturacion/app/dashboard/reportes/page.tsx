@@ -23,7 +23,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import { invoicesApi, Invoice } from '@/lib/api/invoices';
-import { formatCurrency } from '@/lib/utils/formatters';
+import { formatCurrency, formatQuantity } from '@/lib/utils/formatters';
 
 export default function ReportesPage() {
   const [loading, setLoading] = useState(true);
@@ -323,7 +323,7 @@ export default function ReportesPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium break-words">{product.description}</p>
                         <p className="text-xs text-muted-foreground">
-                          Cantidad: {product.quantity}
+                          Cantidad: {formatQuantity(product.quantity)}
                         </p>
                       </div>
                       <p className="text-sm font-semibold flex-shrink-0">
@@ -346,7 +346,9 @@ export default function ReportesPage() {
                       {topProducts.map((product, index) => (
                         <TableRow key={index}>
                           <TableCell className="font-medium">{product.description}</TableCell>
-                          <TableCell className="text-right">{product.quantity}</TableCell>
+                          <TableCell className="text-right">
+                            {formatQuantity(product.quantity)}
+                          </TableCell>
                           <TableCell className="text-right">
                             {formatCurrency(product.total)}
                           </TableCell>

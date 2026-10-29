@@ -68,7 +68,7 @@ import { useCertificateStatus } from '@/lib/hooks/use-certificate';
 
 import { CertificateRequiredDialog } from '@/components/shared/certificate-required-dialog';
 
-import { formatCurrency } from '@/lib/utils/formatters';
+import { formatCurrency, formatQuantity } from '@/lib/utils/formatters';
 
 interface InvoiceDialogProps {
   open: boolean;
@@ -556,9 +556,10 @@ export function InvoiceDialog({
                       id="quantity"
                       value={quantity}
                       onChange={setQuantity}
-                      allowDecimals={false}
-                      min={1}
-                      placeholder="Ej: 5"
+                      allowDecimals
+                      decimalPlaces={3}
+                      min={0}
+                      placeholder="Ej: 5 o 1.250"
                     />
                   </div>
 
@@ -597,7 +598,8 @@ export function InvoiceDialog({
                               {item.description}
                             </h4>
                             <p className="text-sm text-on-surface-variant">
-                              Cantidad: {item.quantity} × {formatCurrency(item.unitPrice)}
+                              Cantidad: {formatQuantity(item.quantity)} ×{' '}
+                              {formatCurrency(item.unitPrice)}
                             </p>
                           </div>
                           <IconButton
@@ -659,7 +661,9 @@ export function InvoiceDialog({
                         {normalized.map((item, index) => (
                           <TableRow key={index}>
                             <TableCell>{item.description}</TableCell>
-                            <TableCell className="text-right">{item.quantity}</TableCell>
+                            <TableCell className="text-right">
+                              {formatQuantity(item.quantity)}
+                            </TableCell>
                             <TableCell className="text-right">
                               {formatCurrency(item.unitPrice)}
                             </TableCell>
