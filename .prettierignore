@@ -1,0 +1,8 @@
+node_modules
+dist
+.next
+coverage
+pnpm-lock.yaml
+signing-service
+packages/facturacion-core/prisma/migrations
+packages/ui/src/tokens/tokens.css

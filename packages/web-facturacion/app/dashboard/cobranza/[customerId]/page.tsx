@@ -2,10 +2,19 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@facturador-sri/ui';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { ArrowLeft, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useAccountStatement, useDeletePayment } from '@/lib/hooks/use-payments';
 import { InvoicePaymentStatus } from '@/lib/api/payments';
@@ -15,6 +24,7 @@ import { EditRetentionDialog } from '@/components/payments/edit-retention-dialog
 import { usePagination } from '@/lib/hooks/use-pagination';
 import { Pagination } from '@/components/ui/pagination';
 import { NativeSelect } from '@/components/ui/native-select';
+import { formatCurrency } from '@/lib/utils/formatters';
 
 type PaymentFilter = 'all' | 'withBalance' | InvoicePaymentStatus;
 
@@ -30,8 +40,8 @@ const STATUS_VARIANT: Record<InvoicePaymentStatus, 'secondary' | 'warning' | 'su
   PAID: 'success',
 };
 
-export default function CobranzaClientePage({ params }: { params: { customerId: string } }) {
-  const { customerId } = params;
+export default function CobranzaClientePage() {
+  const { customerId } = useParams<{ customerId: string }>();
   const { data: statement, isLoading } = useAccountStatement(customerId);
   const deletePayment = useDeletePayment(customerId);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -45,7 +55,7 @@ export default function CobranzaClientePage({ params }: { params: { customerId: 
       ? true
       : paymentFilter === 'withBalance'
         ? invoice.balance > 0
-        : invoice.paymentStatus === paymentFilter
+        : invoice.paymentStatus === paymentFilter,
   );
   const emptyInvoicesMessage =
     allInvoices.length === 0
@@ -85,7 +95,7 @@ export default function CobranzaClientePage({ params }: { params: { customerId: 
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{customerName}</h1>
             <p className="text-sm sm:text-base text-muted-foreground">
-              Saldo pendiente: ${statement.totalPending.toFixed(2)}
+              Saldo pendiente: {formatCurrency(statement.totalPending)}
             </p>
             <button
               type="button"
@@ -99,7 +109,11 @@ export default function CobranzaClientePage({ params }: { params: { customerId: 
             </button>
           </div>
           <div className="flex gap-2 w-full sm:w-auto">
-            <Button variant="outline" onClick={() => setAddInvoiceOpen(true)} className="w-full sm:w-auto">
+            <Button
+              variant="outline"
+              onClick={() => setAddInvoiceOpen(true)}
+              className="w-full sm:w-auto"
+            >
               <Plus className="mr-2 h-4 w-4" />
               Agregar factura
             </Button>
@@ -121,7 +135,9 @@ export default function CobranzaClientePage({ params }: { params: { customerId: 
                 : `${filteredInvoices.length} de ${allInvoices.length}`}
               )
             </CardTitle>
-            <CardDescription>Estado de cobro de cada factura emitida a este cliente</CardDescription>
+            <CardDescription>
+              Estado de cobro de cada factura emitida a este cliente
+            </CardDescription>
           </div>
           {allInvoices.length > 0 && (
             <NativeSelect
@@ -157,15 +173,19 @@ export default function CobranzaClientePage({ params }: { params: { customerId: 
                 <div className="grid grid-cols-3 gap-2 text-sm">
                   <div>
                     <p className="text-xs text-muted-foreground">Total</p>
-                    <p>${invoice.total.toFixed(2)}</p>
+                    <p>{formatCurrency(invoice.total)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Retenido</p>
-                    <p>{invoice.retainedAmount > 0 ? `$${invoice.retainedAmount.toFixed(2)}` : '—'}</p>
+                    <p>
+                      {invoice.retainedAmount > 0
+                        ? `${formatCurrency(invoice.retainedAmount)}`
+                        : '—'}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Saldo</p>
-                    <p className="font-medium">${invoice.balance.toFixed(2)}</p>
+                    <p className="font-medium">{formatCurrency(invoice.balance)}</p>
                   </div>
                 </div>
               </div>
@@ -195,11 +215,13 @@ export default function CobranzaClientePage({ params }: { params: { customerId: 
                   <TableRow key={invoice.id}>
                     <TableCell className="font-mono text-xs">{invoice.sequential}</TableCell>
                     <TableCell>{new Date(invoice.issueDate).toLocaleDateString('es-EC')}</TableCell>
-                    <TableCell>${invoice.total.toFixed(2)}</TableCell>
+                    <TableCell>{formatCurrency(invoice.total)}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {invoice.retainedAmount > 0 ? `$${invoice.retainedAmount.toFixed(2)}` : '—'}
+                      {invoice.retainedAmount > 0
+                        ? `${formatCurrency(invoice.retainedAmount)}`
+                        : '—'}
                     </TableCell>
-                    <TableCell>${invoice.balance.toFixed(2)}</TableCell>
+                    <TableCell>{formatCurrency(invoice.balance)}</TableCell>
                     <TableCell>
                       <Badge variant={STATUS_VARIANT[invoice.paymentStatus]}>
                         {STATUS_LABEL[invoice.paymentStatus]}
@@ -237,27 +259,27 @@ export default function CobranzaClientePage({ params }: { params: { customerId: 
                     <p className="text-sm font-medium">
                       {new Date(payment.paymentDate).toLocaleDateString('es-EC')}
                     </p>
-                    <p className="text-xs text-muted-foreground">{payment.reference || 'Sin referencia'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {payment.reference || 'Sin referencia'}
+                    </p>
                   </div>
                   <div className="flex items-center gap-1">
-                    <p className="text-sm font-semibold">${payment.totalAmount.toFixed(2)}</p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0"
+                    <p className="text-sm font-semibold">{formatCurrency(payment.totalAmount)}</p>
+                    <IconButton
+                      label="Eliminar pago"
+                      tone="destructive"
                       onClick={() => deletePayment.mutate(payment.id)}
-                      aria-label="Eliminar pago"
                     >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                      <Trash2 />
+                    </IconButton>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {payment.allocations
                     .map((a) => {
-                      const label = `${a.invoice?.sequential ?? a.invoiceId} ($${a.amount.toFixed(2)})`;
+                      const label = `${a.invoice?.sequential ?? a.invoiceId} (${formatCurrency(a.amount)})`;
                       return a.retentionAmount > 0
-                        ? `${label} + $${a.retentionAmount.toFixed(2)} ret.`
+                        ? `${label} + ${formatCurrency(a.retentionAmount)} ret.`
                         : label;
                     })
                     .join(', ')}
@@ -286,29 +308,29 @@ export default function CobranzaClientePage({ params }: { params: { customerId: 
               <TableBody>
                 {paymentsPage.pageItems.map((payment) => (
                   <TableRow key={payment.id}>
-                    <TableCell>{new Date(payment.paymentDate).toLocaleDateString('es-EC')}</TableCell>
+                    <TableCell>
+                      {new Date(payment.paymentDate).toLocaleDateString('es-EC')}
+                    </TableCell>
                     <TableCell>{payment.reference || '—'}</TableCell>
-                    <TableCell>${payment.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell>{formatCurrency(payment.totalAmount)}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {payment.allocations
                         .map((a) => {
-                          const label = `${a.invoice?.sequential ?? a.invoiceId} ($${a.amount.toFixed(2)})`;
+                          const label = `${a.invoice?.sequential ?? a.invoiceId} (${formatCurrency(a.amount)})`;
                           return a.retentionAmount > 0
-                            ? `${label} + $${a.retentionAmount.toFixed(2)} ret.`
+                            ? `${label} + ${formatCurrency(a.retentionAmount)} ret.`
                             : label;
                         })
                         .join(', ')}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0"
+                      <IconButton
+                        label="Eliminar pago"
+                        tone="destructive"
                         onClick={() => deletePayment.mutate(payment.id)}
-                        aria-label="Eliminar pago"
                       >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                        <Trash2 />
+                      </IconButton>
                     </TableCell>
                   </TableRow>
                 ))}

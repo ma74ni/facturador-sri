@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+
 import { Button } from '@/components/ui/button';
+
 import {
   Dialog,
   DialogContent,
@@ -10,9 +12,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+
+import { FormField } from '@facturador-sri/ui';
+
 import { AdminEmissionPoint } from '@/lib/api/platform-admin';
+
 import { useUpdateEmissionSequence } from '@/lib/hooks/use-platform-admin';
 
 interface SequenceDialogProps {
@@ -46,7 +52,8 @@ export function SequenceDialog({ companyId, point, onOpenChange }: SequenceDialo
     !Number.isInteger(nextCreditNote) || nextCreditNote < point.minimumNextCreditNote
       ? `Mínimo ${point.minimumNextCreditNote}${point.lastCreditNoteIssued ? ` (ya se emitió hasta el ${point.lastCreditNoteIssued})` : ''}`
       : null;
-  const unchanged = nextInvoice === point.invoiceSequence && nextCreditNote === point.creditNoteSequence;
+  const unchanged =
+    nextInvoice === point.invoiceSequence && nextCreditNote === point.creditNoteSequence;
 
   return (
     <Dialog open={!!point} onOpenChange={onOpenChange}>
@@ -54,19 +61,26 @@ export function SequenceDialog({ companyId, point, onOpenChange }: SequenceDialo
         <DialogHeader>
           <DialogTitle>Numeración del punto {point.label}</DialogTitle>
           <DialogDescription>
-            El número que se usará en el <strong>próximo</strong> comprobante. Úsalo, por ejemplo, si la empresa
-            recordó tarde que ya había facturado con este punto en otro sistema.
+            El número que se usará en el <strong>próximo</strong> comprobante. Úsalo, por ejemplo,
+            si la empresa recordó tarde que ya había facturado con este punto en otro sistema.
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1">
-            <Label htmlFor="next-invoice">Siguiente factura</Label>
-            <Input id="next-invoice" type="number" min={1} value={invoice} onChange={(e) => setInvoice(e.target.value)} />
-            {invoiceError && <p className="text-xs text-red-600">{invoiceError}</p>}
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="next-credit-note">Siguiente nota de crédito</Label>
+          <FormField label="Siguiente factura" htmlFor="next-invoice" error={invoiceError}>
+            <Input
+              id="next-invoice"
+              type="number"
+              min={1}
+              value={invoice}
+              onChange={(e) => setInvoice(e.target.value)}
+            />
+          </FormField>
+          <FormField
+            label="Siguiente nota de crédito"
+            htmlFor="next-credit-note"
+            error={creditNoteError}
+          >
             <Input
               id="next-credit-note"
               type="number"
@@ -74,8 +88,7 @@ export function SequenceDialog({ companyId, point, onOpenChange }: SequenceDialo
               value={creditNote}
               onChange={(e) => setCreditNote(e.target.value)}
             />
-            {creditNoteError && <p className="text-xs text-red-600">{creditNoteError}</p>}
-          </div>
+          </FormField>
         </div>
 
         <DialogFooter>
@@ -88,8 +101,12 @@ export function SequenceDialog({ companyId, point, onOpenChange }: SequenceDialo
               update.mutate(
                 {
                   emissionPointId: point.id,
-                  ...(nextInvoice !== point.invoiceSequence ? { nextInvoiceSequence: nextInvoice } : {}),
-                  ...(nextCreditNote !== point.creditNoteSequence ? { nextCreditNoteSequence: nextCreditNote } : {}),
+                  ...(nextInvoice !== point.invoiceSequence
+                    ? { nextInvoiceSequence: nextInvoice }
+                    : {}),
+                  ...(nextCreditNote !== point.creditNoteSequence
+                    ? { nextCreditNoteSequence: nextCreditNote }
+                    : {}),
                 },
                 { onSuccess: () => onOpenChange(false) },
               )

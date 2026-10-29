@@ -1,7 +1,11 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from 'react';
+
+import { Button } from '@/components/ui/button';
+
+import { IconButton, FormField, FieldError } from '@facturador-sri/ui';
+
 import {
   Dialog,
   DialogBody,
@@ -10,18 +14,24 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { NumberInput } from "@/components/ui/number-input";
-import { Label } from "@/components/ui/label";
-import { SearchableSelect } from "@/components/ui/searchable-select";
+} from '@/components/ui/dialog';
+
+import { Input } from '@/components/ui/input';
+
+import { NumberInput } from '@/components/ui/number-input';
+
+import { Label } from '@/components/ui/label';
+
+import { SearchableSelect } from '@/components/ui/searchable-select';
+
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select';
+
 import {
   Table,
   TableBody,
@@ -29,24 +39,36 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { CreateInvoiceDto, InvoiceItemDto } from "@/lib/api/invoices";
-import { Customer, CreateCustomerDto } from "@/lib/api/customers";
-import { Product, CreateProductDto } from "@/lib/api/products";
-import { Establishment } from "@/lib/api/establishments";
-import { AlertCircle, Plus, Trash2 } from "lucide-react";
-import { CustomerDialog } from "@/components/customers/customer-dialog";
-import { CustomerInfoCard } from "@/components/customers/customer-info-card";
-import { ProductDialog } from "@/components/products/product-dialog";
-import { useToast } from "@/hooks/use-toast";
-import {
-  useCreateCustomer,
-  useUpdateCustomer,
-} from "@/lib/hooks/use-customers";
-import { useCreateProduct } from "@/lib/hooks/use-products";
-import { useTaxCodes, getTaxLabel, getTaxPercentage } from "@/lib/hooks/use-tax-codes";
-import { useCertificateStatus } from "@/lib/hooks/use-certificate";
-import { CertificateRequiredDialog } from "@/components/shared/certificate-required-dialog";
+} from '@/components/ui/table';
+
+import { CreateInvoiceDto, InvoiceItemDto } from '@/lib/api/invoices';
+
+import { Customer, CreateCustomerDto } from '@/lib/api/customers';
+
+import { Product, CreateProductDto } from '@/lib/api/products';
+
+import { Establishment } from '@/lib/api/establishments';
+
+import { Plus, Trash2 } from 'lucide-react';
+import { CustomerDialog } from '@/components/customers/customer-dialog';
+
+import { CustomerInfoCard } from '@/components/customers/customer-info-card';
+
+import { ProductDialog } from '@/components/products/product-dialog';
+
+import { useToast } from '@/hooks/use-toast';
+
+import { useCreateCustomer, useUpdateCustomer } from '@/lib/hooks/use-customers';
+
+import { useCreateProduct } from '@/lib/hooks/use-products';
+
+import { useTaxCodes, getTaxLabel, getTaxPercentage } from '@/lib/hooks/use-tax-codes';
+
+import { useCertificateStatus } from '@/lib/hooks/use-certificate';
+
+import { CertificateRequiredDialog } from '@/components/shared/certificate-required-dialog';
+
+import { formatCurrency, formatQuantity } from '@/lib/utils/formatters';
 
 interface InvoiceDialogProps {
   open: boolean;
@@ -67,29 +89,29 @@ interface InvoiceItemWithCalc extends InvoiceItemDto {
 // Formas de pago del SRI
 const PAYMENT_METHODS = [
   {
-    code: "01",
-    label: "Efectivo",
-    description: "Sin utilización del sistema financiero",
+    code: '01',
+    label: 'Efectivo',
+    description: 'Sin utilización del sistema financiero',
   },
   {
-    code: "19",
-    label: "Tarjeta de Crédito",
-    description: "Visa, Mastercard, etc.",
+    code: '19',
+    label: 'Tarjeta de Crédito',
+    description: 'Visa, Mastercard, etc.',
   },
-  { code: "16", label: "Tarjeta de Débito", description: "Débito bancario" },
+  { code: '16', label: 'Tarjeta de Débito', description: 'Débito bancario' },
   {
-    code: "17",
-    label: "Transferencia / Dinero Electrónico",
-    description: "Transferencias bancarias",
+    code: '17',
+    label: 'Transferencia / Dinero Electrónico',
+    description: 'Transferencias bancarias',
   },
   {
-    code: "20",
-    label: "Otros con Sistema Financiero",
-    description: "Otros métodos bancarios",
+    code: '20',
+    label: 'Otros con Sistema Financiero',
+    description: 'Otros métodos bancarios',
   },
-  { code: "15", label: "Compensación de Deudas", description: "Compensación" },
-  { code: "18", label: "Tarjeta Prepago", description: "Tarjetas prepagadas" },
-  { code: "21", label: "Endoso de Títulos", description: "Endoso" },
+  { code: '15', label: 'Compensación de Deudas', description: 'Compensación' },
+  { code: '18', label: 'Tarjeta Prepago', description: 'Tarjetas prepagadas' },
+  { code: '21', label: 'Endoso de Títulos', description: 'Endoso' },
 ];
 
 // Fecha LOCAL del navegador (asumido Ecuador) en formato YYYY-MM-DD — NO
@@ -98,8 +120,8 @@ const PAYMENT_METHODS = [
 const getTodayLocalDateString = (): string => {
   const now = new Date();
   const year = now.getFullYear();
-  const month = (now.getMonth() + 1).toString().padStart(2, "0");
-  const day = now.getDate().toString().padStart(2, "0");
+  const month = (now.getMonth() + 1).toString().padStart(2, '0');
+  const day = now.getDate().toString().padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
 
@@ -136,18 +158,16 @@ export function InvoiceDialog({
   const { data: certificateStatus } = useCertificateStatus();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [selectedCustomer, setSelectedCustomer] = useState<string>("");
-  const [selectedEstablishment, setSelectedEstablishment] =
-    useState<string>("");
-  const [selectedEmissionPoint, setSelectedEmissionPoint] =
-    useState<string>("");
+  const [selectedCustomer, setSelectedCustomer] = useState<string>('');
+  const [selectedEstablishment, setSelectedEstablishment] = useState<string>('');
+  const [selectedEmissionPoint, setSelectedEmissionPoint] = useState<string>('');
   const [issueDate, setIssueDate] = useState<string>(getTodayLocalDateString);
   const [items, setItems] = useState<InvoiceItemWithCalc[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<string>("01");
+  const [paymentMethod, setPaymentMethod] = useState<string>('01');
   const [isRimpe, setIsRimpe] = useState<boolean>(false);
 
   // Item being added
-  const [selectedProduct, setSelectedProduct] = useState<string>("");
+  const [selectedProduct, setSelectedProduct] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
   const [discount, setDiscount] = useState<number>(0);
 
@@ -157,9 +177,7 @@ export function InvoiceDialog({
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [showCertificateDialog, setShowCertificateDialog] = useState(false);
 
-  const selectedEstablishmentData = establishments.find(
-    (e) => e.id === selectedEstablishment
-  );
+  const selectedEstablishmentData = establishments.find((e) => e.id === selectedEstablishment);
   const emissionPoints = selectedEstablishmentData?.emissionPoints || [];
 
   // Get selected customer
@@ -168,14 +186,14 @@ export function InvoiceDialog({
   useEffect(() => {
     if (!open) {
       // Reset form
-      setSelectedCustomer("");
-      setSelectedEstablishment("");
-      setSelectedEmissionPoint("");
+      setSelectedCustomer('');
+      setSelectedEstablishment('');
+      setSelectedEmissionPoint('');
       setIssueDate(getTodayLocalDateString());
       setItems([]);
-      setPaymentMethod("01");
+      setPaymentMethod('01');
       setIsRimpe(false);
-      setSelectedProduct("");
+      setSelectedProduct('');
       setQuantity(1);
       setDiscount(0);
       setErrors({});
@@ -187,14 +205,11 @@ export function InvoiceDialog({
     unitPrice: number,
     qty: number,
     disc: number,
-    taxCode: string
+    taxCode: string,
   ): { subtotal: number; taxValue: number; total: number } => {
     const subtotal = unitPrice * qty;
     const subtotalAfterDiscount = subtotal - disc;
-    const taxPercentage = getTaxPercentage(
-      taxCodesData?.taxCodes || [],
-      taxCode
-    );
+    const taxPercentage = getTaxPercentage(taxCodesData?.taxCodes || [], taxCode);
     const taxValue = subtotalAfterDiscount * (taxPercentage / 100);
     const total = subtotalAfterDiscount + taxValue;
 
@@ -207,7 +222,7 @@ export function InvoiceDialog({
 
   const handleAddItem = () => {
     if (!selectedProduct) {
-      setErrors({ ...errors, product: "Selecciona un producto" });
+      setErrors({ ...errors, product: 'Selecciona un producto' });
       return;
     }
 
@@ -215,17 +230,12 @@ export function InvoiceDialog({
     if (!product) return;
 
     if (quantity <= 0) {
-      setErrors({ ...errors, quantity: "La cantidad debe ser mayor a 0" });
+      setErrors({ ...errors, quantity: 'La cantidad debe ser mayor a 0' });
       return;
     }
 
     const unitPrice = Number(product.unitPrice);
-    const totals = calculateItemTotals(
-      unitPrice,
-      quantity,
-      discount,
-      product.taxPercentageCode
-    );
+    const totals = calculateItemTotals(unitPrice, quantity, discount, product.taxPercentageCode);
 
     const newItem: InvoiceItemWithCalc = {
       mainCode: product.mainCode,
@@ -239,10 +249,10 @@ export function InvoiceDialog({
     };
 
     setItems([...items, newItem]);
-    setSelectedProduct("");
+    setSelectedProduct('');
     setQuantity(1);
     setDiscount(0);
-    setErrors({ ...errors, product: "", quantity: "", items: "" });
+    setErrors({ ...errors, product: '', quantity: '', items: '' });
   };
 
   const handleRemoveItem = (index: number) => {
@@ -259,7 +269,7 @@ export function InvoiceDialog({
   const ivaGroups = Array.from(
     normalized
       .reduce((groups, item) => {
-        const code = item.taxPercentageCode ?? "";
+        const code = item.taxPercentageCode ?? '';
         const group = groups.get(code) ?? { taxBase: 0, ivaValue: 0 };
         groups.set(code, {
           taxBase: group.taxBase + item.subtotal - item.discount,
@@ -267,7 +277,7 @@ export function InvoiceDialog({
         });
         return groups;
       }, new Map<string, { taxBase: number; ivaValue: number }>())
-      .entries()
+      .entries(),
   ).map(([code, amounts]) => ({
     code,
     label: getTaxLabel(taxCodesData?.taxCodes || [], code),
@@ -282,30 +292,30 @@ export function InvoiceDialog({
       tax: acc.tax + item.taxValue,
       total: acc.total + item.total,
     }),
-    { subtotal: 0, discount: 0, tax: 0, total: 0 }
+    { subtotal: 0, discount: 0, tax: 0, total: 0 },
   );
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
     if (!selectedCustomer) {
-      newErrors.customer = "Selecciona un cliente";
+      newErrors.customer = 'Selecciona un cliente';
     }
 
     if (!selectedEstablishment) {
-      newErrors.establishment = "Selecciona un establecimiento";
+      newErrors.establishment = 'Selecciona un establecimiento';
     }
 
     if (!selectedEmissionPoint) {
-      newErrors.emissionPoint = "Selecciona un punto de emisión";
+      newErrors.emissionPoint = 'Selecciona un punto de emisión';
     }
 
     if (!issueDate) {
-      newErrors.issueDate = "Ingresa la fecha de emisión";
+      newErrors.issueDate = 'Ingresa la fecha de emisión';
     }
 
     if (items.length === 0) {
-      newErrors.items = "Agrega al menos un producto";
+      newErrors.items = 'Agrega al menos un producto';
     }
 
     setErrors(newErrors);
@@ -326,12 +336,12 @@ export function InvoiceDialog({
         emissionPointId: selectedEmissionPoint,
         items: items.map(
           // La tarifa de cada línea viaja al backend; los totales los recalcula él.
-          ({ subtotal, taxValue, total, ...item }) => item
+          ({ subtotal, taxValue, total, ...item }) => item,
         ),
         metadata: {
           paymentMethod,
           isRimpe,
-          source: "WEB_FACTURACION",
+          source: 'WEB_FACTURACION',
           sendToSri, // Indicar si debe enviar al SRI
         },
       };
@@ -339,7 +349,7 @@ export function InvoiceDialog({
       await onSave(invoiceData);
       onOpenChange(false);
     } catch (error) {
-      console.error("Error creating invoice:", error);
+      console.error('Error creating invoice:', error);
     } finally {
       setLoading(false);
     }
@@ -396,23 +406,18 @@ export function InvoiceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="full">
         <DialogHeader>
-          <DialogTitle className="text-2xl">
-            Nueva Factura Electrónica
-          </DialogTitle>
+          <DialogTitle className="text-2xl">Nueva Factura Electrónica</DialogTitle>
           <DialogDescription className="text-base">
-            Complete los datos para generar la factura. Todos los campos
-            marcados con * son obligatorios.
+            Complete los datos para generar la factura. Todos los campos marcados con * son
+            obligatorios.
           </DialogDescription>
         </DialogHeader>
 
         <DialogBody className="pr-1">
-
-        <div className="space-y-6">
+          <div className="space-y-6">
             {/* SECCIÓN 1: Datos Generales */}
             <div className="border-b pb-4">
-              <h3 className="text-lg font-semibold text-slate-700 mb-4">
-                1. Datos Generales
-              </h3>
+              <h3 className="text-lg font-semibold text-on-surface mb-4">1. Datos Generales</h3>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 {/* Cliente - Select con búsqueda */}
                 <div className="space-y-2 md:col-span-2">
@@ -423,7 +428,7 @@ export function InvoiceDialog({
                     value={selectedCustomer}
                     onChange={(id) => {
                       setSelectedCustomer(id);
-                      setErrors({ ...errors, customer: "" });
+                      setErrors({ ...errors, customer: '' });
                     }}
                     getId={(c) => c.id}
                     getLabel={getCustomerDisplayName}
@@ -435,12 +440,7 @@ export function InvoiceDialog({
                     addNewLabel="Nuevo Cliente"
                     error={!!errors.customer}
                   />
-                  {errors.customer && (
-                    <div className="flex items-center gap-1 text-sm text-red-500">
-                      <AlertCircle className="h-4 w-4" />
-                      <span>{errors.customer}</span>
-                    </div>
-                  )}
+                  <FieldError message={errors.customer} />
                 </div>
                 {/* Customer Info Card - Mostrar cuando hay un cliente seleccionado */}
                 {selectedCustomerData && (
@@ -449,8 +449,8 @@ export function InvoiceDialog({
                       customer={selectedCustomerData}
                       onEdit={handleEditCustomer}
                       onClose={() => {
-                        setSelectedCustomer("");
-                        setErrors({ ...errors, customer: "" });
+                        setSelectedCustomer('');
+                        setErrors({ ...errors, customer: '' });
                       }}
                       compact={true}
                     />
@@ -464,29 +464,26 @@ export function InvoiceDialog({
                     type="date"
                     value={issueDate}
                     onChange={(e) => setIssueDate(e.target.value)}
-                    className={errors.issueDate ? "border-red-500" : ""}
+                    aria-invalid={!!errors.issueDate}
                   />
-                  {errors.issueDate && (
-                    <div className="flex items-center gap-1 text-sm text-red-500">
-                      <AlertCircle className="h-4 w-4" />
-                      <span>{errors.issueDate}</span>
-                    </div>
-                  )}
+                  <FieldError message={errors.issueDate} />
                 </div>
 
                 {/* Establecimiento */}
-                <div className="space-y-2 md:col-span-1 lg:col-span-1">
-                  <Label htmlFor="establishment">Establecimiento *</Label>
+                <FormField
+                  label="Establecimiento *"
+                  htmlFor="establishment"
+                  error={errors.establishment}
+                  className="md:col-span-1 lg:col-span-1"
+                >
                   <Select
                     value={selectedEstablishment}
                     onValueChange={(value) => {
                       setSelectedEstablishment(value);
-                      setSelectedEmissionPoint("");
+                      setSelectedEmissionPoint('');
                     }}
                   >
-                    <SelectTrigger
-                      className={errors.establishment ? "border-red-500" : ""}
-                    >
+                    <SelectTrigger aria-invalid={!!errors.establishment}>
                       <SelectValue placeholder="Seleccionar establecimiento" />
                     </SelectTrigger>
                     <SelectContent>
@@ -497,25 +494,21 @@ export function InvoiceDialog({
                       ))}
                     </SelectContent>
                   </Select>
-                  {errors.establishment && (
-                    <div className="flex items-center gap-1 text-sm text-red-500">
-                      <AlertCircle className="h-4 w-4" />
-                      <span>{errors.establishment}</span>
-                    </div>
-                  )}
-                </div>
+                </FormField>
 
                 {/* Punto de Emisión */}
-                <div className="space-y-2 md:col-span-1 lg:col-span-1">
-                  <Label htmlFor="emissionPoint">Punto de Emisión *</Label>
+                <FormField
+                  label="Punto de Emisión *"
+                  htmlFor="emissionPoint"
+                  error={errors.emissionPoint}
+                  className="md:col-span-1 lg:col-span-1"
+                >
                   <Select
                     value={selectedEmissionPoint}
                     onValueChange={setSelectedEmissionPoint}
                     disabled={!selectedEstablishment}
                   >
-                    <SelectTrigger
-                      className={errors.emissionPoint ? "border-red-500" : ""}
-                    >
+                    <SelectTrigger aria-invalid={!!errors.emissionPoint}>
                       <SelectValue placeholder="Seleccionar punto" />
                     </SelectTrigger>
                     <SelectContent>
@@ -526,25 +519,17 @@ export function InvoiceDialog({
                       ))}
                     </SelectContent>
                   </Select>
-                  {errors.emissionPoint && (
-                    <div className="flex items-center gap-1 text-sm text-red-500">
-                      <AlertCircle className="h-4 w-4" />
-                      <span>{errors.emissionPoint}</span>
-                    </div>
-                  )}
-                </div>
+                </FormField>
               </div>
             </div>
 
             {/* SECCIÓN 2: Productos */}
             <div className="border-b pb-4">
-              <h3 className="text-lg font-semibold text-slate-700 mb-4">
+              <h3 className="text-lg font-semibold text-on-surface mb-4">
                 2. Productos y Servicios
               </h3>
-              <div className="border rounded-lg p-4 bg-slate-50">
-                <h4 className="font-medium mb-4 text-slate-600">
-                  Agregar Producto
-                </h4>
+              <div className="border rounded-lg p-4 bg-surface-container-low">
+                <h4 className="font-medium mb-4 text-on-surface-variant">Agregar Producto</h4>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
                   <div className="md:col-span-2 lg:col-span-3 space-y-2">
                     <Label htmlFor="product">Producto</Label>
@@ -555,7 +540,7 @@ export function InvoiceDialog({
                       onChange={setSelectedProduct}
                       getId={(p) => p.id}
                       getLabel={(p) => p.name}
-                      getSubLabel={(p) => `$${Number(p.unitPrice).toFixed(2)}`}
+                      getSubLabel={(p) => `${formatCurrency(Number(p.unitPrice))}`}
                       placeholder="Seleccionar producto..."
                       searchPlaceholder="Buscar producto..."
                       emptyMessage="No se encontraron productos"
@@ -571,9 +556,10 @@ export function InvoiceDialog({
                       id="quantity"
                       value={quantity}
                       onChange={setQuantity}
-                      allowDecimals={false}
-                      min={1}
-                      placeholder="Ej: 5"
+                      allowDecimals
+                      decimalPlaces={3}
+                      min={0}
+                      placeholder="Ej: 5 o 1.250"
                     />
                   </div>
 
@@ -590,11 +576,7 @@ export function InvoiceDialog({
                     />
                   </div>
                 </div>
-                <Button
-                  type="button"
-                  onClick={handleAddItem}
-                  className="mt-4 w-full lg:w-auto"
-                >
+                <Button type="button" onClick={handleAddItem} className="mt-4 w-full lg:w-auto">
                   <Plus className="mr-2 h-4 w-4" />
                   Agregar Producto
                 </Button>
@@ -608,50 +590,51 @@ export function InvoiceDialog({
                     {normalized.map((item, index) => (
                       <div
                         key={index}
-                        className="border rounded-lg p-4 bg-white shadow-sm"
+                        className="border rounded-lg p-4 bg-surface-container-lowest shadow-sm"
                       >
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-semibold text-slate-900 mb-1 truncate">
+                            <h4 className="font-semibold text-on-surface mb-1 truncate">
                               {item.description}
                             </h4>
-                            <p className="text-sm text-slate-500">
-                              Cantidad: {item.quantity} × ${item.unitPrice.toFixed(2)}
+                            <p className="text-sm text-on-surface-variant">
+                              Cantidad: {formatQuantity(item.quantity)} ×{' '}
+                              {formatCurrency(item.unitPrice)}
                             </p>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
+                          <IconButton
+                            label="Quitar producto"
+                            tone="destructive"
                             onClick={() => handleRemoveItem(index)}
-                            className="h-8 w-8 p-0 -mt-1 -mr-1"
+                            className="-mr-1 -mt-1"
                           >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                            <Trash2 />
+                          </IconButton>
                         </div>
 
                         <div className="grid grid-cols-2 gap-2 text-sm">
                           <div>
-                            <span className="text-slate-500">Descuento:</span>
+                            <span className="text-on-surface-variant">Descuento:</span>
                             <span className="ml-1 font-medium">
-                              ${item.discount.toFixed(2)}
+                              {formatCurrency(item.discount)}
                             </span>
                           </div>
                           <div>
-                            <span className="text-slate-500">Subtotal:</span>
+                            <span className="text-on-surface-variant">Subtotal:</span>
                             <span className="ml-1 font-medium">
-                              ${item.subtotal.toFixed(2)}
+                              {formatCurrency(item.subtotal)}
                             </span>
                           </div>
                           <div>
-                            <span className="text-slate-500">IVA:</span>
+                            <span className="text-on-surface-variant">IVA:</span>
                             <span className="ml-1 font-medium">
-                              ${item.taxValue.toFixed(2)}
+                              {formatCurrency(item.taxValue)}
                             </span>
                           </div>
                           <div>
-                            <span className="text-slate-500">Total:</span>
+                            <span className="text-on-surface-variant">Total:</span>
                             <span className="ml-1 font-bold text-primary">
-                              ${item.total.toFixed(2)}
+                              {formatCurrency(item.total)}
                             </span>
                           </div>
                         </div>
@@ -679,31 +662,31 @@ export function InvoiceDialog({
                           <TableRow key={index}>
                             <TableCell>{item.description}</TableCell>
                             <TableCell className="text-right">
-                              {item.quantity}
+                              {formatQuantity(item.quantity)}
                             </TableCell>
                             <TableCell className="text-right">
-                              ${item.unitPrice.toFixed(2)}
+                              {formatCurrency(item.unitPrice)}
                             </TableCell>
                             <TableCell className="text-right">
-                              ${item.discount.toFixed(2)}
+                              {formatCurrency(item.discount)}
                             </TableCell>
                             <TableCell className="text-right">
-                              ${item.subtotal.toFixed(2)}
+                              {formatCurrency(item.subtotal)}
                             </TableCell>
                             <TableCell className="text-right">
-                              ${item.taxValue.toFixed(2)}
+                              {formatCurrency(item.taxValue)}
                             </TableCell>
                             <TableCell className="text-right font-medium">
-                              ${item.total.toFixed(2)}
+                              {formatCurrency(item.total)}
                             </TableCell>
                             <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="sm"
+                              <IconButton
+                                label="Quitar producto"
+                                tone="destructive"
                                 onClick={() => handleRemoveItem(index)}
                               >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
+                                <Trash2 />
+                              </IconButton>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -715,7 +698,7 @@ export function InvoiceDialog({
 
               {/* RESUMEN DE TOTALES - Más visible y claro */}
               {items.length > 0 && (
-                <div className="mt-4 bg-white border-2 border-primary/20 rounded-lg shadow-md overflow-hidden lg:max-w-md lg:ml-auto">
+                <div className="mt-4 bg-surface-container-lowest border-2 border-primary/20 rounded-lg shadow-md overflow-hidden lg:max-w-md lg:ml-auto">
                   <div className="bg-primary/5 px-4 py-2 border-b border-primary/20">
                     <h3 className="font-semibold text-primary text-sm uppercase tracking-wide">
                       Resumen de Factura
@@ -723,32 +706,32 @@ export function InvoiceDialog({
                   </div>
                   <div className="p-4 lg:p-6 space-y-3">
                     <div className="flex justify-between items-center text-base">
-                      <span className="text-slate-600">Subtotal (Base):</span>
+                      <span className="text-on-surface-variant">Subtotal (Base):</span>
                       <span className="font-semibold text-lg">
-                        ${totals.subtotal.toFixed(2)}
+                        {formatCurrency(totals.subtotal)}
                       </span>
                     </div>
 
                     {totals.discount > 0 && (
-                      <div className="flex justify-between items-center text-base text-red-600">
+                      <div className="flex justify-between items-center text-base text-error">
                         <span>Descuento:</span>
                         <span className="font-semibold text-lg">
-                          -${totals.discount.toFixed(2)}
+                          -{formatCurrency(totals.discount)}
                         </span>
                       </div>
                     )}
 
-                    <div className="space-y-3 border-t border-dashed border-slate-300 pt-3">
+                    <div className="space-y-3 border-t border-dashed border-outline-variant pt-3">
                       {ivaGroups.map((group) => (
                         <div
                           key={group.code}
                           className="flex justify-between items-center text-base"
                         >
-                          <span className="text-slate-700 font-medium">
+                          <span className="text-on-surface font-medium">
                             Subtotal {group.label}:
                           </span>
                           <span className="font-semibold text-lg">
-                            ${group.taxBase.toFixed(2)}
+                            {formatCurrency(group.taxBase)}
                           </span>
                         </div>
                       ))}
@@ -761,9 +744,9 @@ export function InvoiceDialog({
                           key={group.code}
                           className="flex justify-between items-center text-base"
                         >
-                          <span className="text-slate-600">{group.label}:</span>
-                          <span className="font-semibold text-lg text-blue-600">
-                            ${group.ivaValue.toFixed(2)}
+                          <span className="text-on-surface-variant">{group.label}:</span>
+                          <span className="font-semibold text-lg text-primary">
+                            {formatCurrency(group.ivaValue)}
                           </span>
                         </div>
                       ))}
@@ -773,52 +756,40 @@ export function InvoiceDialog({
                         Total a Pagar:
                       </span>
                       <span className="text-3xl font-bold text-primary">
-                        ${totals.total.toFixed(2)}
+                        {formatCurrency(totals.total)}
                       </span>
                     </div>
                   </div>
                 </div>
               )}
 
-              {errors.items && (
-                <div className="flex items-center gap-1 text-sm text-red-500 mt-2">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>{errors.items}</span>
-                </div>
-              )}
+              <FieldError message={errors.items} className="mt-2" />
             </div>
           </div>
 
           {/* SECCIÓN 3: Forma de Pago */}
           <div>
-            <h3 className="text-lg font-semibold text-slate-700 mb-4">
+            <h3 className="text-lg font-semibold text-on-surface mb-4">
               3. Forma de Pago y Opciones
             </h3>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label
-                  htmlFor="paymentMethod"
-                  className="text-base font-semibold"
-                >
+                <Label htmlFor="paymentMethod" className="text-base font-semibold">
                   Forma de Pago *
                 </Label>
                 <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                   <SelectTrigger className="h-12 text-base">
                     <SelectValue>
-                      {PAYMENT_METHODS.find((m) => m.code === paymentMethod)
-                        ?.label || "Seleccionar forma de pago"}
+                      {PAYMENT_METHODS.find((m) => m.code === paymentMethod)?.label ||
+                        'Seleccionar forma de pago'}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {PAYMENT_METHODS.map((method) => (
-                      <SelectItem
-                        key={method.code}
-                        value={method.code}
-                        className="py-3"
-                      >
+                      <SelectItem key={method.code} value={method.code} className="py-3">
                         <div className="flex flex-col">
                           <span className="font-medium">{method.label}</span>
-                          <span className="text-xs text-slate-500">
+                          <span className="text-xs text-on-surface-variant">
                             {method.description}
                           </span>
                         </div>
@@ -826,42 +797,34 @@ export function InvoiceDialog({
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-on-surface-variant mt-1">
                   Método de pago que utilizará el cliente
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label className="text-base font-semibold">
-                  Opciones Tributarias
-                </Label>
-                <div className="flex items-center space-x-3 p-3 bg-slate-50 border border-slate-200 rounded-lg h-12">
+                <Label className="text-base font-semibold">Opciones Tributarias</Label>
+                <div className="flex items-center space-x-3 p-3 bg-surface-container-low border border-outline-variant rounded-lg h-12">
                   <input
                     type="checkbox"
                     id="rimpe-checkbox"
                     checked={isRimpe}
                     onChange={(e) => setIsRimpe(e.target.checked)}
-                    className="w-5 h-5 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
+                    className="w-5 h-5 text-primary border-outline-variant rounded focus:ring-primary cursor-pointer"
                   />
-                  <label
-                    htmlFor="rimpe-checkbox"
-                    className="cursor-pointer flex-1"
-                  >
-                    <span className="text-sm font-semibold text-slate-700">
-                      Régimen RIMPE
-                    </span>
+                  <label htmlFor="rimpe-checkbox" className="cursor-pointer flex-1">
+                    <span className="text-sm font-semibold text-on-surface">Régimen RIMPE</span>
                   </label>
                 </div>
               </div>
             </div>
 
             {isRimpe && (
-              <div className="rounded-lg bg-blue-50 border border-blue-200 p-4 mt-4">
-                <p className="text-sm text-blue-800">
-                  <strong>Nota RIMPE:</strong> Esta factura incluirá la leyenda
-                  "CONTRIBUYENTE NEGOCIO POPULAR - RÉGIMEN RIMPE" en la
-                  información adicional del XML. No se aplicará retención de IVA
-                  ni renta.
+              <div className="rounded-lg bg-primary-container border border-primary-container p-4 mt-4">
+                <p className="text-sm text-on-primary-container">
+                  <strong>Nota RIMPE:</strong> Esta factura incluirá la leyenda &ldquo;CONTRIBUYENTE
+                  NEGOCIO POPULAR - RÉGIMEN RIMPE&rdquo; en la información adicional del XML. No se
+                  aplicará retención de IVA ni renta.
                 </p>
               </div>
             )}
@@ -885,7 +848,7 @@ export function InvoiceDialog({
             disabled={loading}
             className="sm:px-6"
           >
-            {loading ? "Guardando..." : "Guardar Borrador"}
+            {loading ? 'Guardando...' : 'Guardar Borrador'}
           </Button>
           <Button
             type="button"
@@ -893,7 +856,7 @@ export function InvoiceDialog({
             disabled={loading}
             className="sm:px-6"
           >
-            {loading ? "Procesando..." : "Firmar y Enviar al SRI"}
+            {loading ? 'Procesando...' : 'Firmar y Enviar al SRI'}
           </Button>
         </DialogFooter>
 

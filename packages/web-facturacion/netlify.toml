@@ -2,15 +2,15 @@
   # Directorio base del frontend
   base = "packages/web-facturacion"
 
-  # Comando de build - primero instalamos shared-types, luego el frontend
+  # Comando de build: instala el workspace y compila el frontend
   command = "cd ../.. && pnpm install && pnpm --filter web-facturacion build"
 
   # Directorio de publicación (relativo al base)
   publish = ".next"
 
 [build.environment]
-  # Usar Node 18+
-  NODE_VERSION = "18"
+  # Node 20 LTS (Next 15 necesita >= 18.18; Node 18 ya no tiene soporte)
+  NODE_VERSION = "20"
 
   # Habilitar pnpm
   NPM_FLAGS = "--version"

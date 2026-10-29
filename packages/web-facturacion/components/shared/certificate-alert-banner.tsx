@@ -33,21 +33,21 @@ export function CertificateAlertBanner() {
   };
 
   return (
-    <Alert className="border-amber-200 bg-amber-50 relative">
-      <ShieldAlert className="h-5 w-5 text-amber-600" />
-      <AlertTitle className="text-amber-900 font-semibold flex items-center justify-between pr-8">
+    <Alert className="border-warning-container bg-warning-container relative">
+      <ShieldAlert className="h-5 w-5 text-warning" />
+      <AlertTitle className="text-on-warning-container font-semibold flex items-center justify-between pr-8">
         Certificado Digital Requerido 2
         <Button
           variant="ghost"
           size="sm"
-          className="absolute right-2 top-2 h-6 w-6 p-0 hover:bg-amber-100"
+          className="absolute right-2 top-2 h-6 w-6 p-0 hover:bg-warning-container"
           onClick={() => setDismissed(true)}
         >
           <X className="h-4 w-4" />
           <span className="sr-only">Cerrar</span>
         </Button>
       </AlertTitle>
-      <AlertDescription className="text-amber-800 mt-2">
+      <AlertDescription className="text-on-warning-container mt-2">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <p className="text-sm">
             Necesitas cargar tu{" "}
@@ -57,7 +57,7 @@ export function CertificateAlertBanner() {
           <Button
             onClick={handleGoToConfiguration}
             size="sm"
-            className="bg-amber-600 hover:bg-amber-700 text-white flex-shrink-0 w-full sm:w-auto"
+            className="bg-warning text-on-warning flex-shrink-0 w-full sm:w-auto"
           >
             Cargar Certificado
             <ArrowRight className="ml-2 h-4 w-4" />

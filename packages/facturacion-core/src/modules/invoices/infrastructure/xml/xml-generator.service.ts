@@ -3,6 +3,20 @@ import { create } from 'xmlbuilder2';
 
 import { SRI_IVA_TAX_CODE } from '../../../tax-codes/domain/iva-rate.catalog';
 import { TaxCalculatorService } from '../../../tax-codes/domain/services/tax-calculator.service';
+import {
+  buyerIdentificationTypeForSri,
+  IDENTIFICATION_TYPE,
+} from '../../../customers/domain/identification-type';
+import { Company, Prisma } from '@prisma/client';
+
+/** La factura con sus líneas y su cliente, tal como sale de Prisma. */
+export type InvoiceForXml = Prisma.InvoiceGetPayload<{ include: { items: true; customer: true } }>;
+
+/** Lo que el XML lee del emisor. */
+export type CompanyForXml = Pick<
+  Company,
+  'environment' | 'businessName' | 'tradeName' | 'ruc' | 'address'
+>;
 
 @Injectable()
 export class XmlGeneratorService {
@@ -23,34 +37,11 @@ export class XmlGeneratorService {
   }
 
   /**
-   * Mapea el tipo de identificación del cliente al código del SRI
-   */
-  private mapIdentificationType(type: string): string {
-    // Ya viene como código del catálogo SRI (04/05/06/07/08): usarlo tal cual.
-    // Sin esto, un cliente creado con identificationType "05" caía al default
-    // '07' y el SRI rechazaba con error 69 (tipo 07 exige identificación
-    // 9999999999999).
-    if (['04', '05', '06', '07', '08'].includes(type)) {
-      return type;
-    }
-
-    const mapping: Record<string, string> = {
-      'CEDULA': '05',
-      'RUC': '04',
-      'PASAPORTE': '06',
-      'CONSUMIDOR_FINAL': '07',
-      'IDENTIFICACION_EXTERIOR': '08',
-    };
-
-    return mapping[type] || '07'; // Default: Consumidor final
-  }
-
-  /**
    * Valida y ajusta la identificación según el tipo
    */
   private normalizeIdentification(identification: string, type: string): string {
     // Venta a consumidor final: 13 dígitos de nueve
-    if (type === 'CONSUMIDOR_FINAL' || type === '07') {
+    if (buyerIdentificationTypeForSri(type) === IDENTIFICATION_TYPE.CONSUMIDOR_FINAL) {
       return '9999999999999';
     }
 
@@ -61,7 +52,7 @@ export class XmlGeneratorService {
    * Genera el XML de una factura según esquema SRI v2.32
    * Estructura basada en ANEXO 1 - Ficha Técnica SRI
    */
-  generateInvoiceXml(invoice: any, company: any): string {
+  generateInvoiceXml(invoice: InvoiceForXml, company: CompanyForXml): string {
     const root = create({ version: '1.0', encoding: 'UTF-8' })
       .ele('factura', {
         id: 'comprobante',
@@ -97,7 +88,7 @@ export class XmlGeneratorService {
     infoFactura.ele('obligadoContabilidad').txt('SI');
 
     // Tipo identificación comprador - Usar código del SRI
-    const tipoIdentificacionCodigo = this.mapIdentificationType(invoice.customer.identificationType);
+    const tipoIdentificacionCodigo = buyerIdentificationTypeForSri(invoice.customer.identificationType);
     const identificacionNormalizada = this.normalizeIdentification(
       invoice.customer.identification,
       invoice.customer.identificationType
@@ -162,20 +153,22 @@ export class XmlGeneratorService {
       detalle.ele('codigoPrincipal').txt(item.mainCode);
       detalle.ele('codigoAuxiliar').txt(item.mainCode); // Mismo código como auxiliar
       detalle.ele('descripcion').txt(item.description);
-      detalle.ele('cantidad').txt(parseFloat(item.quantity).toFixed(2));
-      detalle.ele('precioUnitario').txt(parseFloat(item.unitPrice).toFixed(6));
-      detalle.ele('descuento').txt(parseFloat(item.discount).toFixed(2));
+      // Hasta 6 decimales (factura 2.1.0): con 2, una venta por peso (1.005 kg) salía como 1.00
+      // y cantidad × precio dejaba de cuadrar con precioTotalSinImpuesto.
+      detalle.ele('cantidad').txt(item.quantity.toFixed(6));
+      detalle.ele('precioUnitario').txt(parseFloat(item.unitPrice.toString()).toFixed(6));
+      detalle.ele('descuento').txt(parseFloat(item.discount.toString()).toFixed(2));
 
       // precioTotalSinImpuesto e IVA de la línea: lo que se guardó al emitir.
-      detalle.ele('precioTotalSinImpuesto').txt(parseFloat(item.subtotal).toFixed(2));
+      detalle.ele('precioTotalSinImpuesto').txt(parseFloat(item.subtotal.toString()).toFixed(2));
 
       const impuestos = detalle.ele('impuestos');
       const impuesto = impuestos.ele('impuesto');
       impuesto.ele('codigo').txt(SRI_IVA_TAX_CODE);
       impuesto.ele('codigoPorcentaje').txt(item.ivaCode);
-      impuesto.ele('tarifa').txt(parseFloat(item.ivaRate).toFixed(2));
-      impuesto.ele('baseImponible').txt(parseFloat(item.subtotal).toFixed(2));
-      impuesto.ele('valor').txt(parseFloat(item.ivaValue).toFixed(2));
+      impuesto.ele('tarifa').txt(parseFloat(item.ivaRate.toString()).toFixed(2));
+      impuesto.ele('baseImponible').txt(parseFloat(item.subtotal.toString()).toFixed(2));
+      impuesto.ele('valor').txt(parseFloat(item.ivaValue.toString()).toFixed(2));
     }
 
     // ==================== INFO ADICIONAL (OPCIONAL) ====================

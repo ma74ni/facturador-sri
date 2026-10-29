@@ -68,7 +68,7 @@ export default function CobranzaPage() {
                   <Link
                     key={customer.id}
                     href={`/dashboard/cobranza/${customer.id}`}
-                    className="flex items-center justify-between gap-2 border rounded-lg p-4 hover:bg-slate-50 active:bg-slate-100"
+                    className="flex items-center justify-between gap-2 border rounded-lg p-4 hover:bg-surface-container-low active:bg-surface-container-high"
                   >
                     <div className="min-w-0">
                       <p className="font-medium text-sm break-words">

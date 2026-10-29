@@ -5,10 +5,12 @@ import { AccessKeyService } from '../../domain/services/access-key.service';
 import { XmlGeneratorService } from '../../infrastructure/xml/xml-generator.service';
 import { XmlStorageService } from '../../infrastructure/xml/xml-storage.service';
 import { DigitalSignatureService } from '../../infrastructure/xml/digital-signature.service';
-import { Decimal } from '@prisma/client/runtime/library';
 import { SriWebServiceService } from '../../infrastructure/sri/sri-web-service.service';
 import { RideGeneratorService } from '../../infrastructure/pdf/ride-generator.service';
-import { EmailService } from '../../../../shared/email/email.service';
+import {
+  documentNumber,
+  ElectronicDocumentMailer,
+} from '../../../../shared/email/electronic-document-mailer';
 import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
 import { TaxCalculatorService } from '../../../tax-codes/domain/services/tax-calculator.service';
 import { availableForCreditNote } from '../../../credit-notes/domain/credit-note-limit';
@@ -17,6 +19,27 @@ import {
   LineIvaResolverService,
   toBadRequest,
 } from '../../../tax-codes/application/services/line-iva-resolver.service';
+import { errorMessage } from '../../../../shared/errors/error-message';
+import { Prisma } from '@prisma/client';
+
+/** Lo que necesita el envío por email: cliente y la configuración de email de la empresa. */
+const INVOICE_EMAIL_INCLUDE = {
+  customer: true,
+  company: {
+    select: {
+      id: true,
+      businessName: true,
+      tradeName: true,
+      email: true,
+      replyToEmail: true,
+      emailProvider: true,
+      mailjetApiKey: true,
+      mailjetSecretKey: true,
+      mailjetFromEmail: true,
+      mailjetFromName: true,
+    },
+  },
+} as const;
 
 @Injectable()
 export class InvoicesService {
@@ -29,7 +52,7 @@ export class InvoicesService {
     private xmlStorage: XmlStorageService,
     private digitalSignature: DigitalSignatureService,
     private rideGenerator: RideGeneratorService,
-    private emailService: EmailService,
+    private documentMailer: ElectronicDocumentMailer,
     private sriService: SriWebServiceService,
     private r2Storage: R2StorageService,
     private taxCalculator: TaxCalculatorService,
@@ -179,10 +202,10 @@ export class InvoicesService {
           xmlSignedPath = await this.xmlStorage.saveSignedXml(accessKey, signedXml, companyId);
           signatureStatus = 'firmado';
 
-        } catch (signError: any) {
+        } catch (signError: unknown) {
           signatureStatus = 'error_firma';
-          signatureDetail = signError.message;
-          this.logger.error(`❌ No se pudo firmar la factura ${sequential}: ${signError.message}`);
+          signatureDetail = errorMessage(signError);
+          this.logger.error(`❌ No se pudo firmar la factura ${sequential}: ${errorMessage(signError)}`);
         }
       }
 
@@ -435,9 +458,9 @@ export class InvoicesService {
         this.logger.warn('⚠️ Cliente sin email configurado, no se envió automáticamente');
         emailError = 'Cliente sin email configurado';
       }
-    } catch (error: any) {
-      this.logger.error('⚠️ Error en proceso post-autorización:', error.message);
-      emailError = error.message;
+    } catch (error: unknown) {
+      this.logger.error('⚠️ Error en proceso post-autorización:', errorMessage(error));
+      emailError = errorMessage(error);
       // No fallar la autorización si el email o RIDE fallan
     }
 
@@ -549,184 +572,94 @@ export class InvoicesService {
   // ==================== ENVÍO DE EMAIL ====================
 
 async sendInvoiceByEmail(invoiceId: string, companyId: string, recipientEmail?: string) {
-  // 1. Obtener la factura completa
-  const invoice = await this.prisma.invoice.findFirst({
-    where: { id: invoiceId, companyId },
-    include: {
-      items: true,
-      customer: true,
-      establishment: true,
-      emissionPoint: true,
-      company: {
-        select: {
-          id: true,
-          businessName: true,
-          tradeName: true,
-          email: true,
-          replyToEmail: true,
-          emailProvider: true,
-          mailjetApiKey: true,
-          mailjetSecretKey: true,
-          mailjetFromEmail: true,
-          mailjetFromName: true,
-        },
-      },
-    },
-  });
+    let invoice = await this.prisma.invoice.findFirst({
+      where: { id: invoiceId, companyId },
+      include: INVOICE_EMAIL_INCLUDE,
+    });
 
-  if (!invoice) {
-    throw new NotFoundException('Factura no encontrada');
-  }
+    if (!invoice) {
+      throw new NotFoundException('Factura no encontrada');
+    }
 
-  // 2. Verificar que esté autorizada
-  if (invoice.sriStatus !== 'AUTHORIZED') {
-    throw new BadRequestException(
-      'Solo se pueden enviar facturas autorizadas por el SRI',
-    );
-  }
+    if (invoice.sriStatus !== 'AUTHORIZED') {
+      throw new BadRequestException('Solo se pueden enviar facturas autorizadas por el SRI');
+    }
 
-  // 3. Verificar que tenga RIDE y XML
-  if (!invoice.ridePdfPath) {
-    // Generar RIDE si no existe
-    await this.generateRide(invoiceId, companyId);
+    if (!invoice.ridePdfPath) {
+      await this.generateRide(invoiceId, companyId);
+      invoice = await this.prisma.invoice.findUnique({
+        where: { id: invoiceId },
+        include: INVOICE_EMAIL_INCLUDE,
+      });
+      if (!invoice) {
+        throw new NotFoundException('Error recargando factura');
+      }
+    }
 
-    // Recargar invoice
-    const updatedInvoice = await this.prisma.invoice.findUnique({
-      where: { id: invoiceId },
-      include: {
-        items: true,
-        customer: true,
-        establishment: true,
-        emissionPoint: true,
-        company: {
-          select: {
-            id: true,
-            businessName: true,
-            tradeName: true,
-            email: true,
-            replyToEmail: true,
-            emailProvider: true,
-            mailjetApiKey: true,
-            mailjetSecretKey: true,
-            mailjetFromEmail: true,
-            mailjetFromName: true,
-          },
-        },
+    if (!invoice.xmlSignedPath) {
+      throw new NotFoundException('XML firmado no encontrado');
+    }
+
+    if (!invoice.ridePdfPath) {
+      throw new NotFoundException('RIDE (PDF) no encontrado');
+    }
+
+    const emailTo = recipientEmail || invoice.customer.email;
+
+    if (!emailTo) {
+      throw new BadRequestException(
+        'El cliente no tiene email registrado. Proporciona un email manualmente.',
+      );
+    }
+
+    const invoiceNumber = documentNumber(invoice);
+    this.logger.log(`📧 Enviando factura ${invoiceNumber} a ${emailTo}...`);
+
+    const result = await this.documentMailer.send({
+      template: 'invoice',
+      title: 'Factura Electrónica',
+      filePrefix: 'Factura',
+      recipient: emailTo,
+      company: invoice.company,
+      customer: invoice.customer,
+      number: invoiceNumber,
+      issueDate: invoice.issueDate,
+      authorizationDate: invoice.authorizationDate,
+      authorizationNumber: invoice.authorizationNumber,
+      accessKey: invoice.accessKey,
+      total: invoice.total,
+      authorized: invoice.sriStatus === 'AUTHORIZED',
+      ridePdfPath: invoice.ridePdfPath,
+      xmlSignedPath: invoice.xmlSignedPath,
+      context: { invoiceNumber },
+    });
+
+    await this.prisma.emailLog.create({
+      data: {
+        invoiceId: invoice.id,
+        recipient: emailTo,
+        subject: result.logSubject,
+        status: result.success ? 'SENT' : 'FAILED',
+        sentAt: result.success ? new Date() : null,
+        error: result.error || null,
       },
     });
 
-    if (!updatedInvoice) {
-      throw new NotFoundException('Error recargando factura');
+    if (!result.success) {
+      this.logger.error(`❌ Error enviando email: ${result.error}`);
+      throw new InternalServerErrorException(`Error al enviar el correo: ${result.error}`);
     }
 
-    Object.assign(invoice, updatedInvoice);
-  }
+    this.logger.log(`✅ Factura enviada exitosamente a ${emailTo}`);
 
-  if (!invoice.xmlSignedPath) {
-    throw new NotFoundException('XML firmado no encontrado');
-  }
-
-  if (!invoice.ridePdfPath) {
-    throw new NotFoundException('RIDE (PDF) no encontrado');
-  }
-
-  // 4. Determinar email del destinatario
-  const emailTo = recipientEmail || invoice.customer.email;
-
-  if (!emailTo) {
-    throw new BadRequestException(
-      'El cliente no tiene email registrado. Proporciona un email manualmente.',
-    );
-  }
-
-  // 5. Preparar datos para el template
-  const customerName =
-    invoice.customer.businessName ||
-    `${invoice.customer.firstName || ''} ${invoice.customer.lastName || ''}`.trim() ||
-    'Cliente';
-
-  const invoiceNumber = `${invoice.establishmentCode}-${invoice.emissionPointCode}-${invoice.sequential}`;
-
-  const templateData = {
-    companyName: invoice.company.businessName,
-    customerName,
-    invoiceNumber,
-    issueDate: new Date(invoice.issueDate).toLocaleDateString('es-EC', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      timeZone: 'UTC',
-    }),
-    authorizationDate: invoice.authorizationDate
-      ? new Date(invoice.authorizationDate).toLocaleString('es-EC')
-      : null,
-    authorizationNumber: invoice.authorizationNumber,
-    accessKey: invoice.accessKey,
-    total: invoice.total.toFixed(2),
-    authorized: invoice.sriStatus === 'AUTHORIZED',
-    viewUrl: null, // Puedes agregar URL del frontend aquí
-    year: new Date().getFullYear(),
-  };
-
-  // 6. Descargar archivos desde R2 para adjuntos
-  this.logger.log(`📥 Descargando archivos desde R2 para adjuntos...`);
-  const [pdfBuffer, xmlContent] = await Promise.all([
-    this.r2Storage.downloadRide(invoice.ridePdfPath),
-    this.r2Storage.downloadXml(invoice.xmlSignedPath),
-  ]);
-
-  // 7. Enviar email con adjuntos
-  this.logger.log(`📧 Enviando factura ${invoiceNumber} a ${emailTo}...`);
-
-  const result = await this.emailService.sendEmail({
-    to: emailTo,
-    subject: `Factura Electrónica ${invoiceNumber} - ${invoice.company.businessName}`,
-    template: 'invoice',
-    context: templateData,
-    company: invoice.company,
-    attachments: [
-      {
-        filename: `Factura_${invoiceNumber}.pdf`,
-        content: pdfBuffer,
-        contentType: 'application/pdf',
-      },
-      {
-        filename: `Factura_${invoiceNumber}.xml`,
-        content: Buffer.from(xmlContent, 'utf-8'),
-        contentType: 'application/xml',
-      },
-    ],
-  });
-
-  // 7. Guardar log del envío
-  await this.prisma.emailLog.create({
-    data: {
-      invoiceId: invoice.id,
+    return {
+      message: 'Factura enviada exitosamente por correo electrónico',
       recipient: emailTo,
-      subject: `Factura Electrónica ${invoiceNumber}`,
-      status: result.success ? 'SENT' : 'FAILED',
-      sentAt: result.success ? new Date() : null,
-      error: result.error || null,
-    },
-  });
-
-  if (!result.success) {
-    this.logger.error(`❌ Error enviando email: ${result.error}`);
-    throw new InternalServerErrorException(
-      `Error al enviar el correo: ${result.error}`,
-    );
+      messageId: result.messageId,
+    };
   }
 
-  this.logger.log(`✅ Factura enviada exitosamente a ${emailTo}`);
-
-  return {
-    message: 'Factura enviada exitosamente por correo electrónico',
-    recipient: emailTo,
-    messageId: result.messageId,
-  };
-}
-
-async getemailLogs(invoiceId: string, companyId: string) {
+  async getemailLogs(invoiceId: string, companyId: string) {
   const invoice = await this.prisma.invoice.findFirst({
     where: { id: invoiceId, companyId },
   });
@@ -758,7 +691,7 @@ async getemailLogs(invoiceId: string, companyId: string) {
     this.logger.log('📦 Iniciando procesamiento masivo de facturas...');
 
     // 1. Construir filtro de fechas
-    const dateFilter: any = {};
+    const dateFilter: Prisma.DateTimeFilter = {};
     if (dateFrom) {
       dateFilter.gte = new Date(dateFrom);
     }
@@ -822,11 +755,11 @@ async getemailLogs(invoiceId: string, companyId: string) {
               emailSent: result.emailSent || false,
               success: true,
             };
-          } catch (error: any) {
+          } catch (error: unknown) {
             throw {
               invoiceId: invoice.id,
               invoiceNumber: `${invoice.establishmentCode}-${invoice.emissionPointCode}-${invoice.sequential}`,
-              error: error.message,
+              error: errorMessage(error),
             };
           }
         }),

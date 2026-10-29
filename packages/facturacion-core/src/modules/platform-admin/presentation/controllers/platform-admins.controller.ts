@@ -1,9 +1,13 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
 import { PlatformAdminGuard } from '../../../auth/infrastructure/guards/platform-admin.guard';
 import { PlatformAdminsService } from '../../application/services/platform-admins.service';
 import { GrantPlatformAdminDto } from '../../application/dto/grant-platform-admin.dto';
+import {
+  AuthenticatedUser,
+  CurrentUser,
+} from '../../../auth/infrastructure/decorators/current-user.decorator';
 
 @ApiTags('admin')
 @Controller('admin/platform-admins')
@@ -20,14 +24,14 @@ export class PlatformAdminsController {
 
   @Post()
   @ApiOperation({ summary: 'Dar permiso de administrador de la plataforma a un usuario' })
-  grant(@Body() dto: GrantPlatformAdminDto, @Request() req: any) {
-    return this.admins.grant(req.user.userId, dto.email);
+  grant(@Body() dto: GrantPlatformAdminDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.admins.grant(user.userId, dto.email);
   }
 
   @Delete(':userId')
   @HttpCode(204)
   @ApiOperation({ summary: 'Quitar el permiso de administrador de la plataforma' })
-  async revoke(@Param('userId') userId: string, @Request() req: any) {
-    await this.admins.revoke(req.user.userId, userId);
+  async revoke(@Param('userId') userId: string, @CurrentUser() user: AuthenticatedUser) {
+    await this.admins.revoke(user.userId, userId);
   }
 }

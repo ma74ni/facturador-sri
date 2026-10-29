@@ -3,7 +3,15 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { IconButton, StatCard } from '@facturador-sri/ui';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
@@ -28,15 +36,13 @@ import { usePagination } from '@/lib/hooks/use-pagination';
 import { Pagination } from '@/components/ui/pagination';
 import { FilterBar, FilterField } from '@/components/ui/filter-bar';
 import { NativeSelect } from '@/components/ui/native-select';
+import {
+  ID_TYPE,
+  identificationTypeLabel,
+  toIdentificationTypeCode,
+} from '@/lib/identification-types';
 
 type CustomerSort = 'recent' | 'name';
-
-const ID_TYPE_LABEL: Record<string, string> = {
-  CEDULA: 'Cédula',
-  RUC: 'RUC',
-  PASAPORTE: 'Pasaporte',
-  CONSUMIDOR_FINAL: 'Consumidor final',
-};
 
 export default function ClientesPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -100,28 +106,37 @@ export default function ClientesPage() {
     customer.businessName || `${customer.firstName} ${customer.lastName}`;
 
   // Solo los tipos que efectivamente tiene algún cliente
-  const idTypeOptions = Array.from(new Set(customers.map((c) => c.identificationType))).sort();
+  // Clientes antiguos guardan el nombre (CEDULA…): todo se compara por código SRI
+  const idTypeOf = (customer: Customer) =>
+    toIdentificationTypeCode(customer.identificationType) ?? customer.identificationType;
+  const idTypeOptions = Array.from(new Set(customers.map(idTypeOf))).sort();
 
-  const filteredCustomers = customers.filter(customer => {
-    const searchLower = searchTerm.toLowerCase();
-    const matchesSearch =
-      getNombre(customer).toLowerCase().includes(searchLower) ||
-      customer.identification.includes(searchLower) ||
-      customer.email?.toLowerCase().includes(searchLower);
-    const matchesType = idTypeFilter === 'all' || customer.identificationType === idTypeFilter;
-    return matchesSearch && matchesType;
-  }).sort((a, b) =>
-    sortBy === 'name'
-      ? getNombre(a).localeCompare(getNombre(b), 'es')
-      : b.createdAt.localeCompare(a.createdAt)
-  );
+  const filteredCustomers = customers
+    .filter((customer) => {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch =
+        getNombre(customer).toLowerCase().includes(searchLower) ||
+        customer.identification.includes(searchLower) ||
+        customer.email?.toLowerCase().includes(searchLower);
+      const matchesType = idTypeFilter === 'all' || idTypeOf(customer) === idTypeFilter;
+      return matchesSearch && matchesType;
+    })
+    .sort((a, b) =>
+      sortBy === 'name'
+        ? getNombre(a).localeCompare(getNombre(b), 'es')
+        : b.createdAt.localeCompare(a.createdAt),
+    );
 
   const clearFilters = () => {
     setSearchTerm('');
     setIdTypeFilter('all');
   };
 
-  const pagination = usePagination(filteredCustomers, 10, `${searchTerm}|${idTypeFilter}|${sortBy}`);
+  const pagination = usePagination(
+    filteredCustomers,
+    10,
+    `${searchTerm}|${idTypeFilter}|${sortBy}`,
+  );
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -129,9 +144,7 @@ export default function ClientesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Clientes</h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Gestiona tu base de clientes
-          </p>
+          <p className="text-sm sm:text-base text-muted-foreground">Gestiona tu base de clientes</p>
         </div>
         <Button onClick={handleCreate} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
@@ -149,9 +162,7 @@ export default function ClientesPage() {
               : `${filteredCustomers.length} de ${customers.length}`}
             )
           </CardTitle>
-          <CardDescription>
-            Todos los clientes registrados en el sistema
-          </CardDescription>
+          <CardDescription>Todos los clientes registrados en el sistema</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {customers.length > 0 && (
@@ -163,15 +174,23 @@ export default function ClientesPage() {
               onClear={clearFilters}
             >
               <FilterField label="Tipo de identificación">
-                <NativeSelect value={idTypeFilter} onChange={(e) => setIdTypeFilter(e.target.value)}>
+                <NativeSelect
+                  value={idTypeFilter}
+                  onChange={(e) => setIdTypeFilter(e.target.value)}
+                >
                   <option value="all">Todos</option>
                   {idTypeOptions.map((type) => (
-                    <option key={type} value={type}>{ID_TYPE_LABEL[type] ?? type}</option>
+                    <option key={type} value={type}>
+                      {identificationTypeLabel(type)}
+                    </option>
                   ))}
                 </NativeSelect>
               </FilterField>
               <FilterField label="Ordenar por">
-                <NativeSelect value={sortBy} onChange={(e) => setSortBy(e.target.value as CustomerSort)}>
+                <NativeSelect
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as CustomerSort)}
+                >
                   <option value="recent">Más recientes</option>
                   <option value="name">Nombre (A–Z)</option>
                 </NativeSelect>
@@ -185,8 +204,8 @@ export default function ClientesPage() {
             </div>
           ) : filteredCustomers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="rounded-full bg-slate-100 p-6 mb-4">
-                <Plus className="h-12 w-12 text-slate-400" />
+              <div className="rounded-full bg-surface-container-high p-6 mb-4">
+                <Plus className="h-12 w-12 text-on-surface-variant" />
               </div>
               <h3 className="text-lg font-semibold mb-2">
                 {customers.length === 0
@@ -218,8 +237,11 @@ export default function ClientesPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 space-y-1">
                         <div className="flex items-center gap-2">
-                          <Badge variant={customer.identificationType === 'RUC' ? 'default' : 'secondary'} className="text-xs">
-                            {customer.identificationType}
+                          <Badge
+                            variant={idTypeOf(customer) === ID_TYPE.RUC ? 'default' : 'secondary'}
+                            className="text-xs"
+                          >
+                            {identificationTypeLabel(customer.identificationType)}
                           </Badge>
                           <span className="font-mono text-xs text-muted-foreground truncate">
                             {customer.identification}
@@ -230,24 +252,16 @@ export default function ClientesPage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(customer)}
-                          className="h-9 w-9 p-0"
-                          aria-label="Editar cliente"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
+                        <IconButton label="Editar cliente" onClick={() => handleEdit(customer)}>
+                          <Edit />
+                        </IconButton>
+                        <IconButton
+                          label="Eliminar cliente"
+                          tone="destructive"
                           onClick={() => handleDeleteClick(customer)}
-                          className="h-9 w-9 p-0"
-                          aria-label="Eliminar cliente"
                         >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                          <Trash2 />
+                        </IconButton>
                       </div>
                     </div>
                     {(customer.email || customer.phone || customer.address) && (
@@ -293,15 +307,21 @@ export default function ClientesPage() {
                         <TableCell>
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2">
-                              <Badge variant={customer.identificationType === 'RUC' ? 'default' : 'secondary'} className="text-xs">
-                                {customer.identificationType}
+                              <Badge
+                                variant={
+                                  idTypeOf(customer) === ID_TYPE.RUC ? 'default' : 'secondary'
+                                }
+                                className="text-xs"
+                              >
+                                {identificationTypeLabel(customer.identificationType)}
                               </Badge>
                               <span className="font-mono text-xs text-muted-foreground">
                                 {customer.identification}
                               </span>
                             </div>
                             <span className="font-medium text-sm">
-                              {customer.businessName || `${customer.firstName} ${customer.lastName}`}
+                              {customer.businessName ||
+                                `${customer.firstName} ${customer.lastName}`}
                             </span>
                           </div>
                         </TableCell>
@@ -331,24 +351,16 @@ export default function ClientesPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEdit(customer)}
-                              className="h-9 w-9 p-0"
-                              aria-label="Editar cliente"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
+                            <IconButton label="Editar cliente" onClick={() => handleEdit(customer)}>
+                              <Edit />
+                            </IconButton>
+                            <IconButton
+                              label="Eliminar cliente"
+                              tone="destructive"
                               onClick={() => handleDeleteClick(customer)}
-                              className="h-9 w-9 p-0"
-                              aria-label="Eliminar cliente"
                             >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                              <Trash2 />
+                            </IconButton>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -366,51 +378,23 @@ export default function ClientesPage() {
       {/* Stats */}
       {customers.length > 0 && (
         <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total Clientes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{customers.length}</div>
-              <p className="text-xs text-muted-foreground">
-                clientes registrados
-              </p>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Total Clientes"
+            value={customers.length}
+            description="clientes registrados"
+          />
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Empresas (RUC)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {customers.filter(c => c.identificationType === 'RUC').length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                clientes corporativos
-              </p>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Empresas (RUC)"
+            value={customers.filter((c) => idTypeOf(c) === ID_TYPE.RUC).length}
+            description="clientes corporativos"
+          />
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Personas (CI)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {customers.filter(c => c.identificationType === 'CEDULA').length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                clientes individuales
-              </p>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Personas (CI)"
+            value={customers.filter((c) => idTypeOf(c) === ID_TYPE.CEDULA).length}
+            description="clientes individuales"
+          />
         </div>
       )}
 

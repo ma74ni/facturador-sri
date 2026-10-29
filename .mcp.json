@@ -1,0 +1,36 @@
+{
+  "mcpServers": {
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp"
+    },
+    "sentry": {
+      "type": "http",
+      "url": "https://mcp.sentry.dev/mcp"
+    },
+    "render": {
+      "type": "http",
+      "url": "https://mcp.render.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${RENDER_API_KEY}"
+      }
+    },
+    "postgres-local": {
+      "type": "stdio",
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--network=host",
+        "-e",
+        "DATABASE_URI",
+        "crystaldba/postgres-mcp:latest",
+        "--access-mode=restricted"
+      ],
+      "env": {
+        "DATABASE_URI": "${FACTURADOR_LOCAL_DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/facturador_db}"
+      }
+    }
+  }
+}

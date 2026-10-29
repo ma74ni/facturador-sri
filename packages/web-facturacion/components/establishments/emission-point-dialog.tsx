@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+
 import { Button } from '@/components/ui/button';
+
 import {
   Dialog,
   DialogContent,
@@ -10,10 +12,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+
 import { Input } from '@/components/ui/input';
+
 import { Label } from '@/components/ui/label';
+
+import { FieldError } from '@facturador-sri/ui';
+
 import { CreateEmissionPointDto } from '@/lib/api/establishments';
-import { AlertCircle } from 'lucide-react';
 
 interface EmissionPointDialogProps {
   open: boolean;
@@ -22,7 +28,12 @@ interface EmissionPointDialogProps {
   establishmentName: string;
 }
 
-export function EmissionPointDialog({ open, onOpenChange, onSave, establishmentName }: EmissionPointDialogProps) {
+export function EmissionPointDialog({
+  open,
+  onOpenChange,
+  onSave,
+  establishmentName,
+}: EmissionPointDialogProps) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState<CreateEmissionPointDto>({
@@ -73,9 +84,7 @@ export function EmissionPointDialog({ open, onOpenChange, onSave, establishmentN
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle>Nuevo Punto de Emisión</DialogTitle>
-          <DialogDescription>
-            Agregar punto de emisión para {establishmentName}
-          </DialogDescription>
+          <DialogDescription>Agregar punto de emisión para {establishmentName}</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -93,14 +102,9 @@ export function EmissionPointDialog({ open, onOpenChange, onSave, establishmentN
               }}
               placeholder="001"
               maxLength={3}
-              className={errors.code ? 'border-red-500' : ''}
+              aria-invalid={!!errors.code}
             />
-            {errors.code && (
-              <div className="flex items-center gap-1 text-sm text-red-500">
-                <AlertCircle className="h-4 w-4" />
-                <span>{errors.code}</span>
-              </div>
-            )}
+            <FieldError message={errors.code} />
             <p className="text-xs text-muted-foreground">
               Código de 3 dígitos. Cada punto representa una caja o terminal de facturación.
             </p>

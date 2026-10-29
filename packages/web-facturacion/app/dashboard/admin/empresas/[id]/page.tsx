@@ -5,10 +5,18 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, CheckCircle2, Loader2, Pencil, Rocket, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@facturador-sri/ui';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,7 +53,9 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 const formatDate = (value: string | null) =>
-  value ? new Date(value).toLocaleString('es-EC', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+  value
+    ? new Date(value).toLocaleString('es-EC', { dateStyle: 'medium', timeStyle: 'short' })
+    : '—';
 
 export default function AdminEmpresaDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -54,7 +64,9 @@ export default function AdminEmpresaDetailPage() {
   const [approveOpen, setApproveOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [goLiveOpen, setGoLiveOpen] = useState(false);
-  const [editingPoint, setEditingPoint] = useState<(AdminEmissionPoint & { label: string }) | null>(null);
+  const [editingPoint, setEditingPoint] = useState<(AdminEmissionPoint & { label: string }) | null>(
+    null,
+  );
 
   const points = useMemo(
     () =>
@@ -83,7 +95,10 @@ export default function AdminEmpresaDetailPage() {
 
   return (
     <div className="space-y-6">
-      <Link href="/dashboard/admin/empresas" className="inline-flex items-center text-sm text-muted-foreground hover:text-slate-900">
+      <Link
+        href="/dashboard/admin/empresas"
+        className="inline-flex items-center text-sm text-muted-foreground hover:text-on-surface"
+      >
         <ArrowLeft className="mr-1 h-4 w-4" />
         Empresas
       </Link>
@@ -155,19 +170,33 @@ export default function AdminEmpresaDetailPage() {
             <CardTitle className="text-base">Datos de la empresa</CardTitle>
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
-            <p><span className="text-muted-foreground">Correo:</span> {company.email}</p>
-            <p><span className="text-muted-foreground">Teléfono:</span> {company.phone || '—'}</p>
-            <p><span className="text-muted-foreground">Dirección:</span> {company.address}</p>
-            <p><span className="text-muted-foreground">Registrada:</span> {formatDate(company.createdAt)}</p>
+            <p>
+              <span className="text-muted-foreground">Correo:</span> {company.email}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Teléfono:</span> {company.phone || '—'}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Dirección:</span> {company.address}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Registrada:</span>{' '}
+              {formatDate(company.createdAt)}
+            </p>
             {company.approvedAt && (
-              <p><span className="text-muted-foreground">Aprobada:</span> {formatDate(company.approvedAt)}</p>
-            )}
-            {!inProduction && company.testDocuments.invoices + company.testDocuments.creditNotes > 0 && (
               <p>
-                <span className="text-muted-foreground">Emitido en pruebas:</span> {company.testDocuments.invoices}{' '}
-                factura(s), {company.testDocuments.creditNotes} nota(s) de crédito
+                <span className="text-muted-foreground">Aprobada:</span>{' '}
+                {formatDate(company.approvedAt)}
               </p>
             )}
+            {!inProduction &&
+              company.testDocuments.invoices + company.testDocuments.creditNotes > 0 && (
+                <p>
+                  <span className="text-muted-foreground">Emitido en pruebas:</span>{' '}
+                  {company.testDocuments.invoices} factura(s), {company.testDocuments.creditNotes}{' '}
+                  nota(s) de crédito
+                </p>
+              )}
           </CardContent>
         </Card>
       </div>
@@ -177,7 +206,9 @@ export default function AdminEmpresaDetailPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Puntos de emisión</CardTitle>
-          <CardDescription>El número que usará el próximo comprobante de cada punto.</CardDescription>
+          <CardDescription>
+            El número que usará el próximo comprobante de cada punto.
+          </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {points.length === 0 ? (
@@ -200,24 +231,25 @@ export default function AdminEmpresaDetailPage() {
                   <TableRow key={point.id}>
                     <TableCell>
                       <p className="font-mono">{point.label}</p>
-                      <p className="text-xs text-muted-foreground">{point.description || point.establishmentName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {point.description || point.establishmentName}
+                      </p>
                     </TableCell>
                     <TableCell className="text-right font-mono">{point.invoiceSequence}</TableCell>
-                    <TableCell className="text-right font-mono">{point.creditNoteSequence}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      {point.creditNoteSequence}
+                    </TableCell>
                     <TableCell className="text-right text-sm text-muted-foreground">
                       {point.lastInvoiceIssued ?? '—'}
                       {point.lastCreditNoteIssued ? ` / NC ${point.lastCreditNoteIssued}` : ''}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0"
-                        aria-label={`Ajustar numeración de ${point.label}`}
+                      <IconButton
+                        label={`Ajustar numeración de ${point.label}`}
                         onClick={() => setEditingPoint(point)}
                       >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                        <Pencil />
+                      </IconButton>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -238,7 +270,9 @@ export default function AdminEmpresaDetailPage() {
             {company.members.map((member) => (
               <div key={member.id} className="flex items-center justify-between gap-2 text-sm">
                 <div className="min-w-0">
-                  <p className="truncate">{member.firstName} {member.lastName}</p>
+                  <p className="truncate">
+                    {member.firstName} {member.lastName}
+                  </p>
                   <p className="text-xs text-muted-foreground truncate">{member.email}</p>
                 </div>
                 <div className="flex flex-shrink-0 gap-1">
@@ -282,7 +316,8 @@ export default function AdminEmpresaDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Aprobar {company.businessName}</AlertDialogTitle>
             <AlertDialogDescription>
-              Seguirá emitiendo en el ambiente de pruebas hasta que la pases a producción. Se le enviará un correo.
+              Seguirá emitiendo en el ambiente de pruebas hasta que la pases a producción. Se le
+              enviará un correo.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -300,9 +335,18 @@ export default function AdminEmpresaDetailPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <RejectDialog companyId={company.id} companyName={company.businessName} open={rejectOpen} onOpenChange={setRejectOpen} />
+      <RejectDialog
+        companyId={company.id}
+        companyName={company.businessName}
+        open={rejectOpen}
+        onOpenChange={setRejectOpen}
+      />
       <GoLiveDialog company={company} open={goLiveOpen} onOpenChange={setGoLiveOpen} />
-      <SequenceDialog companyId={company.id} point={editingPoint} onOpenChange={(open) => !open && setEditingPoint(null)} />
+      <SequenceDialog
+        companyId={company.id}
+        point={editingPoint}
+        onOpenChange={(open) => !open && setEditingPoint(null)}
+      />
     </div>
   );
 }

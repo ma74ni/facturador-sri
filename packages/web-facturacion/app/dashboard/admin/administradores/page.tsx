@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Loader2, Trash2, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@facturador-sri/ui';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -50,28 +51,28 @@ export default function AdminAdministradoresPage() {
           {isLoading ? (
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-outline-variant">
               {admins.map((admin) => (
                 <li key={admin.id} className="flex items-center justify-between gap-2 py-3 text-sm">
                   <div className="min-w-0">
                     <p className="truncate">
                       {admin.firstName} {admin.lastName}
-                      {admin.id === user?.id ? <span className="text-muted-foreground"> (tú)</span> : null}
+                      {admin.id === user?.id ? (
+                        <span className="text-muted-foreground"> (tú)</span>
+                      ) : null}
                     </p>
                     <p className="text-xs text-muted-foreground truncate">
                       {admin.email} · {admin.company.businessName}
                     </p>
                   </div>
                   {admin.id !== user?.id && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                      aria-label={`Quitar permiso a ${admin.email}`}
+                    <IconButton
+                      label={`Quitar permiso a ${admin.email}`}
+                      tone="destructive"
                       onClick={() => setToRevoke(admin)}
                     >
-                      <Trash2 className="h-4 w-4 text-red-600" />
-                    </Button>
+                      <Trash2 />
+                    </IconButton>
                   )}
                 </li>
               ))}
@@ -112,7 +113,8 @@ export default function AdminAdministradoresPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Quitar permiso de administrador</AlertDialogTitle>
             <AlertDialogDescription>
-              {toRevoke?.email} dejará de ver el panel de administración. Su cuenta de empresa no cambia.
+              {toRevoke?.email} dejará de ver el panel de administración. Su cuenta de empresa no
+              cambia.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

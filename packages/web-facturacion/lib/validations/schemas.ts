@@ -88,7 +88,7 @@ export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 
 // Schema para cliente
 export const clienteSchema = z.object({
-  identificationType: z.enum(['CEDULA', 'RUC', 'PASAPORTE'], {
+  identificationType: z.enum(['05', '04', '06', '07', '08'], {
     required_error: 'Selecciona el tipo de identificación',
   }),
   identification: z
@@ -102,7 +102,7 @@ export const clienteSchema = z.object({
   address: z.string().optional(),
 }).superRefine((data, ctx) => {
   // Validar según tipo de identificación
-  if (data.identificationType === 'CEDULA') {
+  if (data.identificationType === '05') {
     if (data.identification.length !== 10) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -118,7 +118,7 @@ export const clienteSchema = z.object({
     }
   }
 
-  if (data.identificationType === 'RUC') {
+  if (data.identificationType === '04') {
     if (data.identification.length !== 13) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

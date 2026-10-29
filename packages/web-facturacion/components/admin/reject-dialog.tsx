@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { FieldError } from '@facturador-sri/ui';
 import {
   Dialog,
   DialogContent,
@@ -54,7 +55,7 @@ export function RejectDialog({ companyId, companyName, open, onOpenChange }: Rej
             placeholder="Ej: El RUC registrado no coincide con el del certificado de firma."
           />
           {!valid && reason.length > 0 && (
-            <p className="text-xs text-red-600">Explica el motivo (al menos {MIN_REASON} caracteres).</p>
+            <FieldError message={`Explica el motivo (al menos ${MIN_REASON} caracteres).`} />
           )}
         </div>
 

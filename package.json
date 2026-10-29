@@ -8,30 +8,52 @@
   ],
   "scripts": {
     "dev:core": "pnpm --filter facturacion-core dev",
-    "dev:pos": "pnpm --filter pos-backend dev",
-    "dev:pos-frontend": "pnpm --filter pos-frontend dev",
+    "dev:web": "pnpm --filter web-facturacion dev",
     "build:all": "pnpm -r build",
     "test:all": "pnpm -r test",
-    "lint:all": "pnpm -r lint"
+    "lint:all": "pnpm -r lint",
+    "format": "prettier --write",
+    "format:check": "prettier --check"
   },
   "keywords": [
     "facturacion",
     "sri",
     "ecuador",
-    "monorepo",
-    "pos"
+    "monorepo"
   ],
   "author": "Your Name",
   "license": "MIT",
   "packageManager": "pnpm@10.19.0",
   "devDependencies": {
+    "prettier": "^3.6.2",
     "typescript": "^5.0.0"
   },
   "pnpm": {
     "overrides": {
-      "@types/react": "18.3.12",
-      "@types/react-dom": "18.3.1",
-      "zod": "3.23.8"
+      "@types/react": "^19.1.0",
+      "@types/react-dom": "^19.1.0",
+      "zod": "3.23.8",
+      "express@4": "^4.22.3",
+      "body-parser@1": "^1.20.9",
+      "path-to-regexp@0": "^0.1.13",
+      "proxy-addr@2": "^2.0.8",
+      "multer@2": "^2.5.0",
+      "jws@3": "^3.2.3",
+      "lodash@4": "^4.18.1",
+      "validator@13": "^13.15.35",
+      "js-yaml@3": "^3.15.2",
+      "js-yaml@4": "^4.3.2",
+      "fast-xml-parser@5": "^5.11.2",
+      "fast-uri@3": "^3.1.9",
+      "browserslist@4": "^4.29.5",
+      "rollup@4": "^4.65.1",
+      "glob@10": "^10.5.0",
+      "minimatch@9": "^9.0.9",
+      "brace-expansion@2": "^2.1.7",
+      "postcss@8": "^8.5.32",
+      "nanoid@3": "^3.3.20",
+      "source-map-js@1": "^1.2.2",
+      "picomatch@2": "^2.3.2"
     }
   },
   "engines": {

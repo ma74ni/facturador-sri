@@ -8,4 +8,5 @@ export const REQUIRED_MODULE_KEY = 'requiredModule';
  * ese módulo en `Company.enabledModules`. Se evalúa en RequireModuleGuard.
  * Las claves válidas están en product-modules.catalog.ts.
  */
-export const RequireModule = (moduleKey: ProductModuleKey) => SetMetadata(REQUIRED_MODULE_KEY, moduleKey);
+export const RequireModule = (moduleKey: ProductModuleKey) =>
+  SetMetadata(REQUIRED_MODULE_KEY, moduleKey);

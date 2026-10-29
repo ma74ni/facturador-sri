@@ -2,11 +2,20 @@ import { Injectable } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 import { create } from 'xmlbuilder2';
 
+import { buyerIdentificationTypeForSri } from '../../../customers/domain/identification-type';
+
 import { SRI_IVA_TAX_CODE } from '../../../tax-codes/domain/iva-rate.catalog';
 import {
   IvaGroup,
   TaxCalculatorService,
 } from '../../../tax-codes/domain/services/tax-calculator.service';
+import { Prisma } from '@prisma/client';
+import { CompanyForXml } from '../../../invoices/infrastructure/xml/xml-generator.service';
+
+/** La nota de crédito con sus líneas, su cliente y la fecha de la factura que modifica. */
+export type CreditNoteForXml = Prisma.CreditNoteGetPayload<{
+  include: { items: true; customer: true; modifiedInvoice: { select: { issueDate: true } } };
+}>;
 
 @Injectable()
 export class CreditNoteXmlGeneratorService {
@@ -29,7 +38,7 @@ export class CreditNoteXmlGeneratorService {
    * Código de documento: 04
    * Estructura basada en ANEXO 1 - Ficha Técnica SRI v2.28+
    */
-  generateCreditNoteXml(creditNote: any, company: any): string {
+  generateCreditNoteXml(creditNote: CreditNoteForXml, company: CompanyForXml): string {
     const root = create({ version: '1.0', encoding: 'UTF-8' }).ele('notaCredito', {
       id: 'comprobante',
       version: '1.1.0',
@@ -66,7 +75,8 @@ export class CreditNoteXmlGeneratorService {
     // Tipo identificación comprador
     infoNotaCredito
       .ele('tipoIdentificacionComprador')
-      .txt(creditNote.customer.identificationType);
+      // El cliente puede tener guardado el nombre (CEDULA…): el SRI solo acepta el código.
+      .txt(buyerIdentificationTypeForSri(creditNote.customer.identificationType));
     infoNotaCredito
       .ele('razonSocialComprador')
       .txt(
@@ -135,7 +145,8 @@ export class CreditNoteXmlGeneratorService {
       detalle.ele('codigoInterno').txt(item.mainCode);
       detalle.ele('codigoAdicional').txt(item.mainCode); // Mismo código como adicional
       detalle.ele('descripcion').txt(item.description);
-      detalle.ele('cantidad').txt(item.quantity.toString());
+      // Mismo formato que precioUnitario: 6 decimales fijos (nota de crédito 1.1.0).
+      detalle.ele('cantidad').txt(item.quantity.toFixed(6));
       detalle.ele('precioUnitario').txt(item.unitPrice.toFixed(6));
       detalle.ele('descuento').txt(item.discount.toFixed(2));
       detalle.ele('precioTotalSinImpuesto').txt(item.subtotal.toFixed(2));
@@ -145,9 +156,9 @@ export class CreditNoteXmlGeneratorService {
       const impuesto = impuestos.ele('impuesto');
       impuesto.ele('codigo').txt(SRI_IVA_TAX_CODE);
       impuesto.ele('codigoPorcentaje').txt(item.ivaCode);
-      impuesto.ele('tarifa').txt(parseFloat(item.ivaRate).toFixed(2));
-      impuesto.ele('baseImponible').txt(parseFloat(item.subtotal).toFixed(2));
-      impuesto.ele('valor').txt(parseFloat(item.ivaValue).toFixed(2));
+      impuesto.ele('tarifa').txt(parseFloat(item.ivaRate.toString()).toFixed(2));
+      impuesto.ele('baseImponible').txt(parseFloat(item.subtotal.toString()).toFixed(2));
+      impuesto.ele('valor').txt(parseFloat(item.ivaValue.toString()).toFixed(2));
     }
 
     // ==================== INFO ADICIONAL (OPCIONAL) ====================

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
+import { FormField, FieldError } from '@facturador-sri/ui';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -184,7 +185,8 @@ export function CertificateManager() {
     return (
       <Badge variant="success" className="gap-1">
         <CheckCircle2 className="h-3 w-3" />
-        Válido ({status.daysUntilExpiry} días)
+        {/* Certificados subidos antes de leer su vigencia no traen la fecha. */}
+        {status.daysUntilExpiry != null ? `Válido (${status.daysUntilExpiry} días)` : 'Válido'}
       </Badge>
     );
   };
@@ -194,12 +196,12 @@ export function CertificateManager() {
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <CardTitle>Certificado Digital</CardTitle>
-                <CardDescription>
-                  Gestiona tu certificado digital para firmar documentos electrónicos
-                </CardDescription>
-              </div>
+            <div>
+              <CardTitle>Certificado Digital</CardTitle>
+              <CardDescription>
+                Gestiona tu certificado digital para firmar documentos electrónicos
+              </CardDescription>
+            </div>
             {status?.hasCertificate ? (
               <Button
                 variant="destructive"
@@ -225,16 +227,15 @@ export function CertificateManager() {
         </CardHeader>
         <CardContent className="space-y-4">
           {loading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Cargando...
-            </div>
+            <div className="text-center py-8 text-muted-foreground">Cargando...</div>
           ) : status?.hasCertificate ? (
             <>
               <Alert>
                 <Shield className="h-4 w-4" />
                 <AlertTitle>Certificado configurado</AlertTitle>
                 <AlertDescription>
-                  Tu empresa tiene un certificado digital configurado. Las facturas se firmarán automáticamente antes de enviarlas al SRI.
+                  Tu empresa tiene un certificado digital configurado. Las facturas se firmarán
+                  automáticamente antes de enviarlas al SRI.
                 </AlertDescription>
               </Alert>
 
@@ -252,7 +253,9 @@ export function CertificateManager() {
                     </Label>
                     <div className="font-medium">{formatLongDate(status.expiryDate)}</div>
                     {status.validFrom && (
-                      <p className="text-xs text-muted-foreground">Vigente desde el {formatLongDate(status.validFrom)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Vigente desde el {formatLongDate(status.validFrom)}
+                      </p>
                     )}
                   </div>
                 )}
@@ -277,7 +280,8 @@ export function CertificateManager() {
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Certificado expirado</AlertTitle>
                   <AlertDescription>
-                    Tu certificado digital ha expirado. Debes subir un nuevo certificado para poder firmar facturas.
+                    Tu certificado digital ha expirado. Debes subir un nuevo certificado para poder
+                    firmar facturas.
                   </AlertDescription>
                 </Alert>
               )}
@@ -287,7 +291,8 @@ export function CertificateManager() {
                   <AlertTriangle className="h-4 w-4" />
                   <AlertTitle>Certificado por expirar</AlertTitle>
                   <AlertDescription>
-                    Tu certificado digital expirará en {status.daysUntilExpiry} días. Te recomendamos renovarlo pronto.
+                    Tu certificado digital expirará en {status.daysUntilExpiry} días. Te
+                    recomendamos renovarlo pronto.
                   </AlertDescription>
                 </Alert>
               )}
@@ -298,12 +303,16 @@ export function CertificateManager() {
               <AlertTitle>Sin certificado configurado</AlertTitle>
               <AlertDescription>
                 <div className="space-y-2">
-                  <p>
-                    No tienes un certificado digital configurado. Sin certificado:
-                  </p>
+                  <p>No tienes un certificado digital configurado. Sin certificado:</p>
                   <ul className="list-disc list-inside space-y-1 text-sm">
-                    <li>En <strong>ambiente TEST</strong>: Puedes enviar facturas sin firma (solo para pruebas)</li>
-                    <li>En <strong>ambiente PRODUCCIÓN</strong>: Debes subir un certificado para enviar facturas</li>
+                    <li>
+                      En <strong>ambiente TEST</strong>: Puedes enviar facturas sin firma (solo para
+                      pruebas)
+                    </li>
+                    <li>
+                      En <strong>ambiente PRODUCCIÓN</strong>: Debes subir un certificado para
+                      enviar facturas
+                    </li>
                   </ul>
                   <p className="pt-2">
                     <Button
@@ -339,14 +348,9 @@ export function CertificateManager() {
                 type="file"
                 accept=".p12"
                 onChange={handleFileChange}
-                className={uploadErrors.file ? 'border-red-500' : ''}
+                aria-invalid={!!uploadErrors.file}
               />
-              {uploadErrors.file && (
-                <div className="flex items-center gap-1 text-sm text-red-500">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>{uploadErrors.file}</span>
-                </div>
-              )}
+              <FieldError message={uploadErrors.file} />
               {selectedFile && (
                 <p className="text-sm text-muted-foreground">
                   Archivo seleccionado: {selectedFile.name}
@@ -354,8 +358,11 @@ export function CertificateManager() {
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="certificate-password">Contraseña del certificado *</Label>
+            <FormField
+              label="Contraseña del certificado *"
+              htmlFor="certificate-password"
+              error={uploadErrors.password}
+            >
               <PasswordInput
                 id="certificate-password"
                 value={password}
@@ -364,18 +371,12 @@ export function CertificateManager() {
                   setUploadErrors({ ...uploadErrors, password: '' });
                 }}
                 placeholder="Ingresa la contraseña"
-                className={uploadErrors.password ? 'border-red-500' : ''}
               />
-              {uploadErrors.password && (
-                <div className="flex items-center gap-1 text-sm text-red-500">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>{uploadErrors.password}</span>
-                </div>
-              )}
-            </div>
+            </FormField>
 
             <p className="text-xs text-muted-foreground">
-              El titular, la entidad emisora y la fecha de vencimiento se leen del propio certificado.
+              El titular, la entidad emisora y la fecha de vencimiento se leen del propio
+              certificado.
             </p>
           </div>
 
@@ -394,7 +395,8 @@ export function CertificateManager() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar certificado?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción eliminará el certificado digital configurado. Las facturas ya no podrán ser firmadas hasta que subas un nuevo certificado.
+              Esta acción eliminará el certificado digital configurado. Las facturas ya no podrán
+              ser firmadas hasta que subas un nuevo certificado.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

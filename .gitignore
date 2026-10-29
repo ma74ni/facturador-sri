@@ -43,3 +43,13 @@ coverage/
 # Misc
 *.tsbuildinfo
 .turbo/
+# Certificados de firma y archivos locales de facturas: viven en R2, nunca en el repo (es público)
+*.p12
+*.pfx
+**/storage/certificates/
+**/storage/xml/
+**/storage/pdf/
+**/storage/logos/
+
+# Worktrees de sesiones de Claude Code
+.claude/worktrees/

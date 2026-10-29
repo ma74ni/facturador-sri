@@ -27,6 +27,7 @@ import {
 import { InvoiceDetailItem } from '@/lib/api/invoices';
 import { useInvoiceDetail } from '@/lib/hooks/use-credit-notes';
 import { useToast } from '@/hooks/use-toast';
+import { formatCurrency, formatQuantity } from '@/lib/utils/formatters';
 
 const REASONS = [
   'Devolución de mercadería',
@@ -100,7 +101,10 @@ export function CreditNoteDialog({ invoiceId, onOpenChange, onIssued }: CreditNo
       setReasonOption(REASONS[1]);
       setLines(
         Object.fromEntries(
-          invoice.items.map((item) => [item.id, { quantity: item.quantity, unitPrice: item.unitPrice }]),
+          invoice.items.map((item) => [
+            item.id,
+            { quantity: item.quantity, unitPrice: item.unitPrice },
+          ]),
         ),
       );
     }
@@ -175,7 +179,8 @@ export function CreditNoteDialog({ invoiceId, onOpenChange, onIssued }: CreditNo
               : sri.status === 'SENT'
                 ? {
                     title: `Nota de crédito ${number} enviada`,
-                    description: 'El SRI aún no la autoriza. Vuelve a consultarla en unos minutos desde Notas de crédito.',
+                    description:
+                      'El SRI aún no la autoriza. Vuelve a consultarla en unos minutos desde Notas de crédito.',
                   }
                 : {
                     variant: 'destructive',
@@ -224,191 +229,200 @@ export function CreditNoteDialog({ invoiceId, onOpenChange, onIssued }: CreditNo
         </DialogHeader>
 
         <DialogBody className="space-y-4">
-        {isLoading && <p className="text-sm text-muted-foreground py-6">Cargando factura...</p>}
+          {isLoading && <p className="text-sm text-muted-foreground py-6">Cargando factura...</p>}
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>No se pudo cargar la factura.</AlertDescription>
-          </Alert>
-        )}
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>No se pudo cargar la factura.</AlertDescription>
+            </Alert>
+          )}
 
-        {invoice && (
-          <div className="space-y-5">
-            {/* Resumen de la factura */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-md border p-3 text-sm">
-              <div>
-                <p className="text-muted-foreground text-xs">Total factura</p>
-                <p className="font-semibold">${invoice.total.toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Ya acreditado</p>
-                <p className="font-semibold">${(invoice.total - available).toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Disponible</p>
-                <p className="font-semibold text-green-700">${available.toFixed(2)}</p>
-              </div>
-            </div>
-
-            {available <= 0.01 ? (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Esta factura ya fue acreditada por completo con notas de crédito.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <>
-                {/* Tipo */}
-                <div className="space-y-2">
-                  <Label>Tipo</Label>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <Button
-                      type="button"
-                      variant={mode === 'full' ? 'default' : 'outline'}
-                      onClick={() => selectMode('full')}
-                      disabled={hasPreviousNotes}
-                      className="h-auto flex-col items-start py-2 text-left whitespace-normal"
-                    >
-                      <span className="font-medium">Anular toda la factura</span>
-                      <span className="text-xs opacity-80">
-                        {hasPreviousNotes
-                          ? 'No disponible: ya tiene notas de crédito'
-                          : 'Acredita todas las líneas por completo'}
-                      </span>
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={mode === 'partial' ? 'default' : 'outline'}
-                      onClick={() => selectMode('partial')}
-                      className="h-auto flex-col items-start py-2 text-left whitespace-normal"
-                    >
-                      <span className="font-medium">Devolución o descuento parcial</span>
-                      <span className="text-xs opacity-80">Eliges cantidades o precios por línea</span>
-                    </Button>
-                  </div>
+          {invoice && (
+            <div className="space-y-5">
+              {/* Resumen de la factura */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-md border p-3 text-sm">
+                <div>
+                  <p className="text-muted-foreground text-xs">Total factura</p>
+                  <p className="font-semibold">{formatCurrency(invoice.total)}</p>
                 </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Ya acreditado</p>
+                  <p className="font-semibold">{formatCurrency(invoice.total - available)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Disponible</p>
+                  <p className="font-semibold text-on-success-container">
+                    {formatCurrency(available)}
+                  </p>
+                </div>
+              </div>
 
-                {/* Líneas */}
-                <div className="space-y-2">
-                  <Label>Líneas a acreditar</Label>
+              {available <= 0.01 ? (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Esta factura ya fue acreditada por completo con notas de crédito.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <>
+                  {/* Tipo */}
                   <div className="space-y-2">
-                    {invoice.items.map((item) => {
-                      const line = lines[item.id] ?? { quantity: 0, unitPrice: item.unitPrice };
-                      const { base, iva } = lineTotals(item, line);
-                      return (
-                        <div
-                          key={item.id}
-                          className="grid grid-cols-2 sm:grid-cols-[1fr_7rem_7rem_6rem] gap-2 items-end rounded-md border p-2"
-                        >
-                          <div className="col-span-2 sm:col-span-1 min-w-0">
-                            <p className="text-sm break-words">{item.description}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Facturado: {item.quantity} × ${item.unitPrice.toFixed(2)} · IVA {item.ivaRate}%
+                    <Label>Tipo</Label>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <Button
+                        type="button"
+                        variant={mode === 'full' ? 'default' : 'outline'}
+                        onClick={() => selectMode('full')}
+                        disabled={hasPreviousNotes}
+                        className="h-auto flex-col items-start py-2 text-left whitespace-normal"
+                      >
+                        <span className="font-medium">Anular toda la factura</span>
+                        <span className="text-xs opacity-80">
+                          {hasPreviousNotes
+                            ? 'No disponible: ya tiene notas de crédito'
+                            : 'Acredita todas las líneas por completo'}
+                        </span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={mode === 'partial' ? 'default' : 'outline'}
+                        onClick={() => selectMode('partial')}
+                        className="h-auto flex-col items-start py-2 text-left whitespace-normal"
+                      >
+                        <span className="font-medium">Devolución o descuento parcial</span>
+                        <span className="text-xs opacity-80">
+                          Eliges cantidades o precios por línea
+                        </span>
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Líneas */}
+                  <div className="space-y-2">
+                    <Label>Líneas a acreditar</Label>
+                    <div className="space-y-2">
+                      {invoice.items.map((item) => {
+                        const line = lines[item.id] ?? { quantity: 0, unitPrice: item.unitPrice };
+                        const { base, iva } = lineTotals(item, line);
+                        return (
+                          <div
+                            key={item.id}
+                            className="grid grid-cols-2 sm:grid-cols-[1fr_7rem_7rem_6rem] gap-2 items-end rounded-md border p-2"
+                          >
+                            <div className="col-span-2 sm:col-span-1 min-w-0">
+                              <p className="text-sm break-words">{item.description}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Facturado: {formatQuantity(item.quantity)} ×{' '}
+                                {formatCurrency(item.unitPrice)} · IVA {item.ivaRate}%
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Cantidad</Label>
+                              <NumberInput
+                                value={line.quantity}
+                                onChange={(quantity) =>
+                                  updateLine(item.id, {
+                                    quantity: Math.min(quantity, item.quantity),
+                                  })
+                                }
+                                allowDecimals
+                                decimalPlaces={3}
+                                min={0}
+                                max={item.quantity}
+                                disabled={mode === 'full'}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Precio unit.</Label>
+                              <NumberInput
+                                value={line.unitPrice}
+                                onChange={(unitPrice) =>
+                                  updateLine(item.id, {
+                                    unitPrice: Math.min(unitPrice, item.unitPrice),
+                                  })
+                                }
+                                allowDecimals
+                                min={0}
+                                max={item.unitPrice}
+                                disabled={mode === 'full'}
+                              />
+                            </div>
+                            <p className="text-sm text-right font-medium col-span-2 sm:col-span-1">
+                              {formatCurrency(base + iva)}
                             </p>
                           </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Cantidad</Label>
-                            <NumberInput
-                              value={line.quantity}
-                              onChange={(quantity) =>
-                                updateLine(item.id, { quantity: Math.min(quantity, item.quantity) })
-                              }
-                              allowDecimals
-                              min={0}
-                              max={item.quantity}
-                              disabled={mode === 'full'}
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Precio unit.</Label>
-                            <NumberInput
-                              value={line.unitPrice}
-                              onChange={(unitPrice) =>
-                                updateLine(item.id, { unitPrice: Math.min(unitPrice, item.unitPrice) })
-                              }
-                              allowDecimals
-                              min={0}
-                              max={item.unitPrice}
-                              disabled={mode === 'full'}
-                            />
-                          </div>
-                          <p className="text-sm text-right font-medium col-span-2 sm:col-span-1">
-                            ${(base + iva).toFixed(2)}
-                          </p>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
 
-                {/* Motivo */}
-                <div className="space-y-2">
-                  <Label htmlFor="cn-reason">Motivo</Label>
-                  <NativeSelect
-                    id="cn-reason"
-                    value={reasonOption}
-                    onChange={(e) => setReasonOption(e.target.value)}
-                  >
-                    {REASONS.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
-                    <option value={OTHER_REASON}>Otro motivo...</option>
-                  </NativeSelect>
-                  {reasonOption === OTHER_REASON && (
-                    <Input
-                      value={otherReason}
-                      onChange={(e) => setOtherReason(e.target.value)}
-                      maxLength={300}
-                      placeholder="Describe el motivo (mínimo 5 caracteres)"
-                    />
-                  )}
-                  {reasonOption === OTHER_REASON && reasonError && otherReason.length > 0 && (
-                    <p className="text-xs text-destructive">{reasonError}</p>
-                  )}
-                </div>
+                  {/* Motivo */}
+                  <div className="space-y-2">
+                    <Label htmlFor="cn-reason">Motivo</Label>
+                    <NativeSelect
+                      id="cn-reason"
+                      value={reasonOption}
+                      onChange={(e) => setReasonOption(e.target.value)}
+                    >
+                      {REASONS.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                      <option value={OTHER_REASON}>Otro motivo...</option>
+                    </NativeSelect>
+                    {reasonOption === OTHER_REASON && (
+                      <Input
+                        value={otherReason}
+                        onChange={(e) => setOtherReason(e.target.value)}
+                        maxLength={300}
+                        placeholder="Describe el motivo (mínimo 5 caracteres)"
+                      />
+                    )}
+                    {reasonOption === OTHER_REASON && reasonError && otherReason.length > 0 && (
+                      <p className="text-xs text-destructive">{reasonError}</p>
+                    )}
+                  </div>
 
-                {/* Totales */}
-                <div className="rounded-md bg-muted/50 p-3 text-sm space-y-1">
-                  <div className="flex justify-between">
-                    <span>Subtotal</span>
-                    <span>${totals.base.toFixed(2)}</span>
+                  {/* Totales */}
+                  <div className="rounded-md bg-muted/50 p-3 text-sm space-y-1">
+                    <div className="flex justify-between">
+                      <span>Subtotal</span>
+                      <span>{formatCurrency(totals.base)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>IVA</span>
+                      <span>{formatCurrency(totals.iva)}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold text-base border-t pt-1">
+                      <span>Total nota de crédito</span>
+                      <span>{formatCurrency(totals.total)}</span>
+                    </div>
+                    {exceeds && (
+                      <p className="text-xs text-destructive">
+                        Excede el disponible de la factura ({formatCurrency(available)}).
+                      </p>
+                    )}
                   </div>
-                  <div className="flex justify-between">
-                    <span>IVA</span>
-                    <span>${totals.iva.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between font-semibold text-base border-t pt-1">
-                    <span>Total nota de crédito</span>
-                    <span>${totals.total.toFixed(2)}</span>
-                  </div>
-                  {exceeds && (
-                    <p className="text-xs text-destructive">
-                      Excede el disponible de la factura (${available.toFixed(2)}).
+                </>
+              )}
+
+              {hasPreviousNotes && (
+                <div className="space-y-1 text-xs text-muted-foreground">
+                  <p className="font-medium">Notas anteriores de esta factura</p>
+                  {invoice.creditNotes.map((cn) => (
+                    <p key={cn.id}>
+                      {cn.formattedNumber} · {formatCurrency(cn.total)} ·{' '}
+                      {CREDIT_NOTE_STATUS_LABEL[cn.sriStatus as CreditNoteStatus] ?? cn.sriStatus} ·{' '}
+                      {cn.reason}
                     </p>
-                  )}
+                  ))}
                 </div>
-              </>
-            )}
-
-            {hasPreviousNotes && (
-              <div className="space-y-1 text-xs text-muted-foreground">
-                <p className="font-medium">Notas anteriores de esta factura</p>
-                {invoice.creditNotes.map((cn) => (
-                  <p key={cn.id}>
-                    {cn.formattedNumber} · ${cn.total.toFixed(2)} ·{' '}
-                    {CREDIT_NOTE_STATUS_LABEL[cn.sriStatus as CreditNoteStatus] ?? cn.sriStatus} ·{' '}
-                    {cn.reason}
-                  </p>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
+              )}
+            </div>
+          )}
         </DialogBody>
 
         <DialogFooter className="gap-2">

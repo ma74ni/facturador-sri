@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+
 import { Button } from '@/components/ui/button';
+
 import {
   Dialog,
   DialogContent,
@@ -10,10 +12,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+
 import { Input } from '@/components/ui/input';
+
 import { Label } from '@/components/ui/label';
-import { Establishment, CreateEstablishmentDto, UpdateEstablishmentDto } from '@/lib/api/establishments';
-import { AlertCircle } from 'lucide-react';
+
+import { FormField, FieldError } from '@facturador-sri/ui';
+
+import {
+  Establishment,
+  CreateEstablishmentDto,
+  UpdateEstablishmentDto,
+} from '@/lib/api/establishments';
 
 interface EstablishmentDialogProps {
   open: boolean;
@@ -22,7 +32,12 @@ interface EstablishmentDialogProps {
   establishment?: Establishment;
 }
 
-export function EstablishmentDialog({ open, onOpenChange, onSave, establishment }: EstablishmentDialogProps) {
+export function EstablishmentDialog({
+  open,
+  onOpenChange,
+  onSave,
+  establishment,
+}: EstablishmentDialogProps) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState<CreateEstablishmentDto>({
@@ -126,22 +141,16 @@ export function EstablishmentDialog({ open, onOpenChange, onSave, establishment 
               placeholder="001"
               maxLength={3}
               disabled={!!establishment}
-              className={errors.code ? 'border-red-500' : ''}
+              aria-invalid={!!errors.code}
             />
-            {errors.code && (
-              <div className="flex items-center gap-1 text-sm text-red-500">
-                <AlertCircle className="h-4 w-4" />
-                <span>{errors.code}</span>
-              </div>
-            )}
+            <FieldError message={errors.code} />
             <p className="text-xs text-muted-foreground">
               Código de 3 dígitos. El establecimiento matriz generalmente usa 001.
             </p>
           </div>
 
           {/* Nombre */}
-          <div className="space-y-2">
-            <Label htmlFor="name">Nombre del Establecimiento *</Label>
+          <FormField label="Nombre del Establecimiento *" htmlFor="name" error={errors.name}>
             <Input
               id="name"
               value={formData.name}
@@ -152,19 +161,11 @@ export function EstablishmentDialog({ open, onOpenChange, onSave, establishment 
                 }
               }}
               placeholder="Matriz"
-              className={errors.name ? 'border-red-500' : ''}
             />
-            {errors.name && (
-              <div className="flex items-center gap-1 text-sm text-red-500">
-                <AlertCircle className="h-4 w-4" />
-                <span>{errors.name}</span>
-              </div>
-            )}
-          </div>
+          </FormField>
 
           {/* Dirección */}
-          <div className="space-y-2">
-            <Label htmlFor="address">Dirección *</Label>
+          <FormField label="Dirección *" htmlFor="address" error={errors.address}>
             <Input
               id="address"
               value={formData.address}
@@ -175,17 +176,10 @@ export function EstablishmentDialog({ open, onOpenChange, onSave, establishment 
                 }
               }}
               placeholder="Av. Principal 123 y Secundaria"
-              className={errors.address ? 'border-red-500' : ''}
             />
-            {errors.address && (
-              <div className="flex items-center gap-1 text-sm text-red-500">
-                <AlertCircle className="h-4 w-4" />
-                <span>{errors.address}</span>
-              </div>
-            )}
-          </div>
+          </FormField>
 
-          <DialogFooter className='gap-4'>
+          <DialogFooter className="gap-4">
             <Button
               type="button"
               variant="outline"

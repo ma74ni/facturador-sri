@@ -23,6 +23,12 @@ interface SigningResponse {
   };
 }
 
+/** Lo que la firma necesita de la empresa: dónde está su certificado y su clave cifrada. */
+export interface SigningCompany {
+  certificatePath?: string | null;
+  certificatePassword?: string | null;
+}
+
 @Injectable()
 export class DigitalSignatureService {
   private readonly logger = new Logger(DigitalSignatureService.name);
@@ -48,7 +54,7 @@ export class DigitalSignatureService {
    * Firma un XML usando el microservicio Java
    * Carga automáticamente el certificado de la empresa desde R2
    */
-  async signXml(xmlContent: string, company: any): Promise<string> {
+  async signXml(xmlContent: string, company: SigningCompany | null): Promise<string> {
     try {
       this.logger.log('📤 Enviando XML al microservicio de firma...');
 
@@ -115,7 +121,7 @@ export class DigitalSignatureService {
   /**
    * Carga el certificado de la empresa desde R2
    */
-  private async loadCompanyCertificate(company: any): Promise<{
+  private async loadCompanyCertificate(company: SigningCompany | null): Promise<{
     certificateBase64: string;
     password: string;
   }> {

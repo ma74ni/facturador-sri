@@ -1,12 +1,27 @@
-import { IsString, IsEmail, IsOptional, IsNotEmpty, IsNumber, Min, Max } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsNotEmpty, IsNumber, Min, Max, IsIn } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+import {
+  IDENTIFICATION_TYPE_CODES,
+  IdentificationTypeCode,
+  toIdentificationTypeCode,
+} from '../../domain/identification-type';
 
 export class CreateCustomerDto {
-  @ApiProperty({ example: '05', description: 'Tipo: 04=RUC, 05=Cédula, 06=Pasaporte' })
-  @IsString()
+  @ApiProperty({
+    example: '05',
+    enum: IDENTIFICATION_TYPE_CODES,
+    description:
+      'Código SRI: 04=RUC, 05=Cédula, 06=Pasaporte, 07=Consumidor final, 08=Identificación del exterior. ' +
+      'También acepta el nombre (CEDULA, RUC…) y lo guarda como código.',
+  })
+  // Clientes antiguos (y versiones previas de la web) mandan el nombre: se guarda siempre el código.
+  @Transform(({ value }) => toIdentificationTypeCode(value) ?? value)
+  @IsIn(IDENTIFICATION_TYPE_CODES, {
+    message: 'Tipo de identificación inválido: usa 04 (RUC), 05 (Cédula), 06 (Pasaporte), 07 u 08',
+  })
   @IsNotEmpty()
-  identificationType: string;
+  identificationType: IdentificationTypeCode;
 
   @ApiProperty({ example: '1234567890' })
   @IsString()

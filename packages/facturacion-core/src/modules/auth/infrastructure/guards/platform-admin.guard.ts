@@ -23,7 +23,9 @@ export class PlatformAdminGuard implements CanActivate {
     });
 
     if (!user || !user.isActive || !user.emailVerified || !user.isPlatformAdmin) {
-      throw new ForbiddenException('Solo un administrador de la plataforma puede realizar esta acción');
+      throw new ForbiddenException(
+        'Solo un administrador de la plataforma puede realizar esta acción',
+      );
     }
 
     return true;

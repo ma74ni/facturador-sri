@@ -83,24 +83,24 @@ export default function DashboardLayout({
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-surface-container-low">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-slate-900/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-scrim/40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-surface-container-lowest border-r border-outline-variant transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-between h-16 px-6 border-b border-slate-200">
+          <div className="flex items-center justify-between h-16 px-6 border-b border-outline-variant">
             <div className="flex items-center">
               <FileText className="h-6 w-6 text-primary" />
               <span className="ml-2 text-lg font-semibold">Tu Facturador</span>
@@ -108,7 +108,7 @@ export default function DashboardLayout({
             {/* Close button (mobile only) */}
             <button
               onClick={() => setSidebarOpen(false)}
-              className="lg:hidden p-2 rounded-md text-slate-500 hover:bg-slate-100"
+              className="lg:hidden p-2 rounded-md text-on-surface-variant hover:bg-surface-container-high"
             >
               <X className="h-5 w-5" />
             </button>
@@ -130,7 +130,7 @@ export default function DashboardLayout({
                   className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                     isActive
                       ? "bg-primary/10 text-primary"
-                      : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                      : "text-on-surface hover:bg-surface-container-high hover:text-on-surface"
                   }`}
                 >
                   <Icon className="mr-3 h-5 w-5 flex-shrink-0" />
@@ -141,12 +141,12 @@ export default function DashboardLayout({
           </nav>
 
           {/* User info & Logout */}
-          <div className="p-4 border-t border-slate-200">
+          <div className="p-4 border-t border-outline-variant">
             <div className="mb-3">
-              <p className="text-sm font-medium text-slate-900 truncate">
+              <p className="text-sm font-medium text-on-surface truncate">
                 {user?.firstName} {user?.lastName}
               </p>
-              <p className="text-xs text-slate-500 truncate">
+              <p className="text-xs text-on-surface-variant truncate">
                 {company?.businessName}
               </p>
             </div>
@@ -166,10 +166,10 @@ export default function DashboardLayout({
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Mobile header */}
-        <header className="lg:hidden sticky top-0 z-30 flex items-center h-16 px-4 bg-white border-b border-slate-200">
+        <header className="lg:hidden sticky top-0 z-30 flex items-center h-16 px-4 bg-surface-container-lowest border-b border-outline-variant">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-2.5 -m-0.5 rounded-md text-slate-500 hover:bg-slate-100"
+            className="p-2.5 -m-0.5 rounded-md text-on-surface-variant hover:bg-surface-container-high"
             aria-label="Abrir menú"
           >
             <Menu className="h-6 w-6" />

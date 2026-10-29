@@ -3,10 +3,12 @@
 import { useState, useEffect } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Clock, CheckCircle2, AlertCircle } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/context/auth-context";
 
 export function CompanyStatusBanners() {
   const { company, isLoading } = useAuth();
+  const pathname = usePathname();
   const [hasCheckedStatus, setHasCheckedStatus] = useState(false);
 
   // Esperar a que tengamos datos confirmados de la empresa
@@ -17,7 +19,8 @@ export function CompanyStatusBanners() {
   }, [isLoading, company]);
 
   // No mostrar hasta que hayamos confirmado el estado
-  if (!hasCheckedStatus || isLoading || !company) {
+  // La página de empresa ya muestra el estado con su propio aviso, más detallado.
+  if (!hasCheckedStatus || isLoading || !company || pathname === "/dashboard/empresa") {
     return null;
   }
 
@@ -27,8 +30,9 @@ export function CompanyStatusBanners() {
       {company.status === "PENDING" && (
         <Alert variant="info" className="mb-6">
           <Clock className="h-4 w-4" />
-          <AlertTitle>Cuenta en revisión</AlertTitle>
-          <AlertDescription>
+          {/* En el celular basta el título: el detalle ocupaba media pantalla en cada página. */}
+          <AlertTitle>Cuenta en revisión · modo TEST</AlertTitle>
+          <AlertDescription className="hidden sm:block">
             Tu empresa está siendo revisada por nuestro equipo. Mientras tanto,
             puedes usar el sistema en <strong>modo TEST</strong>. Recibirás un
             email cuando tu cuenta sea aprobada.
@@ -40,8 +44,8 @@ export function CompanyStatusBanners() {
       {company.status === "APPROVED" && company.environment === "TEST" && (
         <Alert variant="success" className="mb-6">
           <CheckCircle2 className="h-4 w-4" />
-          <AlertTitle>Cuenta aprobada</AlertTitle>
-          <AlertDescription>
+          <AlertTitle>Cuenta aprobada · modo TEST</AlertTitle>
+          <AlertDescription className="hidden sm:block">
             Tu empresa ha sido aprobada. Actualmente estás en{" "}
             <strong>modo TEST</strong>. Contacta a soporte para activar el modo
             PRODUCCIÓN.

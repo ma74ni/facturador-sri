@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+
 import { Button } from '@/components/ui/button';
+
 import {
   Dialog,
   DialogBody,
@@ -11,9 +13,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+
 import { Input } from '@/components/ui/input';
+
 import { NumberInput } from '@/components/ui/number-input';
+
 import { Label } from '@/components/ui/label';
+
+import { FieldError, FormField } from '@facturador-sri/ui';
+
 import {
   Select,
   SelectContent,
@@ -21,10 +29,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+
 import { Textarea } from '@/components/ui/textarea';
+
 import { Product, CreateProductDto } from '@/lib/api/products';
-import { AlertCircle } from 'lucide-react';
+
 import { useTaxCodes, getTaxLabel } from '@/lib/hooks/use-tax-codes';
+
+import { formatCurrency } from '@/lib/utils/formatters';
 
 /** Producto en blanco; el IVA siempre es el impuesto 2 de la Tabla 16 del SRI. */
 function emptyProduct(taxPercentageCode: string): CreateProductDto {
@@ -75,7 +87,7 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
 
   // Referencia para quien piensa en el precio final: lo que pagará el cliente.
   const selectedTaxCode = taxCodesData?.taxCodes.find(
-    (taxCode) => taxCode.code === formData.taxPercentageCode
+    (taxCode) => taxCode.code === formData.taxPercentageCode,
   );
   const priceWithIva =
     selectedTaxCode && formData.unitPrice > 0
@@ -137,9 +149,7 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="full">
         <DialogHeader>
-          <DialogTitle>
-            {product ? 'Editar Producto' : 'Nuevo Producto'}
-          </DialogTitle>
+          <DialogTitle>{product ? 'Editar Producto' : 'Nuevo Producto'}</DialogTitle>
           <DialogDescription>
             {product
               ? 'Modifica la información del producto'
@@ -148,196 +158,162 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-        <DialogBody className="space-y-4 max-w-2xl w-full mx-auto pr-1">
-          <div className="grid gap-4 md:grid-cols-2">
-            {/* Código Principal */}
-            <div className="space-y-2">
-              <Label htmlFor="mainCode">Código Principal *</Label>
-              <Input
-                id="mainCode"
-                value={formData.mainCode}
-                onChange={(e) => {
-                  setFormData({ ...formData, mainCode: e.target.value });
-                  if (errors.mainCode) {
-                    setErrors({ ...errors, mainCode: '' });
-                  }
-                }}
-                placeholder="Ej: PROD001"
-                className={errors.mainCode ? 'border-red-500' : ''}
-              />
-              {errors.mainCode && (
-                <div className="flex items-center gap-1 text-sm text-red-500">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>{errors.mainCode}</span>
-                </div>
-              )}
-            </div>
+          <DialogBody className="space-y-4 max-w-2xl w-full mx-auto pr-1">
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Código Principal */}
+              <FormField label="Código Principal *" htmlFor="mainCode" error={errors.mainCode}>
+                <Input
+                  id="mainCode"
+                  value={formData.mainCode}
+                  onChange={(e) => {
+                    setFormData({ ...formData, mainCode: e.target.value });
+                    if (errors.mainCode) {
+                      setErrors({ ...errors, mainCode: '' });
+                    }
+                  }}
+                  placeholder="Ej: PROD001"
+                />
+              </FormField>
 
-            {/* Código Auxiliar */}
-            <div className="space-y-2">
-              <Label htmlFor="auxiliaryCode">Código Auxiliar</Label>
-              <Input
-                id="auxiliaryCode"
-                value={formData.auxiliaryCode || ''}
-                onChange={(e) =>
-                  setFormData({ ...formData, auxiliaryCode: e.target.value })
-                }
-                placeholder="Opcional"
-              />
-            </div>
-          </div>
-
-          {/* Nombre */}
-          <div className="space-y-2">
-            <Label htmlFor="name">Nombre del Producto *</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => {
-                setFormData({ ...formData, name: e.target.value });
-                if (errors.name) {
-                  setErrors({ ...errors, name: '' });
-                }
-              }}
-              placeholder="Ej: Coca Cola 500ml"
-              className={errors.name ? 'border-red-500' : ''}
-            />
-            {errors.name && (
-              <div className="flex items-center gap-1 text-sm text-red-500">
-                <AlertCircle className="h-4 w-4" />
-                <span>{errors.name}</span>
+              {/* Código Auxiliar */}
+              <div className="space-y-2">
+                <Label htmlFor="auxiliaryCode">Código Auxiliar</Label>
+                <Input
+                  id="auxiliaryCode"
+                  value={formData.auxiliaryCode || ''}
+                  onChange={(e) => setFormData({ ...formData, auxiliaryCode: e.target.value })}
+                  placeholder="Opcional"
+                />
               </div>
-            )}
-          </div>
+            </div>
 
-          {/* Descripción */}
-          <div className="space-y-2">
-            <Label htmlFor="description">Descripción</Label>
-            <Textarea
-              id="description"
-              value={formData.description || ''}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              placeholder="Descripción adicional del producto..."
-              rows={3}
-            />
-          </div>
-
-          {/* Precio y Costo */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="unitPrice">Precio unitario sin IVA * ($)</Label>
-              <NumberInput
-                id="unitPrice"
-                value={formData.unitPrice}
-                onChange={(value) => {
-                  setFormData({ ...formData, unitPrice: value });
-                  if (errors.unitPrice) {
-                    setErrors({ ...errors, unitPrice: '' });
+            {/* Nombre */}
+            <FormField label="Nombre del Producto *" htmlFor="name" error={errors.name}>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => {
+                  setFormData({ ...formData, name: e.target.value });
+                  if (errors.name) {
+                    setErrors({ ...errors, name: '' });
                   }
                 }}
-                allowDecimals={true}
-                decimalPlaces={2}
-                min={0}
-                placeholder="Ej: 15.99"
-                className={errors.unitPrice ? 'border-red-500' : ''}
+                placeholder="Ej: Coca Cola 500ml"
               />
-              {errors.unitPrice ? (
-                <div className="flex items-center gap-1 text-sm text-red-500">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>{errors.unitPrice}</span>
-                </div>
+            </FormField>
+
+            {/* Descripción */}
+            <div className="space-y-2">
+              <Label htmlFor="description">Descripción</Label>
+              <Textarea
+                id="description"
+                value={formData.description || ''}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Descripción adicional del producto..."
+                rows={3}
+              />
+            </div>
+
+            {/* Precio y Costo */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="unitPrice">Precio unitario sin IVA * ($)</Label>
+                <NumberInput
+                  id="unitPrice"
+                  value={formData.unitPrice}
+                  onChange={(value) => {
+                    setFormData({ ...formData, unitPrice: value });
+                    if (errors.unitPrice) {
+                      setErrors({ ...errors, unitPrice: '' });
+                    }
+                  }}
+                  allowDecimals={true}
+                  decimalPlaces={2}
+                  min={0}
+                  placeholder="Ej: 15.99"
+                  aria-invalid={!!errors.unitPrice}
+                />
+                {errors.unitPrice ? (
+                  <FieldError message={errors.unitPrice} />
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Ingresa el precio <strong>sin IVA</strong>: el IVA se suma al facturar.
+                    {priceWithIva !== null && (
+                      <> Precio final con IVA: {formatCurrency(priceWithIva)}.</>
+                    )}
+                  </p>
+                )}
+              </div>
+
+              <FormField label="Costo ($)" htmlFor="cost" error={errors.cost}>
+                <NumberInput
+                  id="cost"
+                  value={formData.cost || 0}
+                  onChange={(value) => {
+                    setFormData({ ...formData, cost: value });
+                    if (errors.cost) {
+                      setErrors({ ...errors, cost: '' });
+                    }
+                  }}
+                  allowDecimals={true}
+                  decimalPlaces={2}
+                  min={0}
+                  placeholder="Ej: 8.50"
+                />
+              </FormField>
+            </div>
+
+            {/* IVA */}
+            <div className="space-y-2">
+              <Label htmlFor="taxPercentageCode">Tipo de IVA *</Label>
+              <Select
+                value={formData.taxPercentageCode}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, taxPercentageCode: value, taxCode: '2' })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {taxCodesLoading ? (
+                    <SelectItem value="loading" disabled>
+                      Cargando...
+                    </SelectItem>
+                  ) : (
+                    taxCodesData?.commonCodes.map((code) => (
+                      <SelectItem key={code} value={code}>
+                        {getTaxLabel(taxCodesData.taxCodes, code)}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              {errors.taxPercentageCode ? (
+                <FieldError message={errors.taxPercentageCode} />
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  Ingresa el precio <strong>sin IVA</strong>: el IVA se suma al facturar.
-                  {priceWithIva !== null && (
-                    <> Precio final con IVA: ${priceWithIva.toFixed(2)}.</>
-                  )}
+                  Selecciona el tipo de IVA que aplica a este producto según la normativa del SRI
                 </p>
               )}
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="cost">Costo ($)</Label>
-              <NumberInput
-                id="cost"
-                value={formData.cost || 0}
-                onChange={(value) => {
-                  setFormData({ ...formData, cost: value });
-                  if (errors.cost) {
-                    setErrors({ ...errors, cost: '' });
-                  }
-                }}
-                allowDecimals={true}
-                decimalPlaces={2}
-                min={0}
-                placeholder="Ej: 8.50"
-                className={errors.cost ? 'border-red-500' : ''}
-              />
-              {errors.cost && (
-                <div className="flex items-center gap-1 text-sm text-red-500">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>{errors.cost}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* IVA */}
-          <div className="space-y-2">
-            <Label htmlFor="taxPercentageCode">Tipo de IVA *</Label>
-            <Select
-              value={formData.taxPercentageCode}
-              onValueChange={(value) =>
-                setFormData({ ...formData, taxPercentageCode: value, taxCode: '2' })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {taxCodesLoading ? (
-                  <SelectItem value="loading" disabled>
-                    Cargando...
-                  </SelectItem>
-                ) : (
-                  taxCodesData?.commonCodes.map((code) => (
-                    <SelectItem key={code} value={code}>
-                      {getTaxLabel(taxCodesData.taxCodes, code)}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            {errors.taxPercentageCode ? (
-              <div className="flex items-center gap-1 text-sm text-red-500">
-                <AlertCircle className="h-4 w-4" />
-                <span>{errors.taxPercentageCode}</span>
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Selecciona el tipo de IVA que aplica a este producto según la normativa del SRI
-              </p>
-            )}
-          </div>
-          {/* Margen de Ganancia (Informativo) */}
-          {/* {formData.cost && formData.cost > 0 && formData.unitPrice > 0 && (
-            <div className="rounded-lg bg-slate-100 p-4">
+            {/* Margen de Ganancia (Informativo) */}
+            {/* {formData.cost && formData.cost > 0 && formData.unitPrice > 0 && (
+            <div className="rounded-lg bg-surface-container-high p-4">
               jjjj
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Margen de Ganancia:</span>
                 kkkk
               </div>
               <div className="mt-2 text-xs text-muted-foreground">
-                Ganancia: ${(formData.unitPrice - formData.cost).toFixed(2)}
+                Ganancia: {formatCurrency((formData.unitPrice - formData.cost))}
               </div>
               ffff
             </div>
           )} */}
-        </DialogBody>
+          </DialogBody>
 
-          <DialogFooter className='gap-4 max-w-2xl w-full mx-auto'>
+          <DialogFooter className="gap-4 max-w-2xl w-full mx-auto">
             <Button
               type="button"
               variant="outline"

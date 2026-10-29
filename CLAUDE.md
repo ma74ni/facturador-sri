@@ -7,13 +7,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Facturador SRI** is a monorepo for an Electronic Invoicing System compliant with Ecuador's SRI (Servicio de Rentas Internas) regulations. It handles generation, signing, authorization, and delivery of electronic invoices and credit notes.
 
 **Monorepo Structure:**
-- `packages/facturacion-core` - NestJS backend API (port 3001)
-- `packages/web-facturacion` - Next.js frontend (port 3002)
-- `packages/pos-backend` - NestJS POS backend API (port 3003)
-- `packages/pos-frontend` - Vite + React POS frontend (port 5173)
-- `packages/shared-types` - Shared TypeScript types and DTOs
+- `packages/facturacion-core` - NestJS backend API (port 3000), deployed on Render
+- `packages/web-facturacion` - Next.js frontend (port 3001), deployed on Netlify
+- `packages/ui` - Design system: Material Design 3 tokens + atomic components (Tailwind + Radix), consumed by the web as TypeScript source
+- `signing-service` - Java XAdES-BES signing microservice (port 18081 locally), deployed on Render
+
+The POS (Lattia) lives in a separate repository (`new-lattia-pos`) and consumes this API. The GitHub repo is public: never commit certificates, `.env` files or customer data.
 
 **Package Manager:** pnpm with workspaces
+
+**Branches:** short branches from `dev`, one small PR each. `dev` deploys to staging (Netlify `dev--facturador-siete8`, Render `facturador-core-dev`); `main` is production. Prisma migrations run automatically on deploy (`render-start.sh`), so a merged migration reaches staging immediately.
+
+## Claude Code tooling (`.claude/`, `.mcp.json`)
+
+- **Skills:** `new-api-endpoint` (endpoint end to end with tenant isolation), `prisma-migration` (backward-compatible migrations for Neon), `ship-pr` (checks, push, PR to `dev`).
+- **Agents:** `sri-compliance-reviewer` (anything touching emission: access key, XML, signing, SRI, RIDE), `tenant-security-reviewer` (endpoints, Prisma queries, uploads, secrets), `test-writer` (Jest tests in the repo's conventions). Run the reviewers before opening a PR in their area.
+- **Hook:** every file Claude edits under `packages/` is formatted with Prettier (`.claude/hooks/format-edited-file.sh`).
+- **Permissions:** `.claude/settings.json` blocks reading `.env`/`.p12`, `prisma migrate reset`, `prisma db push` and force pushes.
+- **MCP servers:** `context7` (current library docs), `sentry` (production errors; OAuth on first use), `render` (logs and deploys; needs `RENDER_API_KEY` in your environment), `postgres-local` (read-only queries to the local `facturador-postgres` via Docker; override with `FACTURADOR_LOCAL_DATABASE_URL`). Never point an MCP or command at the Neon databases.
 
 ## Common Commands
 
@@ -22,21 +33,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Install dependencies (from root)
 pnpm install
 
-# Run facturacion-core backend dev server (port 3001)
-cd packages/facturacion-core
-PORT=3001 pnpm dev
+# Run facturacion-core backend dev server (port 3000)
+pnpm dev:core
 
-# Run web-facturacion frontend dev server (port 3002)
-cd packages/web-facturacion
-pnpm dev
-
-# Run pos-backend dev server (port 3003)
-cd packages/pos-backend
-pnpm dev
-
-# Run pos-frontend dev server (port 5173)
-cd packages/pos-frontend
-pnpm dev
+# Run web-facturacion frontend dev server (port 3001)
+pnpm dev:web
 ```
 
 ### Building
@@ -49,9 +50,6 @@ pnpm --filter facturacion-core build
 
 # Build frontend only
 pnpm --filter web-facturacion build
-
-# Build shared types
-pnpm --filter shared-types build
 ```
 
 ### Testing & Linting
@@ -68,11 +66,12 @@ pnpm --filter facturacion-core test:watch
 # Run test coverage
 pnpm --filter facturacion-core test:cov
 
-# Run e2e tests
-pnpm --filter facturacion-core test:e2e
-
-# Lint all packages
+# Lint all packages (ESLint: quality rules only; `any` and unused vars in web are warnings for now)
 pnpm lint:all
+
+# Format specific files with Prettier (single quotes, width 100). Format only files you touch:
+# the codebase is not mass-formatted to keep diffs reviewable.
+pnpm format <files...>
 
 # Lint backend
 pnpm --filter facturacion-core lint
@@ -83,16 +82,8 @@ pnpm --filter web-facturacion type-check
 
 ### Database (Prisma)
 ```bash
-# Facturacion-core database (public schema)
 cd packages/facturacion-core
 pnpm prisma:generate  # Generate Prisma client
-pnpm prisma:migrate   # Run migrations
-pnpm prisma:studio    # Open Prisma Studio
-pnpm prisma:seed      # Seed database
-
-# POS backend database (pos schema)
-cd packages/pos-backend
-pnpm prisma:generate  # Generate Prisma client (custom output: node_modules/.prisma/client-pos)
 pnpm prisma:migrate   # Run migrations
 pnpm prisma:studio    # Open Prisma Studio
 pnpm prisma:seed      # Seed database
@@ -131,8 +122,9 @@ npx tsx scripts/verify-user-email.ts <userId>
 - `credit-notes` - Credit note management
 
 **API Structure:**
-- Base URL: `http://localhost:3001/api/v1`
-- Swagger docs: `http://localhost:3001/api/docs`
+- Base URL: `http://localhost:3000/api/v1`
+- Swagger docs: `http://localhost:3000/api/docs` (off when `NODE_ENV=production` unless `SWAGGER_ENABLED=true`)
+- Auth routes are rate limited per IP (`@nestjs/throttler` in `AuthModule`); uploads have multer size caps in `shared/http/upload-limits.ts`
 - All routes use `/api/v1` prefix
 - Authentication via Bearer token
 
@@ -143,102 +135,19 @@ npx tsx scripts/verify-user-email.ts <userId>
 - Enums: Role (ADMIN, MANAGER, USER, VIEWER), SRIEnvironment (TEST, PRODUCTION), SRIStatus (PENDING, SENT, AUTHORIZED, REJECTED, ERROR)
 - Email verification: Users must verify email before creating customers/invoices (emailVerified field)
 
-### Backend (pos-backend)
+### Design system (packages/ui)
 
-**Tech Stack:**
-- NestJS 10.x (TypeScript framework)
-- PostgreSQL with Prisma 5.x ORM (separate schema: `pos`)
-- JWT authentication
-- Fastify adapter
-- Integration with facturacion-core API
-- Swagger for API docs
-
-**Architecture Pattern:** Clean Architecture with layered module structure
-- `presentation/` - Controllers (HTTP layer)
-- `application/` - Services (business logic)
-- `domain/` - Domain models and services
-- `infrastructure/` - External integrations (facturacion API, printing)
-
-**Key Modules:**
-- `auth` - Authentication and device/session management
-- `locales` - Store/location management
-- `colaboradores` - Collaborator management
-- `turnos` - Shift/cash register management
-- `productos` - Product catalog (synced from facturacion-core)
-- `orders` - Order management (core POS functionality)
-- `delivery` - Delivery management
-- `facturacion` - Integration with facturacion-core API
-- `printing` - Print job queue (comandas, tickets, cierre de caja)
-- `reportes` - Reports and dashboards
-
-**API Structure:**
-- Base URL: `http://localhost:3003/api/v1`
-- Swagger docs: `http://localhost:3003/api/docs`
-- All routes use `/api/v1` prefix
-- Authentication via Bearer token
-
-**Database:**
-- Schema: `pos` (separate PostgreSQL schema)
-- Main models: Local, Colaborador, Turno, Order, OrderItem, PrintJob
-- **IMPORTANT: Custom Prisma Client Location**
-  - Generated at: `node_modules/.prisma/client-pos`
-  - This prevents conflicts with facturacion-core's Prisma Client
-  - Configured via `schema.prisma` output setting
-  - Requires custom webpack and TypeScript configuration
-
-**Prisma Client Separation Solution:**
-To avoid conflicts when multiple NestJS apps use different Prisma schemas in the same monorepo:
-1. Configure custom output in `schema.prisma`:
-   ```prisma
-   generator client {
-     provider = "prisma-client-js"
-     output   = "../node_modules/.prisma/client-pos"
-   }
-   ```
-2. Update `PrismaService` import:
-   ```typescript
-   import { PrismaClient } from '../../../node_modules/.prisma/client-pos';
-   ```
-3. Add TypeScript path alias in `tsconfig.json`:
-   ```json
-   "paths": {
-     "@prisma/client": ["node_modules/.prisma/client-pos"]
-   }
-   ```
-4. Create `webpack.config.js` for runtime resolution:
-   ```javascript
-   module.exports = function (options, webpack) {
-     return {
-       ...options,
-       resolve: {
-         ...options.resolve,
-         alias: {
-           ...options.resolve.alias,
-           '@prisma/client': require.resolve('./node_modules/.prisma/client-pos'),
-         },
-       },
-     };
-   };
-   ```
-5. Update `nest-cli.json`:
-   ```json
-   "compilerOptions": {
-     "webpack": true,
-     "webpackConfigPath": "webpack.config.js"
-   }
-   ```
-
-**Integration with facturacion-core:**
-- pos-backend calls facturacion-core API for customer and product management
-- Uses JWT token configured in `.env` (`FACTURACION_API_TOKEN`)
-- Customers and products are managed in facturacion-core, referenced by ID in pos-backend
-- Invoicing triggered from POS orders
+- **Tokens:** Material Design 3 palette generated from seed `#1A5FB4` (`SchemeVibrant`, with the darker `SchemeFidelity` primary `#004790` for buttons and links; success `#2E7D32` and warning `#C9A100` not harmonized) by `scripts/generate-tokens.mjs` into `src/tokens/tokens.css` (`--md-*` RGB triplets; light in `:root`, dark in `.dark`, not enabled yet). Never edit `tokens.css` by hand: change the script and run `pnpm --filter @facturador-sri/ui tokens`.
+- **Tailwind preset** (`src/tailwind-preset.ts`): MD3 color roles (`bg-primary`, `text-on-surface-variant`, `bg-surface-container`, `bg-success-container`…), type scale (`text-title-lg`, `text-body-md`, `text-label-lg`…), shape scale and `shadow-elevation-1..5`. Legacy shadcn names (`muted`, `destructive`, `border`…) are aliases of MD3 roles so old screens follow the palette.
+- **Components:** `src/atoms` (Button, IconButton, Badge, Input, NumberInput, PasswordInput, Textarea, Label, FieldError, NativeSelect, Spinner; all fields share `fieldStyles`: white `surface-container-lowest` background, `outline` border), `src/molecules` (Card, Dialog: full screen on mobile with the actions at the end of the scroll, pinned footer on desktop; AlertDialog, Alert, Table, Pagination, Toast, Select, SearchableSelect, FilterBar, StatCard, FormField). Every `components/ui/*` file in the web now only re-exports the package (except `toaster.tsx`/`use-toast.ts`, which hold app state). Use the package `cn` (the web `lib/utils` re-exports it): it teaches tailwind-merge the MD3 type scale, otherwise `text-title-lg` is dropped next to a text color, `src/organisms`. Export everything from `src/index.ts`.
+- **In the web:** import from `@facturador-sri/ui`. Icon-only actions use `IconButton` (requires `label`, used as aria-label and tooltip); indicator cards use `StatCard`; form fields use `FormField` (label + field + error or hint; it sets `aria-invalid` on the field, so never add `border-error` by hand) or `FieldError` when the layout does not fit; form-level errors use `<Alert variant="destructive">`. `components/ui/*` files that moved re-export the package so existing imports keep working. Use MD3 roles and the type scale, never raw Tailwind colors (`text-red-600`, `bg-slate-100`): the web's ESLint rejects them (`no-restricted-syntax`).
+- Font: Roboto (`--font-sans`, set in `app/layout.tsx`).
 
 ### Frontend (web-facturacion)
 
 **Tech Stack:**
-- Next.js 14.2.x (App Router)
-- React 18.3.x
+- Next.js 15.5.x (App Router)
+- React 19.x
 - TypeScript
 - Tailwind CSS
 - Radix UI components
@@ -267,43 +176,6 @@ To avoid conflicts when multiple NestJS apps use different Prisma schemas in the
 - API clients in `lib/api/*.ts` use axios
 - Base URL configured via environment variable
 - JWT token stored in localStorage/cookies
-- Type-safe with shared types from `@facturador-sri/shared-types`
-
-### Frontend (pos-frontend)
-
-**Tech Stack:**
-- Vite 6.x
-- React 18.3.x
-- TypeScript
-- Tailwind CSS
-- Radix UI components
-- React Router v6
-- React Hook Form + Zod validation
-- Axios for API calls
-- Zustand for state management
-
-**Structure:**
-- `src/features/` - Feature-based modules
-  - `auth/` - Authentication and login
-  - `products/` - Product catalog display
-  - `cart/` - Shopping cart
-  - `payment/` - Payment processing and invoicing
-  - `orders/` - Order management
-- `src/components/` - Reusable UI components
-- `src/lib/` - Utilities and helpers
-  - `api/` - API client functions
-  - `store/` - Zustand stores
-  - `utils/` - Helper functions
-
-**API Client Pattern:**
-- API clients in `lib/api/*.ts` use axios
-- Base URL: `http://localhost:3003/api/v1`
-- JWT token stored in localStorage
-- Error handling with toast notifications
-
-### Shared Types
-
-The `shared-types` package contains TypeScript interfaces, DTOs, and enums shared between backend and frontend. It's referenced as a workspace dependency (`workspace:*`) in both packages.
 
 ## SRI Invoice Processing Flow
 
@@ -349,8 +221,8 @@ The system is multi-tenant at the Company level:
 
 ### Authentication Guards
 - `@UseGuards(JwtAuthGuard)` on protected routes
-- `@CurrentUser()` decorator to get authenticated user from request
-- Role-based access via custom decorators (if implemented)
+- `@CurrentUser() user: AuthenticatedUser` (`modules/auth/infrastructure/decorators/current-user.decorator.ts`) gives `userId`, `email` and `companyId`, loaded fresh by `JwtStrategy` on every request. Pass `user.companyId` to services; never read the company from the body, query or params, and don't re-query the user in controllers.
+- Other guards: `EmailVerifiedGuard`, `AdminGuard` (company admin), `PlatformAdminGuard`, `RequireModuleGuard` + `@RequireModule(...)`
 
 ### Database Queries
 - Use Prisma Client via injected `PrismaService`
@@ -378,10 +250,10 @@ The system is multi-tenant at the Company level:
 
 ## Environment Variables
 
-Backend (packages/facturacion-core/.env):
+Backend (packages/facturacion-core/.env, template in `/.env-example`):
 - `DATABASE_URL` - PostgreSQL connection string (schema: public)
 - `JWT_SECRET` - Secret for JWT token signing
-- `PORT` - Backend port (default: 3001)
+- `PORT` - Backend port (default: 3000)
 - `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` - Cloudflare R2
 - `R2_BUCKET_NAME` - R2 bucket name
 - `MAILJET_API_KEY`, `MAILJET_SECRET_KEY` - System Mailjet credentials
@@ -389,24 +261,13 @@ Backend (packages/facturacion-core/.env):
 - `SRI_WS_RECEPTION_URL_TEST`, `SRI_WS_RECEPTION_URL_PROD` - SRI reception endpoints
 - `SRI_WS_AUTHORIZATION_URL_TEST`, `SRI_WS_AUTHORIZATION_URL_PROD` - SRI authorization endpoints
 
-Backend (packages/pos-backend/.env):
-- `DATABASE_URL` - PostgreSQL connection string (schema: pos)
-- `PORT` - Backend port (default: 3003)
-- `NODE_ENV` - Environment (development/production)
-- `FACTURACION_API_URL` - facturacion-core API URL (http://localhost:3001/api/v1)
-- `FACTURACION_API_TOKEN` - JWT token for facturacion-core API
-- `FACTURACION_COMPANY_ID` - Company ID in facturacion-core
-
 Frontend (packages/web-facturacion/.env.local):
-- `NEXT_PUBLIC_API_URL` - Backend API URL (http://localhost:3001)
-
-Frontend (packages/pos-frontend/.env):
-- `VITE_API_URL` - Backend API URL (http://localhost:3003/api/v1)
+- `NEXT_PUBLIC_API_URL` - Backend API URL (http://localhost:3000/api/v1)
 
 ## Common Development Tasks
 
 ### Adding a New API Endpoint
-1. Create DTO in appropriate module or `shared-types`
+1. Create DTO in the module's `application/dto/`
 2. Add method to controller in `presentation/`
 3. Implement business logic in `application/services/`
 4. Add Swagger decorators (`@ApiOperation`, `@ApiResponse`)
@@ -416,7 +277,7 @@ Frontend (packages/pos-frontend/.env):
 1. Update `packages/facturacion-core/prisma/schema.prisma`
 2. Run `pnpm prisma:generate` to update Prisma client
 3. Create and run migration: `pnpm prisma:migrate`
-4. Create corresponding DTOs in backend or `shared-types`
+4. Create corresponding DTOs in the module
 5. Create module with controller and service if needed
 
 ### Adding a New Frontend Page
@@ -438,7 +299,7 @@ Frontend (packages/pos-frontend/.env):
 ## Key Files Reference
 
 ### Facturacion-core
-- `packages/facturacion-core/src/main.ts` - Backend bootstrap (port 3001)
+- `packages/facturacion-core/src/main.ts` - Backend bootstrap (port 3000)
 - `packages/facturacion-core/src/app.module.ts` - Root module
 - `packages/facturacion-core/prisma/schema.prisma` - Database schema (public schema)
 - `packages/facturacion-core/src/shared/database/prisma.service.ts` - Prisma service
@@ -450,29 +311,9 @@ Frontend (packages/pos-frontend/.env):
 - `packages/web-facturacion/app/dashboard/layout.tsx` - Dashboard layout with navigation
 - `packages/web-facturacion/lib/api/client.ts` - Axios configuration
 
-### POS Backend
-- `packages/pos-backend/src/main.ts` - Backend bootstrap (port 3003)
-- `packages/pos-backend/src/app.module.ts` - Root module
-- `packages/pos-backend/prisma/schema.prisma` - Database schema (pos schema, custom output)
-- `packages/pos-backend/src/shared/prisma/prisma.service.ts` - Prisma service (custom import)
-- `packages/pos-backend/webpack.config.js` - Webpack config for Prisma Client alias
-- `packages/pos-backend/nest-cli.json` - NestJS CLI config with webpack
-- `packages/pos-backend/tsconfig.json` - TypeScript config with path alias
-- `packages/pos-backend/src/modules/facturacion/infrastructure/facturacion-api.service.ts` - Integration with facturacion-core
-- `packages/pos-backend/src/modules/printing/application/services/print-job.service.ts` - Print queue service
-
-### POS Frontend
-- `packages/pos-frontend/src/main.tsx` - Application entry point
-- `packages/pos-frontend/src/App.tsx` - Root component with routing
-- `packages/pos-frontend/src/lib/api/client.ts` - Axios configuration
-- `packages/pos-frontend/src/features/payment/PaymentModal.tsx` - Payment and invoicing flow
-
-### Shared
-- `packages/shared-types/src/index.ts` - Exported types
-
 ## Notes
 
-### SRI Invoicing (facturacion-core)
+### SRI Invoicing
 - The system follows SRI Ecuador specification version 2.32 for electronic invoicing
 - Access keys must be exactly 49 digits and follow specific format
 - Digital certificates must be PKCS12 format (.p12)
@@ -480,13 +321,6 @@ Frontend (packages/pos-frontend/.env):
 - Dates use ISO 8601 format (YYYY-MM-DD)
 - Invoice sequential numbers are per emission point
 - Credit notes reference original invoices via access key
-
-### POS System
-- POS backend uses separate database schema (`pos`) from facturacion-core (`public`)
-- Custom Prisma Client location prevents conflicts in monorepo
-- Integration with facturacion-core via REST API for customers, products, and invoicing
-- Print jobs are queued and processed asynchronously (comanda, ticket, cierre de caja)
-- Multi-collaborator support with shared device sessions
 
 ### Email Verification
 - Users must verify their email before creating customers or invoices in facturacion-core

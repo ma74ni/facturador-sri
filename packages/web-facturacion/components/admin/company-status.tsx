@@ -35,10 +35,10 @@ export function ReadinessPills({ readiness }: { readiness: CompanyReadiness }) {
             title={check.message}
             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${
               !check.ok
-                ? 'bg-red-50 text-red-700'
+                ? 'bg-error-container text-on-error-container'
                 : warn
-                  ? 'bg-yellow-50 text-yellow-800'
-                  : 'bg-green-50 text-green-700'
+                  ? 'bg-warning-container text-on-warning-container'
+                  : 'bg-success-container text-on-success-container'
             }`}
           >
             {!check.ok ? (
@@ -66,13 +66,13 @@ export function ReadinessChecklist({ readiness }: { readiness: CompanyReadiness 
         return (
           <li key={check.key} className="flex items-start gap-2 text-sm">
             {!check.ok ? (
-              <XCircle className="h-4 w-4 mt-0.5 text-red-600 flex-shrink-0" />
+              <XCircle className="h-4 w-4 mt-0.5 text-error flex-shrink-0" />
             ) : warn ? (
-              <AlertTriangle className="h-4 w-4 mt-0.5 text-yellow-600 flex-shrink-0" />
+              <AlertTriangle className="h-4 w-4 mt-0.5 text-warning flex-shrink-0" />
             ) : (
-              <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-600 flex-shrink-0" />
+              <CheckCircle2 className="h-4 w-4 mt-0.5 text-success flex-shrink-0" />
             )}
-            <span className={check.ok ? 'text-slate-700' : 'text-red-700'}>
+            <span className={check.ok ? 'text-on-surface' : 'text-on-error-container'}>
               {check.message}
               {warn ? ' — pídele que lo renueve' : ''}
             </span>

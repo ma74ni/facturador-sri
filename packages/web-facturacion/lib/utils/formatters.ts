@@ -1,12 +1,12 @@
+const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+
 /**
- * Formatear cantidad como moneda USD
+ * Monto en dólares como en el RIDE: `$1,024.08`. Acepta los Decimal que la API manda como texto;
+ * un valor vacío o inválido se muestra como `$0.00`.
  */
-export function formatCurrency(amount: number | string): string {
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('es-EC', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(num);
+export function formatCurrency(amount: number | string | null | undefined): string {
+  const num = Number(amount);
+  return USD.format(Number.isFinite(num) ? num : 0);
 }
 
 /**
@@ -50,9 +50,20 @@ export function formatDateShort(date: string | Date): string {
 export function formatInvoiceNumber(
   establishment: string,
   emissionPoint: string,
-  sequential: string
+  sequential: string,
 ): string {
   return `${establishment}-${emissionPoint}-${sequential}`;
+}
+
+const QUANTITY = new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 });
+
+/**
+ * Cantidad de una línea: enteros sin decimales (`2`) y ventas por peso con los suyos (`1.005`),
+ * hasta 3. También limpia el ruido de sumar decimales (`1.1049999…` → `1.105`).
+ */
+export function formatQuantity(quantity: number | string | null | undefined): string {
+  const value = Number(quantity);
+  return QUANTITY.format(Number.isFinite(value) ? value : 0);
 }
 
 /**
