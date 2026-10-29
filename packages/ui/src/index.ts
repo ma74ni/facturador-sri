@@ -2,7 +2,7 @@
  * Design system del facturador (Material Design 3 sobre Tailwind + Radix).
  *
  * - atoms: piezas indivisibles (botón, campo, etiqueta…).
- * - molecules: combinaciones de átomos con un propósito (tarjeta…).
+ * - molecules: combinaciones de átomos con un propósito (tarjeta, diálogo…).
  * - organisms: secciones completas de una pantalla.
  *
  * Los colores, la tipografía y las formas vienen de `tailwind-preset` y `tokens.css`.
@@ -25,3 +25,17 @@ export {
   CardDescription,
   CardContent,
 } from './molecules/card';
+
+export {
+  Dialog,
+  DialogPortal,
+  DialogOverlay,
+  DialogClose,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogBody,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from './molecules/dialog';
