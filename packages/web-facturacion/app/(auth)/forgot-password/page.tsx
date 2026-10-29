@@ -1,15 +1,31 @@
 'use client';
 
 import { useState } from 'react';
+
 import { useForm } from 'react-hook-form';
+
 import { zodResolver } from '@hookform/resolvers/zod';
+
 import Link from 'next/link';
 import { authApi } from '@/lib/api/auth';
+
 import { forgotPasswordSchema, ForgotPasswordFormData } from '@/lib/validations/schemas';
+
 import { Button } from '@/components/ui/button';
+
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+
+import { FormField, Alert, AlertDescription } from '@facturador-sri/ui';
+
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+
 import { AlertCircle, CheckCircle2, Loader2, Mail } from 'lucide-react';
 
 export default function ForgotPasswordPage() {
@@ -42,9 +58,7 @@ export default function ForgotPasswordPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-surface-container-low to-surface-container-high p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">
-            Recuperar contraseña
-          </CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">Recuperar contraseña</CardTitle>
           <CardDescription className="text-center">
             Te enviaremos un enlace para elegir una nueva
           </CardDescription>
@@ -54,8 +68,8 @@ export default function ForgotPasswordPage() {
             <div className="flex flex-col items-center py-4 space-y-4 text-center">
               <CheckCircle2 className="h-12 w-12 text-success" />
               <p className="text-sm text-muted-foreground">
-                Si <strong className="text-foreground">{sentTo}</strong> está registrado, te
-                llegará un correo con el enlace en unos minutos. Vence en 1 hora.
+                Si <strong className="text-foreground">{sentTo}</strong> está registrado, te llegará
+                un correo con el enlace en unos minutos. Vence en 1 hora.
               </p>
               <p className="text-sm text-muted-foreground">
                 ¿No llega? Revisa la carpeta de spam o vuelve a pedirlo en un minuto.
@@ -67,14 +81,13 @@ export default function ForgotPasswordPage() {
           ) : (
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               {error && (
-                <div className="flex items-center gap-2 p-3 text-sm text-on-error-container bg-error-container border border-error-container rounded-md">
-                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                  <span>{error}</span>
-                </div>
+                <Alert variant="destructive">
+                  <AlertCircle />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email de tu cuenta</Label>
+              <FormField label="Email de tu cuenta" htmlFor="email" error={errors.email?.message}>
                 <Input
                   id="email"
                   type="email"
@@ -83,10 +96,7 @@ export default function ForgotPasswordPage() {
                   {...register('email')}
                   disabled={isLoading}
                 />
-                {errors.email && (
-                  <p className="text-sm text-error">{errors.email.message}</p>
-                )}
-              </div>
+              </FormField>
 
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? (

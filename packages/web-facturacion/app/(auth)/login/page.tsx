@@ -11,7 +11,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { FormField, FieldError, Alert, AlertDescription } from '@facturador-sri/ui';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { LogIn, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
@@ -68,9 +76,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-surface-container-low to-surface-container-high p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">
-            Iniciar Sesión
-          </CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">Iniciar Sesión</CardTitle>
           <CardDescription className="text-center">
             Sistema de Facturación Electrónica SRI
           </CardDescription>
@@ -78,14 +84,13 @@ export default function LoginPage() {
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {error && (
-              <div className="flex items-center gap-2 p-3 text-sm text-on-error-container bg-error-container border border-error-container rounded-md">
-                <AlertCircle className="h-4 w-4" />
-                <span>{error}</span>
-              </div>
+              <Alert variant="destructive">
+                <AlertCircle />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+            <FormField label="Email" htmlFor="email" error={errors.email?.message}>
               <Input
                 id="email"
                 type="email"
@@ -93,18 +98,12 @@ export default function LoginPage() {
                 {...register('email')}
                 disabled={isLoading}
               />
-              {errors.email && (
-                <p className="text-sm text-error">{errors.email.message}</p>
-              )}
-            </div>
+            </FormField>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Contraseña</Label>
-                <Link
-                  href="/forgot-password"
-                  className="text-sm text-primary hover:underline"
-                >
+                <Link href="/forgot-password" className="text-sm text-primary hover:underline">
                   ¿Olvidaste tu contraseña?
                 </Link>
               </div>
@@ -114,16 +113,10 @@ export default function LoginPage() {
                 {...register('password')}
                 disabled={isLoading}
               />
-              {errors.password && (
-                <p className="text-sm text-error">{errors.password.message}</p>
-              )}
+              <FieldError message={errors.password?.message} />
             </div>
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isLoading}
-            >
+            <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (
                 'Iniciando sesión...'
               ) : (
