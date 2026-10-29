@@ -16,16 +16,23 @@ import {
   Hct,
   hexFromArgb,
   MaterialDynamicColors,
+  SchemeFidelity,
   SchemeVibrant,
 } from '@material/material-color-utilities';
 
 const SEED = '#1A5FB4';
 
-// MD3 no trae "éxito" ni "aviso": se agregan como colores propios, armonizados con la semilla.
+// MD3 no trae "éxito" ni "aviso": se agregan como colores propios. Sin armonizar con la semilla:
+// armonizados, el verde salía menta y el aviso melocotón.
 const EXTRA_COLORS = [
   { name: 'success', value: '#2E7D32' },
-  { name: 'warning', value: '#B26A00' },
+  { name: 'warning', value: '#C9A100' },
 ];
+
+// Botones y enlaces en un azul más oscuro y sobrio (el de SchemeFidelity), pero con los
+// contenedores claros de Vibrant: con Fidelity completo, el contenedor primario pasa a azul fuerte
+// y los avisos informativos quedarían como bloques oscuros.
+const FIDELITY_ROLES = ['primary', 'onPrimary', 'inversePrimary'];
 
 const ROLES = [
   'primary',
@@ -70,15 +77,17 @@ const rgb = (argb) => `${(argb >> 16) & 255} ${(argb >> 8) & 255} ${argb & 255}`
 function schemeVars(isDark) {
   // Vibrant conserva la saturación de la semilla (TonalSpot la apaga hasta casi gris).
   const scheme = new SchemeVibrant(Hct.fromInt(argbFromHex(SEED)), isDark, 0);
+  const fidelity = new SchemeFidelity(Hct.fromInt(argbFromHex(SEED)), isDark, 0);
   const lines = ROLES.map((role) => {
-    const argb = MaterialDynamicColors[role].getArgb(scheme);
+    const source = FIDELITY_ROLES.includes(role) ? fidelity : scheme;
+    const argb = MaterialDynamicColors[role].getArgb(source);
     return `  --md-${kebab(role)}: ${rgb(argb)}; /* ${hexFromArgb(argb)} */`;
   });
   for (const extra of EXTRA_COLORS) {
     const group = customColor(argbFromHex(SEED), {
       name: extra.name,
       value: argbFromHex(extra.value),
-      blend: true,
+      blend: false,
     });
     const tones = isDark ? group.dark : group.light;
     const n = extra.name;
