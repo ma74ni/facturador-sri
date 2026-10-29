@@ -13,15 +13,14 @@ import {
   Package,
   TrendingUp,
   Clock,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
   Plus
 } from 'lucide-react';
 import { useInvoices, useInvoiceStats } from '@/lib/hooks/use-invoices';
 import { useCustomers } from '@/lib/hooks/use-customers';
 import { useProducts } from '@/lib/hooks/use-products';
 import { CertificateAlertBanner } from '@/components/shared/certificate-alert-banner';
+import { formatCurrency } from '@/lib/utils/formatters';
+import { SriStatusBadge } from '@/components/shared/sri-status-badge';
 
 interface RecentInvoice {
   id: string;
@@ -61,31 +60,7 @@ export default function DashboardPage() {
       }));
   }, [invoices]);
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline', icon: any, label: string }> = {
-      AUTHORIZED: { variant: 'default', icon: CheckCircle2, label: 'Autorizada' },
-      PENDING: { variant: 'secondary', icon: Clock, label: 'Pendiente' },
-      REJECTED: { variant: 'destructive', icon: XCircle, label: 'Rechazada' },
-      ERROR: { variant: 'destructive', icon: AlertCircle, label: 'Error' },
-    };
 
-    const config = statusConfig[status] || statusConfig.PENDING;
-    const Icon = config.icon;
-
-    return (
-      <Badge variant={config.variant} className="gap-1">
-        <Icon className="h-3 w-3" />
-        {config.label}
-      </Badge>
-    );
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-EC', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
 
   const statsCards = [
     {
@@ -208,7 +183,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="text-right space-y-1">
                       <p className="text-sm font-medium">{formatCurrency(invoice.totalAmount)}</p>
-                      {getStatusBadge(invoice.status)}
+                      <SriStatusBadge status={invoice.status} />
                     </div>
                   </div>
                 ))}

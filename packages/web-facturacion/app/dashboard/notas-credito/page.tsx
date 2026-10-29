@@ -6,19 +6,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import {
-  AlertCircle,
   Calendar,
-  CheckCircle2,
-  Clock,
   Download,
   FileDown,
   FileMinus,
   Mail,
   Send,
-  XCircle,
-} from 'lucide-react';
+  } from 'lucide-react';
 import {
   creditNotesApi,
   CreditNote,
@@ -31,19 +26,9 @@ import { Pagination } from '@/components/ui/pagination';
 import { FilterBar, FilterField } from '@/components/ui/filter-bar';
 import { NativeSelect } from '@/components/ui/native-select';
 import { useToast } from '@/hooks/use-toast';
+import { formatCurrency } from '@/lib/utils/formatters';
+import { SriStatusBadge } from '@/components/shared/sri-status-badge';
 
-const STATUS_STYLE: Record<
-  CreditNoteStatus,
-  { variant: 'warning' | 'info' | 'success' | 'destructive' | 'secondary'; icon: typeof Clock }
-> = {
-  DRAFT: { variant: 'secondary', icon: Clock },
-  PENDING: { variant: 'warning', icon: Clock },
-  SENT: { variant: 'info', icon: Send },
-  AUTHORIZED: { variant: 'success', icon: CheckCircle2 },
-  REJECTED: { variant: 'destructive', icon: XCircle },
-  ERROR: { variant: 'destructive', icon: AlertCircle },
-  CANCELLED: { variant: 'secondary', icon: XCircle },
-};
 
 // Se pueden (re)enviar las que no quedaron autorizadas, si tienen XML firmado.
 // Una SENT quedó sin respuesta del SRI: reenviarla vuelve a consultar su autorización.
@@ -147,16 +132,6 @@ export default function NotasCreditoPage() {
 
   const pagination = usePagination(filtered, 10, `${searchTerm}|${statusFilter}`);
 
-  const statusBadge = (status: CreditNoteStatus) => {
-    const style = STATUS_STYLE[status] ?? STATUS_STYLE.DRAFT;
-    const Icon = style.icon;
-    return (
-      <Badge variant={style.variant}>
-        <Icon className="mr-1 h-3 w-3" />
-        {CREDIT_NOTE_STATUS_LABEL[status] ?? status}
-      </Badge>
-    );
-  };
 
   const renderActions = (cn: CreditNote) => {
     const busy = busyId === cn.id;
@@ -303,14 +278,14 @@ export default function NotasCreditoPage() {
                           {formatDate(cn.issueDate)}
                         </p>
                       </div>
-                      {statusBadge(cn.sriStatus)}
+                      <SriStatusBadge status={cn.sriStatus} />
                     </div>
                     <div className="flex items-end justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-sm break-words">{cn.customerName}</p>
                         <p className="text-xs text-muted-foreground break-words">{cn.reason}</p>
                       </div>
-                      <p className="font-semibold text-sm flex-shrink-0">${cn.total.toFixed(2)}</p>
+                      <p className="font-semibold text-sm flex-shrink-0">{formatCurrency(cn.total)}</p>
                     </div>
                     <div className="flex items-center justify-end gap-1 border-t pt-2">
                       {renderActions(cn)}
@@ -353,8 +328,8 @@ export default function NotasCreditoPage() {
                         <TableCell className="hidden lg:table-cell text-sm text-muted-foreground max-w-[16rem]">
                           {cn.reason}
                         </TableCell>
-                        <TableCell>{statusBadge(cn.sriStatus)}</TableCell>
-                        <TableCell className="text-right font-medium text-sm">${cn.total.toFixed(2)}</TableCell>
+                        <TableCell><SriStatusBadge status={cn.sriStatus} /></TableCell>
+                        <TableCell className="text-right font-medium text-sm">{formatCurrency(cn.total)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">{renderActions(cn)}</div>
                         </TableCell>

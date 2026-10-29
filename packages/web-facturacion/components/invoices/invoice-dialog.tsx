@@ -47,6 +47,7 @@ import { useCreateProduct } from "@/lib/hooks/use-products";
 import { useTaxCodes, getTaxLabel, getTaxPercentage } from "@/lib/hooks/use-tax-codes";
 import { useCertificateStatus } from "@/lib/hooks/use-certificate";
 import { CertificateRequiredDialog } from "@/components/shared/certificate-required-dialog";
+import { formatCurrency } from '@/lib/utils/formatters';
 
 interface InvoiceDialogProps {
   open: boolean;
@@ -555,7 +556,7 @@ export function InvoiceDialog({
                       onChange={setSelectedProduct}
                       getId={(p) => p.id}
                       getLabel={(p) => p.name}
-                      getSubLabel={(p) => `$${Number(p.unitPrice).toFixed(2)}`}
+                      getSubLabel={(p) => `${formatCurrency(Number(p.unitPrice))}`}
                       placeholder="Seleccionar producto..."
                       searchPlaceholder="Buscar producto..."
                       emptyMessage="No se encontraron productos"
@@ -616,7 +617,7 @@ export function InvoiceDialog({
                               {item.description}
                             </h4>
                             <p className="text-sm text-slate-500">
-                              Cantidad: {item.quantity} × ${item.unitPrice.toFixed(2)}
+                              Cantidad: {item.quantity} × {formatCurrency(item.unitPrice)}
                             </p>
                           </div>
                           <Button
@@ -633,25 +634,25 @@ export function InvoiceDialog({
                           <div>
                             <span className="text-slate-500">Descuento:</span>
                             <span className="ml-1 font-medium">
-                              ${item.discount.toFixed(2)}
+                              {formatCurrency(item.discount)}
                             </span>
                           </div>
                           <div>
                             <span className="text-slate-500">Subtotal:</span>
                             <span className="ml-1 font-medium">
-                              ${item.subtotal.toFixed(2)}
+                              {formatCurrency(item.subtotal)}
                             </span>
                           </div>
                           <div>
                             <span className="text-slate-500">IVA:</span>
                             <span className="ml-1 font-medium">
-                              ${item.taxValue.toFixed(2)}
+                              {formatCurrency(item.taxValue)}
                             </span>
                           </div>
                           <div>
                             <span className="text-slate-500">Total:</span>
                             <span className="ml-1 font-bold text-primary">
-                              ${item.total.toFixed(2)}
+                              {formatCurrency(item.total)}
                             </span>
                           </div>
                         </div>
@@ -682,19 +683,19 @@ export function InvoiceDialog({
                               {item.quantity}
                             </TableCell>
                             <TableCell className="text-right">
-                              ${item.unitPrice.toFixed(2)}
+                              {formatCurrency(item.unitPrice)}
                             </TableCell>
                             <TableCell className="text-right">
-                              ${item.discount.toFixed(2)}
+                              {formatCurrency(item.discount)}
                             </TableCell>
                             <TableCell className="text-right">
-                              ${item.subtotal.toFixed(2)}
+                              {formatCurrency(item.subtotal)}
                             </TableCell>
                             <TableCell className="text-right">
-                              ${item.taxValue.toFixed(2)}
+                              {formatCurrency(item.taxValue)}
                             </TableCell>
                             <TableCell className="text-right font-medium">
-                              ${item.total.toFixed(2)}
+                              {formatCurrency(item.total)}
                             </TableCell>
                             <TableCell>
                               <Button
@@ -725,7 +726,7 @@ export function InvoiceDialog({
                     <div className="flex justify-between items-center text-base">
                       <span className="text-slate-600">Subtotal (Base):</span>
                       <span className="font-semibold text-lg">
-                        ${totals.subtotal.toFixed(2)}
+                        {formatCurrency(totals.subtotal)}
                       </span>
                     </div>
 
@@ -733,7 +734,7 @@ export function InvoiceDialog({
                       <div className="flex justify-between items-center text-base text-red-600">
                         <span>Descuento:</span>
                         <span className="font-semibold text-lg">
-                          -${totals.discount.toFixed(2)}
+                          -{formatCurrency(totals.discount)}
                         </span>
                       </div>
                     )}
@@ -748,7 +749,7 @@ export function InvoiceDialog({
                             Subtotal {group.label}:
                           </span>
                           <span className="font-semibold text-lg">
-                            ${group.taxBase.toFixed(2)}
+                            {formatCurrency(group.taxBase)}
                           </span>
                         </div>
                       ))}
@@ -763,7 +764,7 @@ export function InvoiceDialog({
                         >
                           <span className="text-slate-600">{group.label}:</span>
                           <span className="font-semibold text-lg text-blue-600">
-                            ${group.ivaValue.toFixed(2)}
+                            {formatCurrency(group.ivaValue)}
                           </span>
                         </div>
                       ))}
@@ -773,7 +774,7 @@ export function InvoiceDialog({
                         Total a Pagar:
                       </span>
                       <span className="text-3xl font-bold text-primary">
-                        ${totals.total.toFixed(2)}
+                        {formatCurrency(totals.total)}
                       </span>
                     </div>
                   </div>

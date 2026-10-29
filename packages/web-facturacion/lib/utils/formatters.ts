@@ -1,12 +1,12 @@
+const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+
 /**
- * Formatear cantidad como moneda USD
+ * Monto en dólares como en el RIDE: `$1,024.08`. Acepta los Decimal que la API manda como texto;
+ * un valor vacío o inválido se muestra como `$0.00`.
  */
-export function formatCurrency(amount: number | string): string {
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('es-EC', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(num);
+export function formatCurrency(amount: number | string | null | undefined): string {
+  const num = Number(amount);
+  return USD.format(Number.isFinite(num) ? num : 0);
 }
 
 /**

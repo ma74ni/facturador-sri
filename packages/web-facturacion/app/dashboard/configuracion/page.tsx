@@ -186,7 +186,7 @@ export default function ConfiguracionPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b overflow-x-auto pb-px scrollbar-hide px-2">
+      <div className="grid grid-cols-4 border-b sm:flex sm:gap-1 sm:px-2">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -194,7 +194,7 @@ export default function ConfiguracionPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors min-w-[70px] sm:min-w-0 ${
+              className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-1 sm:px-4 py-2 border-b-2 transition-colors ${
                 isActive
                   ? 'border-primary text-primary font-medium'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -202,7 +202,7 @@ export default function ConfiguracionPage() {
               title={tab.label}
             >
               <Icon className="h-4 w-4 flex-shrink-0" />
-              <span className="text-[10px] sm:text-sm whitespace-normal break-normal">{tab.label}</span>
+              <span className="text-center text-label-md leading-tight sm:text-label-lg">{tab.label}</span>
             </button>
           );
         })}

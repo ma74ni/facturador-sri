@@ -27,6 +27,7 @@ import {
 import { InvoiceDetailItem } from '@/lib/api/invoices';
 import { useInvoiceDetail } from '@/lib/hooks/use-credit-notes';
 import { useToast } from '@/hooks/use-toast';
+import { formatCurrency } from '@/lib/utils/formatters';
 
 const REASONS = [
   'Devolución de mercadería',
@@ -239,15 +240,15 @@ export function CreditNoteDialog({ invoiceId, onOpenChange, onIssued }: CreditNo
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-md border p-3 text-sm">
               <div>
                 <p className="text-muted-foreground text-xs">Total factura</p>
-                <p className="font-semibold">${invoice.total.toFixed(2)}</p>
+                <p className="font-semibold">{formatCurrency(invoice.total)}</p>
               </div>
               <div>
                 <p className="text-muted-foreground text-xs">Ya acreditado</p>
-                <p className="font-semibold">${(invoice.total - available).toFixed(2)}</p>
+                <p className="font-semibold">{formatCurrency((invoice.total - available))}</p>
               </div>
               <div>
                 <p className="text-muted-foreground text-xs">Disponible</p>
-                <p className="font-semibold text-green-700">${available.toFixed(2)}</p>
+                <p className="font-semibold text-green-700">{formatCurrency(available)}</p>
               </div>
             </div>
 
@@ -305,7 +306,7 @@ export function CreditNoteDialog({ invoiceId, onOpenChange, onIssued }: CreditNo
                           <div className="col-span-2 sm:col-span-1 min-w-0">
                             <p className="text-sm break-words">{item.description}</p>
                             <p className="text-xs text-muted-foreground">
-                              Facturado: {item.quantity} × ${item.unitPrice.toFixed(2)} · IVA {item.ivaRate}%
+                              Facturado: {item.quantity} × {formatCurrency(item.unitPrice)} · IVA {item.ivaRate}%
                             </p>
                           </div>
                           <div className="space-y-1">
@@ -335,7 +336,7 @@ export function CreditNoteDialog({ invoiceId, onOpenChange, onIssued }: CreditNo
                             />
                           </div>
                           <p className="text-sm text-right font-medium col-span-2 sm:col-span-1">
-                            ${(base + iva).toFixed(2)}
+                            {formatCurrency((base + iva))}
                           </p>
                         </div>
                       );
@@ -375,19 +376,19 @@ export function CreditNoteDialog({ invoiceId, onOpenChange, onIssued }: CreditNo
                 <div className="rounded-md bg-muted/50 p-3 text-sm space-y-1">
                   <div className="flex justify-between">
                     <span>Subtotal</span>
-                    <span>${totals.base.toFixed(2)}</span>
+                    <span>{formatCurrency(totals.base)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>IVA</span>
-                    <span>${totals.iva.toFixed(2)}</span>
+                    <span>{formatCurrency(totals.iva)}</span>
                   </div>
                   <div className="flex justify-between font-semibold text-base border-t pt-1">
                     <span>Total nota de crédito</span>
-                    <span>${totals.total.toFixed(2)}</span>
+                    <span>{formatCurrency(totals.total)}</span>
                   </div>
                   {exceeds && (
                     <p className="text-xs text-destructive">
-                      Excede el disponible de la factura (${available.toFixed(2)}).
+                      Excede el disponible de la factura ({formatCurrency(available)}).
                     </p>
                   )}
                 </div>
@@ -399,7 +400,7 @@ export function CreditNoteDialog({ invoiceId, onOpenChange, onIssued }: CreditNo
                 <p className="font-medium">Notas anteriores de esta factura</p>
                 {invoice.creditNotes.map((cn) => (
                   <p key={cn.id}>
-                    {cn.formattedNumber} · ${cn.total.toFixed(2)} ·{' '}
+                    {cn.formattedNumber} · {formatCurrency(cn.total)} ·{' '}
                     {CREDIT_NOTE_STATUS_LABEL[cn.sriStatus as CreditNoteStatus] ?? cn.sriStatus} ·{' '}
                     {cn.reason}
                   </p>
