@@ -25,6 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Product, CreateProductDto } from '@/lib/api/products';
 import { AlertCircle } from 'lucide-react';
 import { useTaxCodes, getTaxLabel } from '@/lib/hooks/use-tax-codes';
+import { formatCurrency } from '@/lib/utils/formatters';
 
 /** Producto en blanco; el IVA siempre es el impuesto 2 de la Tabla 16 del SRI. */
 function emptyProduct(taxPercentageCode: string): CreateProductDto {
@@ -252,7 +253,7 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
                 <p className="text-xs text-muted-foreground">
                   Ingresa el precio <strong>sin IVA</strong>: el IVA se suma al facturar.
                   {priceWithIva !== null && (
-                    <> Precio final con IVA: ${priceWithIva.toFixed(2)}.</>
+                    <> Precio final con IVA: {formatCurrency(priceWithIva)}.</>
                   )}
                 </p>
               )}
@@ -330,7 +331,7 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
                 kkkk
               </div>
               <div className="mt-2 text-xs text-muted-foreground">
-                Ganancia: ${(formData.unitPrice - formData.cost).toFixed(2)}
+                Ganancia: {formatCurrency((formData.unitPrice - formData.cost))}
               </div>
               ffff
             </div>

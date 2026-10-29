@@ -18,6 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Search, X } from 'lucide-react';
 import { InvoiceStatement } from '@/lib/api/payments';
 import { useCreatePayment } from '@/lib/hooks/use-payments';
+import { formatCurrency } from '@/lib/utils/formatters';
 
 interface RegisterPaymentDialogProps {
   open: boolean;
@@ -223,7 +224,7 @@ export function RegisterPaymentDialog({
                       onClick={() => handleAddInvoice(invoice)}
                     >
                       <span className="font-mono">{invoice.sequential}</span>
-                      <span className="text-muted-foreground">Saldo ${invoice.balance.toFixed(2)}</span>
+                      <span className="text-muted-foreground">Saldo {formatCurrency(invoice.balance)}</span>
                     </button>
                   ))
                 ) : (
@@ -256,7 +257,7 @@ export function RegisterPaymentDialog({
                       <div>
                         <p className="font-mono text-sm">{invoice.sequential}</p>
                         <p className="text-sm text-muted-foreground">
-                          Saldo ${invoice.balance.toFixed(2)}
+                          Saldo {formatCurrency(invoice.balance)}
                         </p>
                       </div>
                       <button
@@ -313,7 +314,7 @@ export function RegisterPaymentDialog({
                     return (
                       <TableRow key={invoice.id}>
                         <TableCell className="font-mono text-xs">{invoice.sequential}</TableCell>
-                        <TableCell>${invoice.balance.toFixed(2)}</TableCell>
+                        <TableCell>{formatCurrency(invoice.balance)}</TableCell>
                         <TableCell>
                           <NumberInput
                             value={entry.amount}
@@ -362,15 +363,15 @@ export function RegisterPaymentDialog({
         <div className="text-sm text-right space-y-0.5">
           <div>
             {selectedInvoices.length} factura{selectedInvoices.length === 1 ? '' : 's'} agregada
-            {selectedInvoices.length === 1 ? '' : 's'} — Efectivo aplicado: ${allocatedTotal.toFixed(2)}{' '}
-            de ${totalAmount.toFixed(2)}
+            {selectedInvoices.length === 1 ? '' : 's'} — Efectivo aplicado: {formatCurrency(allocatedTotal)}{' '}
+            de {formatCurrency(totalAmount)}
             {difference !== 0 && (
-              <span className="text-muted-foreground"> (sin aplicar: ${difference.toFixed(2)})</span>
+              <span className="text-muted-foreground"> (sin aplicar: {formatCurrency(difference)})</span>
             )}
           </div>
           {retainedTotal > 0 && (
             <div className="text-muted-foreground">
-              + ${retainedTotal.toFixed(2)} de retención (no se descuenta del monto recibido)
+              + {formatCurrency(retainedTotal)} de retención (no se descuenta del monto recibido)
             </div>
           )}
         </div>

@@ -16,6 +16,7 @@ import { EditRetentionDialog } from '@/components/payments/edit-retention-dialog
 import { usePagination } from '@/lib/hooks/use-pagination';
 import { Pagination } from '@/components/ui/pagination';
 import { NativeSelect } from '@/components/ui/native-select';
+import { formatCurrency } from '@/lib/utils/formatters';
 
 type PaymentFilter = 'all' | 'withBalance' | InvoicePaymentStatus;
 
@@ -86,7 +87,7 @@ export default function CobranzaClientePage() {
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{customerName}</h1>
             <p className="text-sm sm:text-base text-muted-foreground">
-              Saldo pendiente: ${statement.totalPending.toFixed(2)}
+              Saldo pendiente: {formatCurrency(statement.totalPending)}
             </p>
             <button
               type="button"
@@ -158,15 +159,15 @@ export default function CobranzaClientePage() {
                 <div className="grid grid-cols-3 gap-2 text-sm">
                   <div>
                     <p className="text-xs text-muted-foreground">Total</p>
-                    <p>${invoice.total.toFixed(2)}</p>
+                    <p>{formatCurrency(invoice.total)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Retenido</p>
-                    <p>{invoice.retainedAmount > 0 ? `$${invoice.retainedAmount.toFixed(2)}` : '—'}</p>
+                    <p>{invoice.retainedAmount > 0 ? `${formatCurrency(invoice.retainedAmount)}` : '—'}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Saldo</p>
-                    <p className="font-medium">${invoice.balance.toFixed(2)}</p>
+                    <p className="font-medium">{formatCurrency(invoice.balance)}</p>
                   </div>
                 </div>
               </div>
@@ -196,11 +197,11 @@ export default function CobranzaClientePage() {
                   <TableRow key={invoice.id}>
                     <TableCell className="font-mono text-xs">{invoice.sequential}</TableCell>
                     <TableCell>{new Date(invoice.issueDate).toLocaleDateString('es-EC')}</TableCell>
-                    <TableCell>${invoice.total.toFixed(2)}</TableCell>
+                    <TableCell>{formatCurrency(invoice.total)}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {invoice.retainedAmount > 0 ? `$${invoice.retainedAmount.toFixed(2)}` : '—'}
+                      {invoice.retainedAmount > 0 ? `${formatCurrency(invoice.retainedAmount)}` : '—'}
                     </TableCell>
-                    <TableCell>${invoice.balance.toFixed(2)}</TableCell>
+                    <TableCell>{formatCurrency(invoice.balance)}</TableCell>
                     <TableCell>
                       <Badge variant={STATUS_VARIANT[invoice.paymentStatus]}>
                         {STATUS_LABEL[invoice.paymentStatus]}
@@ -241,7 +242,7 @@ export default function CobranzaClientePage() {
                     <p className="text-xs text-muted-foreground">{payment.reference || 'Sin referencia'}</p>
                   </div>
                   <div className="flex items-center gap-1">
-                    <p className="text-sm font-semibold">${payment.totalAmount.toFixed(2)}</p>
+                    <p className="text-sm font-semibold">{formatCurrency(payment.totalAmount)}</p>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -256,9 +257,9 @@ export default function CobranzaClientePage() {
                 <p className="text-xs text-muted-foreground">
                   {payment.allocations
                     .map((a) => {
-                      const label = `${a.invoice?.sequential ?? a.invoiceId} ($${a.amount.toFixed(2)})`;
+                      const label = `${a.invoice?.sequential ?? a.invoiceId} (${formatCurrency(a.amount)})`;
                       return a.retentionAmount > 0
-                        ? `${label} + $${a.retentionAmount.toFixed(2)} ret.`
+                        ? `${label} + ${formatCurrency(a.retentionAmount)} ret.`
                         : label;
                     })
                     .join(', ')}
@@ -289,13 +290,13 @@ export default function CobranzaClientePage() {
                   <TableRow key={payment.id}>
                     <TableCell>{new Date(payment.paymentDate).toLocaleDateString('es-EC')}</TableCell>
                     <TableCell>{payment.reference || '—'}</TableCell>
-                    <TableCell>${payment.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell>{formatCurrency(payment.totalAmount)}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {payment.allocations
                         .map((a) => {
-                          const label = `${a.invoice?.sequential ?? a.invoiceId} ($${a.amount.toFixed(2)})`;
+                          const label = `${a.invoice?.sequential ?? a.invoiceId} (${formatCurrency(a.amount)})`;
                           return a.retentionAmount > 0
-                            ? `${label} + $${a.retentionAmount.toFixed(2)} ret.`
+                            ? `${label} + ${formatCurrency(a.retentionAmount)} ret.`
                             : label;
                         })
                         .join(', ')}

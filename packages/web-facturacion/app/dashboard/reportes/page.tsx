@@ -3,24 +3,19 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   FileText,
   DollarSign,
-  Users,
-  Package,
   TrendingUp,
   Download,
   CheckCircle2,
   Clock,
   XCircle,
-  AlertCircle,
   Calendar
 } from 'lucide-react';
 import { invoicesApi, Invoice } from '@/lib/api/invoices';
-import { customersApi } from '@/lib/api/customers';
-import { productsApi } from '@/lib/api/products';
+import { formatCurrency } from '@/lib/utils/formatters';
 
 export default function ReportesPage() {
   const [loading, setLoading] = useState(true);
@@ -115,31 +110,7 @@ export default function ReportesPage() {
       .slice(0, 10);
   })();
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-EC', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: any; label: string }> = {
-      AUTHORIZED: { variant: 'default', icon: CheckCircle2, label: 'Autorizada' },
-      PENDING: { variant: 'secondary', icon: Clock, label: 'Pendiente' },
-      REJECTED: { variant: 'destructive', icon: XCircle, label: 'Rechazada' },
-      ERROR: { variant: 'destructive', icon: AlertCircle, label: 'Error' },
-    };
-
-    const config = statusConfig[status] || statusConfig.PENDING;
-    const Icon = config.icon;
-
-    return (
-      <Badge variant={config.variant} className="gap-1">
-        <Icon className="h-3 w-3" />
-        {config.label}
-      </Badge>
-    );
-  };
 
   const exportToCSV = () => {
     const headers = ['Número', 'Fecha', 'Cliente', 'Subtotal', 'IVA', 'Total', 'Estado'];

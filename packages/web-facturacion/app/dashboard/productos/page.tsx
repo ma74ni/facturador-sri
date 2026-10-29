@@ -29,6 +29,7 @@ import { usePagination } from '@/lib/hooks/use-pagination';
 import { Pagination } from '@/components/ui/pagination';
 import { FilterBar, FilterField } from '@/components/ui/filter-bar';
 import { NativeSelect } from '@/components/ui/native-select';
+import { formatCurrency } from '@/lib/utils/formatters';
 
 type ProductSort = 'recent' | 'name' | 'priceAsc' | 'priceDesc';
 
@@ -237,7 +238,7 @@ export default function ProductosPage() {
                           <p className="font-mono text-xs text-muted-foreground">{product.mainCode}</p>
                           <p className="font-medium text-sm break-words">{product.name}</p>
                         </div>
-                        <p className="font-semibold text-sm flex-shrink-0">${unitPrice.toFixed(2)}</p>
+                        <p className="font-semibold text-sm flex-shrink-0">{formatCurrency(unitPrice)}</p>
                       </div>
                       {product.description && (
                         <p className="text-xs text-muted-foreground line-clamp-2">{product.description}</p>
@@ -247,7 +248,7 @@ export default function ProductosPage() {
                           <Badge variant="outline" className="text-xs">
                             {getTaxLabel(taxCodesData?.taxCodes || [], product.taxPercentageCode)}
                           </Badge>
-                          {cost !== null && <span>Costo: ${cost.toFixed(2)}</span>}
+                          {cost !== null && <span>Costo: {formatCurrency(cost)}</span>}
                           {margen !== null && (
                             <span className={getMargenColor(margen)}>Margen: {margen.toFixed(1)}%</span>
                           )}
@@ -310,7 +311,7 @@ export default function ProductosPage() {
                                 </Badge>
                               </div>
                               <div className="flex gap-2 text-xs text-muted-foreground mt-1">
-                                {cost !== null && <span>Costo: ${cost.toFixed(2)}</span>}
+                                {cost !== null && <span>Costo: {formatCurrency(cost)}</span>}
                                 {margen !== null && (
                                   <span className={getMargenColor(margen)}>Margen: {margen.toFixed(1)}%</span>
                                 )}
@@ -326,7 +327,7 @@ export default function ProductosPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right font-medium text-sm">
-                            ${unitPrice.toFixed(2)}
+                            {formatCurrency(unitPrice)}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
@@ -390,7 +391,7 @@ export default function ProductosPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ${products.length > 0 ? (products.reduce((sum, p) => sum + Number(p.unitPrice), 0) / products.length).toFixed(2) : '0.00'}
+                {formatCurrency(products.length > 0 ? products.reduce((sum, p) => sum + Number(p.unitPrice), 0) / products.length : 0)}
               </div>
               <p className="text-xs text-muted-foreground">
                 precio venta

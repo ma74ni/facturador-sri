@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,15 +17,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import {
   Plus,
-  Eye,
   Download,
   Mail,
   Send,
   FileText,
   CheckCircle2,
   Clock,
-  XCircle,
-  AlertCircle,
   DollarSign,
   Calendar,
   FileDown,
@@ -35,10 +31,7 @@ import {
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { CreditNoteDialog } from '@/components/credit-notes/credit-note-dialog';
-import { invoicesApi, Invoice, CreateInvoiceDto, InvoiceStats } from '@/lib/api/invoices';
-import { Customer } from '@/lib/api/customers';
-import { Product } from '@/lib/api/products';
-import { Establishment } from '@/lib/api/establishments';
+import { invoicesApi, Invoice, CreateInvoiceDto } from '@/lib/api/invoices';
 import { InvoiceDialog } from '@/components/invoices/invoice-dialog';
 import { CertificateRequiredDialog } from '@/components/shared/certificate-required-dialog';
 import { EmailVerificationRequiredDialog } from '@/components/shared/email-verification-required-dialog';
@@ -58,6 +51,8 @@ import {
   getPeriodRange,
   isInRange,
 } from '@/lib/utils/date-range';
+import { formatCurrency } from '@/lib/utils/formatters';
+import { SriStatusBadge } from '@/components/shared/sri-status-badge';
 
 type InvoiceSort = 'recent' | 'oldest' | 'amountDesc' | 'amountAsc';
 
@@ -402,27 +397,6 @@ export default function FacturasPage() {
     );
   };
 
-  const getStatusBadge = (status: Invoice['status']) => {
-    const statusConfig = {
-      DRAFT: { variant: 'secondary' as const, icon: Clock, label: 'Borrador' },
-      CANCELLED: { variant: 'secondary' as const, icon: Ban, label: 'Cancelada' },
-      PENDING: { variant: 'warning' as const, icon: Clock, label: 'Pendiente' },
-      SENT: { variant: 'info' as const, icon: Send, label: 'Enviada' },
-      AUTHORIZED: { variant: 'success' as const, icon: CheckCircle2, label: 'Autorizada' },
-      REJECTED: { variant: 'destructive' as const, icon: XCircle, label: 'Rechazada' },
-      ERROR: { variant: 'destructive' as const, icon: AlertCircle, label: 'Error' },
-    };
-
-    const config = statusConfig[status] || { variant: 'secondary' as const, icon: AlertCircle, label: status || 'Desconocido' };
-    const Icon = config.icon;
-
-    return (
-      <Badge variant={config.variant}>
-        <Icon className="mr-1 h-3 w-3" />
-        {config.label}
-      </Badge>
-    );
-  };
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -496,7 +470,7 @@ export default function FacturasPage() {
               <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-xl sm:text-2xl font-bold">${stats.totalAmount.toFixed(2)}</div>
+              <div className="text-xl sm:text-2xl font-bold">{formatCurrency(stats.totalAmount)}</div>
               <p className="text-xs text-muted-foreground">
                 suma de facturas
               </p>
@@ -619,7 +593,7 @@ export default function FacturasPage() {
                           {new Date(factura.issueDate).toLocaleDateString('es-EC', { timeZone: 'UTC' })}
                         </p>
                       </div>
-                      {getStatusBadge(factura.status)}
+                      <SriStatusBadge status={factura.status} />
                     </div>
                     <div className="flex items-end justify-between gap-2">
                       <div className="min-w-0">
@@ -627,7 +601,7 @@ export default function FacturasPage() {
                         <p className="font-mono text-xs text-muted-foreground">{factura.customerIdentification}</p>
                       </div>
                       <p className="font-semibold text-sm flex-shrink-0">
-                        ${Number(factura.totalAmount).toFixed(2)}
+                        {formatCurrency(Number(factura.totalAmount))}
                       </p>
                     </div>
                     <div className="flex items-center justify-end gap-1 border-t pt-2">
@@ -661,7 +635,7 @@ export default function FacturasPage() {
                             </span>
                             {/* Estado debajo del secuencial cuando no hay columna Estado */}
                             <span className="lg:hidden">
-                              {getStatusBadge(factura.status)}
+                              <SriStatusBadge status={factura.status} />
                             </span>
                           </div>
                         </TableCell>
@@ -684,10 +658,10 @@ export default function FacturasPage() {
                           {factura.customerIdentification}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
-                          {getStatusBadge(factura.status)}
+                          <SriStatusBadge status={factura.status} />
                         </TableCell>
                         <TableCell className="text-right font-medium text-sm">
-                          ${Number(factura.totalAmount).toFixed(2)}
+                          {formatCurrency(Number(factura.totalAmount))}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
@@ -737,7 +711,7 @@ export default function FacturasPage() {
                       </p>
                     </div>
                     <div className="text-left sm:text-right flex-shrink-0">
-                      <p className="text-sm font-medium">${Number(factura.totalAmount).toFixed(2)}</p>
+                      <p className="text-sm font-medium">{formatCurrency(Number(factura.totalAmount))}</p>
                       <p className="text-xs text-muted-foreground">
                         {factura.authorizationDate &&
                           new Date(factura.authorizationDate).toLocaleDateString('es-EC')}
