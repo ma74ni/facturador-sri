@@ -102,14 +102,14 @@ export function GoLiveDialog({ company, open, onOpenChange }: GoLiveDialogProps)
         </DialogHeader>
 
         <DialogBody className="space-y-5">
-          <p className="text-sm text-slate-700">
+          <p className="text-sm text-on-surface">
             Para cada punto de emisión, pregúntale a la empresa si <strong>ya facturó electrónicamente</strong> con
             ese número en otro sistema (por ejemplo, el facturador gratuito del SRI). Si se repite un número, el SRI
             rechaza la factura.
           </p>
 
           {plan.map(({ point, answer, nextInvoice, nextCreditNote, invalid }) => (
-            <div key={point.id} className="rounded-lg border border-slate-200 p-4 space-y-3">
+            <div key={point.id} className="rounded-lg border border-outline-variant p-4 space-y-3">
               <p className="font-medium">
                 Punto {point.label}
                 {point.description ? <span className="text-muted-foreground font-normal"> · {point.description}</span> : null}
@@ -165,7 +165,7 @@ export function GoLiveDialog({ company, open, onOpenChange }: GoLiveDialogProps)
                 </div>
               )}
 
-              <p className={`text-sm ${invalid ? 'text-red-600' : 'text-slate-600'}`}>
+              <p className={`text-sm ${invalid ? 'text-error' : 'text-on-surface-variant'}`}>
                 {invalid
                   ? answer.usedBefore && answer.lastInvoice.trim() === ''
                     ? 'Indica el número de la última factura emitida.'

@@ -411,7 +411,7 @@ export function InvoiceDialog({
         <div className="space-y-6">
             {/* SECCIÓN 1: Datos Generales */}
             <div className="border-b pb-4">
-              <h3 className="text-lg font-semibold text-slate-700 mb-4">
+              <h3 className="text-lg font-semibold text-on-surface mb-4">
                 1. Datos Generales
               </h3>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -437,7 +437,7 @@ export function InvoiceDialog({
                     error={!!errors.customer}
                   />
                   {errors.customer && (
-                    <div className="flex items-center gap-1 text-sm text-red-500">
+                    <div className="flex items-center gap-1 text-sm text-error">
                       <AlertCircle className="h-4 w-4" />
                       <span>{errors.customer}</span>
                     </div>
@@ -465,10 +465,10 @@ export function InvoiceDialog({
                     type="date"
                     value={issueDate}
                     onChange={(e) => setIssueDate(e.target.value)}
-                    className={errors.issueDate ? "border-red-500" : ""}
+                    className={errors.issueDate ? "border-error" : ""}
                   />
                   {errors.issueDate && (
-                    <div className="flex items-center gap-1 text-sm text-red-500">
+                    <div className="flex items-center gap-1 text-sm text-error">
                       <AlertCircle className="h-4 w-4" />
                       <span>{errors.issueDate}</span>
                     </div>
@@ -486,7 +486,7 @@ export function InvoiceDialog({
                     }}
                   >
                     <SelectTrigger
-                      className={errors.establishment ? "border-red-500" : ""}
+                      className={errors.establishment ? "border-error" : ""}
                     >
                       <SelectValue placeholder="Seleccionar establecimiento" />
                     </SelectTrigger>
@@ -499,7 +499,7 @@ export function InvoiceDialog({
                     </SelectContent>
                   </Select>
                   {errors.establishment && (
-                    <div className="flex items-center gap-1 text-sm text-red-500">
+                    <div className="flex items-center gap-1 text-sm text-error">
                       <AlertCircle className="h-4 w-4" />
                       <span>{errors.establishment}</span>
                     </div>
@@ -515,7 +515,7 @@ export function InvoiceDialog({
                     disabled={!selectedEstablishment}
                   >
                     <SelectTrigger
-                      className={errors.emissionPoint ? "border-red-500" : ""}
+                      className={errors.emissionPoint ? "border-error" : ""}
                     >
                       <SelectValue placeholder="Seleccionar punto" />
                     </SelectTrigger>
@@ -528,7 +528,7 @@ export function InvoiceDialog({
                     </SelectContent>
                   </Select>
                   {errors.emissionPoint && (
-                    <div className="flex items-center gap-1 text-sm text-red-500">
+                    <div className="flex items-center gap-1 text-sm text-error">
                       <AlertCircle className="h-4 w-4" />
                       <span>{errors.emissionPoint}</span>
                     </div>
@@ -539,11 +539,11 @@ export function InvoiceDialog({
 
             {/* SECCIÓN 2: Productos */}
             <div className="border-b pb-4">
-              <h3 className="text-lg font-semibold text-slate-700 mb-4">
+              <h3 className="text-lg font-semibold text-on-surface mb-4">
                 2. Productos y Servicios
               </h3>
-              <div className="border rounded-lg p-4 bg-slate-50">
-                <h4 className="font-medium mb-4 text-slate-600">
+              <div className="border rounded-lg p-4 bg-surface-container-low">
+                <h4 className="font-medium mb-4 text-on-surface-variant">
                   Agregar Producto
                 </h4>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
@@ -609,14 +609,14 @@ export function InvoiceDialog({
                     {normalized.map((item, index) => (
                       <div
                         key={index}
-                        className="border rounded-lg p-4 bg-white shadow-sm"
+                        className="border rounded-lg p-4 bg-surface-container-lowest shadow-sm"
                       >
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-semibold text-slate-900 mb-1 truncate">
+                            <h4 className="font-semibold text-on-surface mb-1 truncate">
                               {item.description}
                             </h4>
-                            <p className="text-sm text-slate-500">
+                            <p className="text-sm text-on-surface-variant">
                               Cantidad: {item.quantity} × {formatCurrency(item.unitPrice)}
                             </p>
                           </div>
@@ -632,25 +632,25 @@ export function InvoiceDialog({
 
                         <div className="grid grid-cols-2 gap-2 text-sm">
                           <div>
-                            <span className="text-slate-500">Descuento:</span>
+                            <span className="text-on-surface-variant">Descuento:</span>
                             <span className="ml-1 font-medium">
                               {formatCurrency(item.discount)}
                             </span>
                           </div>
                           <div>
-                            <span className="text-slate-500">Subtotal:</span>
+                            <span className="text-on-surface-variant">Subtotal:</span>
                             <span className="ml-1 font-medium">
                               {formatCurrency(item.subtotal)}
                             </span>
                           </div>
                           <div>
-                            <span className="text-slate-500">IVA:</span>
+                            <span className="text-on-surface-variant">IVA:</span>
                             <span className="ml-1 font-medium">
                               {formatCurrency(item.taxValue)}
                             </span>
                           </div>
                           <div>
-                            <span className="text-slate-500">Total:</span>
+                            <span className="text-on-surface-variant">Total:</span>
                             <span className="ml-1 font-bold text-primary">
                               {formatCurrency(item.total)}
                             </span>
@@ -716,7 +716,7 @@ export function InvoiceDialog({
 
               {/* RESUMEN DE TOTALES - Más visible y claro */}
               {items.length > 0 && (
-                <div className="mt-4 bg-white border-2 border-primary/20 rounded-lg shadow-md overflow-hidden lg:max-w-md lg:ml-auto">
+                <div className="mt-4 bg-surface-container-lowest border-2 border-primary/20 rounded-lg shadow-md overflow-hidden lg:max-w-md lg:ml-auto">
                   <div className="bg-primary/5 px-4 py-2 border-b border-primary/20">
                     <h3 className="font-semibold text-primary text-sm uppercase tracking-wide">
                       Resumen de Factura
@@ -724,14 +724,14 @@ export function InvoiceDialog({
                   </div>
                   <div className="p-4 lg:p-6 space-y-3">
                     <div className="flex justify-between items-center text-base">
-                      <span className="text-slate-600">Subtotal (Base):</span>
+                      <span className="text-on-surface-variant">Subtotal (Base):</span>
                       <span className="font-semibold text-lg">
                         {formatCurrency(totals.subtotal)}
                       </span>
                     </div>
 
                     {totals.discount > 0 && (
-                      <div className="flex justify-between items-center text-base text-red-600">
+                      <div className="flex justify-between items-center text-base text-error">
                         <span>Descuento:</span>
                         <span className="font-semibold text-lg">
                           -{formatCurrency(totals.discount)}
@@ -739,13 +739,13 @@ export function InvoiceDialog({
                       </div>
                     )}
 
-                    <div className="space-y-3 border-t border-dashed border-slate-300 pt-3">
+                    <div className="space-y-3 border-t border-dashed border-outline-variant pt-3">
                       {ivaGroups.map((group) => (
                         <div
                           key={group.code}
                           className="flex justify-between items-center text-base"
                         >
-                          <span className="text-slate-700 font-medium">
+                          <span className="text-on-surface font-medium">
                             Subtotal {group.label}:
                           </span>
                           <span className="font-semibold text-lg">
@@ -762,8 +762,8 @@ export function InvoiceDialog({
                           key={group.code}
                           className="flex justify-between items-center text-base"
                         >
-                          <span className="text-slate-600">{group.label}:</span>
-                          <span className="font-semibold text-lg text-blue-600">
+                          <span className="text-on-surface-variant">{group.label}:</span>
+                          <span className="font-semibold text-lg text-primary">
                             {formatCurrency(group.ivaValue)}
                           </span>
                         </div>
@@ -782,7 +782,7 @@ export function InvoiceDialog({
               )}
 
               {errors.items && (
-                <div className="flex items-center gap-1 text-sm text-red-500 mt-2">
+                <div className="flex items-center gap-1 text-sm text-error mt-2">
                   <AlertCircle className="h-4 w-4" />
                   <span>{errors.items}</span>
                 </div>
@@ -792,7 +792,7 @@ export function InvoiceDialog({
 
           {/* SECCIÓN 3: Forma de Pago */}
           <div>
-            <h3 className="text-lg font-semibold text-slate-700 mb-4">
+            <h3 className="text-lg font-semibold text-on-surface mb-4">
               3. Forma de Pago y Opciones
             </h3>
             <div className="grid gap-4 md:grid-cols-2">
@@ -819,7 +819,7 @@ export function InvoiceDialog({
                       >
                         <div className="flex flex-col">
                           <span className="font-medium">{method.label}</span>
-                          <span className="text-xs text-slate-500">
+                          <span className="text-xs text-on-surface-variant">
                             {method.description}
                           </span>
                         </div>
@@ -827,7 +827,7 @@ export function InvoiceDialog({
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-on-surface-variant mt-1">
                   Método de pago que utilizará el cliente
                 </p>
               </div>
@@ -836,19 +836,19 @@ export function InvoiceDialog({
                 <Label className="text-base font-semibold">
                   Opciones Tributarias
                 </Label>
-                <div className="flex items-center space-x-3 p-3 bg-slate-50 border border-slate-200 rounded-lg h-12">
+                <div className="flex items-center space-x-3 p-3 bg-surface-container-low border border-outline-variant rounded-lg h-12">
                   <input
                     type="checkbox"
                     id="rimpe-checkbox"
                     checked={isRimpe}
                     onChange={(e) => setIsRimpe(e.target.checked)}
-                    className="w-5 h-5 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
+                    className="w-5 h-5 text-primary border-outline-variant rounded focus:ring-primary cursor-pointer"
                   />
                   <label
                     htmlFor="rimpe-checkbox"
                     className="cursor-pointer flex-1"
                   >
-                    <span className="text-sm font-semibold text-slate-700">
+                    <span className="text-sm font-semibold text-on-surface">
                       Régimen RIMPE
                     </span>
                   </label>
@@ -857,8 +857,8 @@ export function InvoiceDialog({
             </div>
 
             {isRimpe && (
-              <div className="rounded-lg bg-blue-50 border border-blue-200 p-4 mt-4">
-                <p className="text-sm text-blue-800">
+              <div className="rounded-lg bg-primary-container border border-primary-container p-4 mt-4">
+                <p className="text-sm text-on-primary-container">
                   <strong>Nota RIMPE:</strong> Esta factura incluirá la leyenda
                   &ldquo;CONTRIBUYENTE NEGOCIO POPULAR - RÉGIMEN RIMPE&rdquo; en la
                   información adicional del XML. No se aplicará retención de IVA

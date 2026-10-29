@@ -238,8 +238,8 @@ export default function ConfiguracionPage() {
             <CardContent>
               {establishments.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <div className="rounded-full bg-slate-100 p-6 mb-4">
-                    <Building className="h-12 w-12 text-slate-400" />
+                  <div className="rounded-full bg-surface-container-high p-6 mb-4">
+                    <Building className="h-12 w-12 text-on-surface-variant" />
                   </div>
                   <h3 className="text-lg font-semibold mb-2">
                     No hay establecimientos registrados
@@ -312,7 +312,7 @@ export default function ConfiguracionPage() {
                             {establishment.emissionPoints.map((point) => (
                               <div
                                 key={point.id}
-                                className="flex items-center justify-between p-2 sm:p-3 border rounded-lg bg-slate-50"
+                                className="flex items-center justify-between p-2 sm:p-3 border rounded-lg bg-surface-container-low"
                               >
                                 <div className="flex items-center gap-2 min-w-0 flex-1">
                                   <Badge variant="secondary" className="font-mono text-xs flex-shrink-0">
@@ -405,8 +405,8 @@ export default function ConfiguracionPage() {
             <CardContent>
               {users.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <div className="rounded-full bg-slate-100 p-6 mb-4">
-                    <Users className="h-12 w-12 text-slate-400" />
+                  <div className="rounded-full bg-surface-container-high p-6 mb-4">
+                    <Users className="h-12 w-12 text-on-surface-variant" />
                   </div>
                   <h3 className="text-lg font-semibold mb-2">
                     Solo tú tienes acceso

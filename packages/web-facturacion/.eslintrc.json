@@ -1,12 +1,33 @@
 {
   "root": true,
-  "extends": ["next/core-web-vitals", "next/typescript", "prettier"],
-  "ignorePatterns": ["next-env.d.ts"],
+  "extends": [
+    "next/core-web-vitals",
+    "next/typescript",
+    "prettier"
+  ],
+  "ignorePatterns": [
+    "next-env.d.ts"
+  ],
   "rules": {
     "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/no-unused-vars": [
       "warn",
-      { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_", "ignoreRestSiblings": true }
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "ignoreRestSiblings": true
+      }
+    ],
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "Literal[value=/(bg|text|border|ring|divide|from|via|to|fill|stroke|outline|placeholder)-(red|rose|green|emerald|teal|lime|yellow|amber|orange|blue|sky|indigo|cyan|purple|violet|pink|fuchsia|slate|gray|zinc|neutral|stone)-[0-9]/]",
+        "message": "Usá los roles de color MD3 del design system (text-error, bg-surface-container, text-on-surface-variant…), no la paleta de Tailwind."
+      },
+      {
+        "selector": "TemplateElement[value.raw=/(bg|text|border|ring|divide|from|via|to|fill|stroke|outline|placeholder)-(red|rose|green|emerald|teal|lime|yellow|amber|orange|blue|sky|indigo|cyan|purple|violet|pink|fuchsia|slate|gray|zinc|neutral|stone)-[0-9]/]",
+        "message": "Usá los roles de color MD3 del design system (text-error, bg-surface-container, text-on-surface-variant…), no la paleta de Tailwind."
+      }
     ]
   }
 }

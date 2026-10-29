@@ -83,7 +83,7 @@ export default function AdminEmpresaDetailPage() {
 
   return (
     <div className="space-y-6">
-      <Link href="/dashboard/admin/empresas" className="inline-flex items-center text-sm text-muted-foreground hover:text-slate-900">
+      <Link href="/dashboard/admin/empresas" className="inline-flex items-center text-sm text-muted-foreground hover:text-on-surface">
         <ArrowLeft className="mr-1 h-4 w-4" />
         Empresas
       </Link>

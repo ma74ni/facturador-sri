@@ -93,10 +93,10 @@ export function EmissionPointDialog({ open, onOpenChange, onSave, establishmentN
               }}
               placeholder="001"
               maxLength={3}
-              className={errors.code ? 'border-red-500' : ''}
+              className={errors.code ? 'border-error' : ''}
             />
             {errors.code && (
-              <div className="flex items-center gap-1 text-sm text-red-500">
+              <div className="flex items-center gap-1 text-sm text-error">
                 <AlertCircle className="h-4 w-4" />
                 <span>{errors.code}</span>
               </div>

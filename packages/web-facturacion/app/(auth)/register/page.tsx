@@ -50,7 +50,7 @@ export default function RegisterPage() {
   // Mostrar loading mientras verifica autenticación
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-surface-container-low to-surface-container-high">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-muted-foreground">Cargando...</p>
@@ -65,7 +65,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-surface-container-low to-surface-container-high p-4">
       <Card className="w-full max-w-2xl">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">
@@ -78,7 +78,7 @@ export default function RegisterPage() {
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             {error && (
-              <div className="flex items-center gap-2 p-3 text-sm text-red-800 bg-red-50 border border-red-200 rounded-md">
+              <div className="flex items-center gap-2 p-3 text-sm text-on-error-container bg-error-container border border-error-container rounded-md">
                 <AlertCircle className="h-4 w-4" />
                 <span>{error}</span>
               </div>
@@ -102,7 +102,7 @@ export default function RegisterPage() {
                     disabled={isLoading}
                   />
                   {errors.ruc && (
-                    <p className="text-sm text-red-600">{errors.ruc.message}</p>
+                    <p className="text-sm text-error">{errors.ruc.message}</p>
                   )}
                 </div>
 
@@ -115,7 +115,7 @@ export default function RegisterPage() {
                     disabled={isLoading}
                   />
                   {errors.businessName && (
-                    <p className="text-sm text-red-600">{errors.businessName.message}</p>
+                    <p className="text-sm text-error">{errors.businessName.message}</p>
                   )}
                 </div>
 
@@ -128,7 +128,7 @@ export default function RegisterPage() {
                     disabled={isLoading}
                   />
                   {errors.tradeName && (
-                    <p className="text-sm text-red-600">{errors.tradeName.message}</p>
+                    <p className="text-sm text-error">{errors.tradeName.message}</p>
                   )}
                 </div>
 
@@ -141,7 +141,7 @@ export default function RegisterPage() {
                     disabled={isLoading}
                   />
                   {errors.phone && (
-                    <p className="text-sm text-red-600">{errors.phone.message}</p>
+                    <p className="text-sm text-error">{errors.phone.message}</p>
                   )}
                 </div>
               </div>
@@ -155,7 +155,7 @@ export default function RegisterPage() {
                   disabled={isLoading}
                 />
                 {errors.address && (
-                  <p className="text-sm text-red-600">{errors.address.message}</p>
+                  <p className="text-sm text-error">{errors.address.message}</p>
                 )}
               </div>
 
@@ -169,7 +169,7 @@ export default function RegisterPage() {
                   disabled={isLoading}
                 />
                 {errors.email && (
-                  <p className="text-sm text-red-600">{errors.email.message}</p>
+                  <p className="text-sm text-error">{errors.email.message}</p>
                 )}
               </div>
             </div>
@@ -191,7 +191,7 @@ export default function RegisterPage() {
                     disabled={isLoading}
                   />
                   {errors.firstName && (
-                    <p className="text-sm text-red-600">{errors.firstName.message}</p>
+                    <p className="text-sm text-error">{errors.firstName.message}</p>
                   )}
                 </div>
 
@@ -204,7 +204,7 @@ export default function RegisterPage() {
                     disabled={isLoading}
                   />
                   {errors.lastName && (
-                    <p className="text-sm text-red-600">{errors.lastName.message}</p>
+                    <p className="text-sm text-error">{errors.lastName.message}</p>
                   )}
                 </div>
 
@@ -218,7 +218,7 @@ export default function RegisterPage() {
                     disabled={isLoading}
                   />
                   {errors.userEmail && (
-                    <p className="text-sm text-red-600">{errors.userEmail.message}</p>
+                    <p className="text-sm text-error">{errors.userEmail.message}</p>
                   )}
                 </div>
 
@@ -231,7 +231,7 @@ export default function RegisterPage() {
                     disabled={isLoading}
                   />
                   {errors.password && (
-                    <p className="text-sm text-red-600">{errors.password.message}</p>
+                    <p className="text-sm text-error">{errors.password.message}</p>
                   )}
                 </div>
 
@@ -244,7 +244,7 @@ export default function RegisterPage() {
                     disabled={isLoading}
                   />
                   {errors.confirmPassword && (
-                    <p className="text-sm text-red-600">{errors.confirmPassword.message}</p>
+                    <p className="text-sm text-error">{errors.confirmPassword.message}</p>
                   )}
                 </div>
               </div>

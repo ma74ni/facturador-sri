@@ -68,28 +68,28 @@ export default function DashboardPage() {
       value: loading ? '...' : (invoiceStats?.total || 0).toString(),
       icon: FileText,
       description: `${invoiceStats?.authorized || 0} autorizadas, ${invoiceStats?.pending || 0} pendientes`,
-      color: 'text-blue-600',
+      color: 'text-primary',
     },
     {
       title: 'Ingresos Totales',
       value: loading ? '...' : formatCurrency(invoiceStats?.totalAmount || 0),
       icon: DollarSign,
       description: 'Total facturado',
-      color: 'text-green-600',
+      color: 'text-success',
     },
     {
       title: 'Clientes',
       value: loading ? '...' : customers.length.toString(),
       icon: Users,
       description: 'clientes registrados',
-      color: 'text-purple-600',
+      color: 'text-tertiary',
     },
     {
       title: 'Productos',
       value: loading ? '...' : products.length.toString(),
       icon: Package,
       description: 'en catálogo',
-      color: 'text-orange-600',
+      color: 'text-warning',
     },
   ];
 
@@ -172,7 +172,7 @@ export default function DashboardPage() {
                 {recentInvoices.map((invoice) => (
                   <div
                     key={invoice.id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer"
                     onClick={() => router.push(`/dashboard/facturas`)}
                   >
                     <div className="space-y-1">
@@ -280,7 +280,7 @@ export default function DashboardPage() {
                 <div
                   key={action.title}
                   onClick={() => router.push(action.path)}
-                  className="flex items-start space-x-3 p-4 border rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                  className="flex items-start space-x-3 p-4 border rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer"
                 >
                   <Icon className="h-5 w-5 text-primary mt-0.5" />
                   <div>

@@ -50,7 +50,7 @@ export default function AdminAdministradoresPage() {
           {isLoading ? (
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-outline-variant">
               {admins.map((admin) => (
                 <li key={admin.id} className="flex items-center justify-between gap-2 py-3 text-sm">
                   <div className="min-w-0">
@@ -70,7 +70,7 @@ export default function AdminAdministradoresPage() {
                       aria-label={`Quitar permiso a ${admin.email}`}
                       onClick={() => setToRevoke(admin)}
                     >
-                      <Trash2 className="h-4 w-4 text-red-600" />
+                      <Trash2 className="h-4 w-4 text-error" />
                     </Button>
                   )}
                 </li>

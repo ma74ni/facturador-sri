@@ -29,34 +29,34 @@ export function CustomerInfoCard({ customer, onEdit, onClose, compact = false }:
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2">
               <User className="h-4 w-4 text-primary flex-shrink-0" />
-              <h4 className="font-semibold text-slate-900 truncate">{displayName}</h4>
+              <h4 className="font-semibold text-on-surface truncate">{displayName}</h4>
             </div>
 
             <div className="space-y-1.5 text-sm">
               <div className="flex items-center gap-2 min-w-0">
-                <FileText className="h-3.5 w-3.5 text-slate-500 flex-shrink-0" />
-                <span className="text-slate-600 flex-shrink-0">{identificationLabel}:</span>
-                <span className="font-mono font-medium text-slate-900 truncate">{customer.identification}</span>
+                <FileText className="h-3.5 w-3.5 text-on-surface-variant flex-shrink-0" />
+                <span className="text-on-surface-variant flex-shrink-0">{identificationLabel}:</span>
+                <span className="font-mono font-medium text-on-surface truncate">{customer.identification}</span>
               </div>
 
               {customer.email && (
                 <div className="flex items-center gap-2 min-w-0">
-                  <Mail className="h-3.5 w-3.5 text-slate-500 flex-shrink-0" />
-                  <span className="text-slate-700 truncate">{customer.email}</span>
+                  <Mail className="h-3.5 w-3.5 text-on-surface-variant flex-shrink-0" />
+                  <span className="text-on-surface truncate">{customer.email}</span>
                 </div>
               )}
 
               {customer.phone && (
                 <div className="flex items-center gap-2 min-w-0">
-                  <Phone className="h-3.5 w-3.5 text-slate-500 flex-shrink-0" />
-                  <span className="text-slate-700 truncate">{customer.phone}</span>
+                  <Phone className="h-3.5 w-3.5 text-on-surface-variant flex-shrink-0" />
+                  <span className="text-on-surface truncate">{customer.phone}</span>
                 </div>
               )}
 
               {customer.address && (
                 <div className="flex items-start gap-2">
-                  <MapPin className="h-3.5 w-3.5 text-slate-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-slate-700 text-xs leading-relaxed">{customer.address}</span>
+                  <MapPin className="h-3.5 w-3.5 text-on-surface-variant flex-shrink-0 mt-0.5" />
+                  <span className="text-on-surface text-xs leading-relaxed">{customer.address}</span>
                 </div>
               )}
             </div>
@@ -81,7 +81,7 @@ export function CustomerInfoCard({ customer, onEdit, onClose, compact = false }:
                 variant="ghost"
                 size="sm"
                 onClick={onClose}
-                className="h-8 px-2 hover:bg-red-100 hover:text-red-600"
+                className="h-8 px-2 hover:bg-error-container hover:text-error"
                 title="Quitar selección"
               >
                 <X className="h-4 w-4" />
@@ -118,24 +118,24 @@ export function CustomerInfoCard({ customer, onEdit, onClose, compact = false }:
       <CardContent className="pt-4">
         <div className="space-y-3">
           <div>
-            <p className="text-sm text-slate-500 mb-1">Nombre</p>
-            <p className="text-base font-semibold text-slate-900">{displayName}</p>
+            <p className="text-sm text-on-surface-variant mb-1">Nombre</p>
+            <p className="text-base font-semibold text-on-surface">{displayName}</p>
           </div>
 
           <div>
-            <p className="text-sm text-slate-500 mb-1">Identificación</p>
+            <p className="text-sm text-on-surface-variant mb-1">Identificación</p>
             <div className="flex items-center gap-2">
               <Badge variant="secondary">{identificationLabel}</Badge>
-              <span className="font-mono font-medium text-slate-900">{customer.identification}</span>
+              <span className="font-mono font-medium text-on-surface">{customer.identification}</span>
             </div>
           </div>
 
           {customer.email && (
             <div>
-              <p className="text-sm text-slate-500 mb-1">Email</p>
+              <p className="text-sm text-on-surface-variant mb-1">Email</p>
               <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-slate-400" />
-                <a href={`mailto:${customer.email}`} className="text-sm text-blue-600 hover:underline">
+                <Mail className="h-4 w-4 text-on-surface-variant" />
+                <a href={`mailto:${customer.email}`} className="text-sm text-primary hover:underline">
                   {customer.email}
                 </a>
               </div>
@@ -144,10 +144,10 @@ export function CustomerInfoCard({ customer, onEdit, onClose, compact = false }:
 
           {customer.phone && (
             <div>
-              <p className="text-sm text-slate-500 mb-1">Teléfono</p>
+              <p className="text-sm text-on-surface-variant mb-1">Teléfono</p>
               <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-slate-400" />
-                <a href={`tel:${customer.phone}`} className="text-sm text-slate-700">
+                <Phone className="h-4 w-4 text-on-surface-variant" />
+                <a href={`tel:${customer.phone}`} className="text-sm text-on-surface">
                   {customer.phone}
                 </a>
               </div>
@@ -156,10 +156,10 @@ export function CustomerInfoCard({ customer, onEdit, onClose, compact = false }:
 
           {customer.address && (
             <div>
-              <p className="text-sm text-slate-500 mb-1">Dirección</p>
+              <p className="text-sm text-on-surface-variant mb-1">Dirección</p>
               <div className="flex items-start gap-2">
-                <MapPin className="h-4 w-4 text-slate-400 mt-0.5" />
-                <p className="text-sm text-slate-700 leading-relaxed">{customer.address}</p>
+                <MapPin className="h-4 w-4 text-on-surface-variant mt-0.5" />
+                <p className="text-sm text-on-surface leading-relaxed">{customer.address}</p>
               </div>
             </div>
           )}

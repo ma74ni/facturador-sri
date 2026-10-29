@@ -16,7 +16,7 @@ function ModuleBadges({ keys, names }: { keys: string[]; names: Record<string, s
   return (
     <div className="mt-1 flex flex-wrap gap-1">
       {keys.map((key) => (
-        <span key={key} className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-700">
+        <span key={key} className="rounded bg-surface-container-high px-1.5 py-0.5 text-[11px] text-on-surface">
           {names[key] ?? key}
         </span>
       ))}
@@ -50,7 +50,7 @@ export default function AdminEmpresasPage() {
             className={`rounded-full border px-3 py-1 text-sm transition-colors ${
               filter === option.value
                 ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                : 'border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container-low'
             }`}
           >
             {option.label}

@@ -63,7 +63,7 @@ export function SequenceDialog({ companyId, point, onOpenChange }: SequenceDialo
           <div className="space-y-1">
             <Label htmlFor="next-invoice">Siguiente factura</Label>
             <Input id="next-invoice" type="number" min={1} value={invoice} onChange={(e) => setInvoice(e.target.value)} />
-            {invoiceError && <p className="text-xs text-red-600">{invoiceError}</p>}
+            {invoiceError && <p className="text-xs text-error">{invoiceError}</p>}
           </div>
           <div className="space-y-1">
             <Label htmlFor="next-credit-note">Siguiente nota de crédito</Label>
@@ -74,7 +74,7 @@ export function SequenceDialog({ companyId, point, onOpenChange }: SequenceDialo
               value={creditNote}
               onChange={(e) => setCreditNote(e.target.value)}
             />
-            {creditNoteError && <p className="text-xs text-red-600">{creditNoteError}</p>}
+            {creditNoteError && <p className="text-xs text-error">{creditNoteError}</p>}
           </div>
         </div>
 

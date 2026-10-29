@@ -327,7 +327,7 @@ export default function FacturasPage() {
             onClick={() => handleSendToSri(factura.id)}
             className="h-9 w-9 p-0"
           >
-            <Send className="h-4 w-4 text-blue-600" />
+            <Send className="h-4 w-4 text-primary" />
           </Button>
         )}
         {/* El XML existe desde que se genera, aunque el SRI lo haya rechazado:
@@ -342,7 +342,7 @@ export default function FacturasPage() {
             className="h-9 w-9 p-0"
           >
             <FileDown
-              className={`h-4 w-4 ${factura.status === 'AUTHORIZED' ? 'text-green-600' : 'text-slate-500'}`}
+              className={`h-4 w-4 ${factura.status === 'AUTHORIZED' ? 'text-success' : 'text-on-surface-variant'}`}
             />
           </Button>
         )}
@@ -356,7 +356,7 @@ export default function FacturasPage() {
               onClick={() => handleDownloadPdf(factura.id, numero)}
               className="h-9 w-9 p-0"
             >
-              <Download className="h-4 w-4 text-green-600" />
+              <Download className="h-4 w-4 text-success" />
             </Button>
             <Button
               variant="ghost"
@@ -366,7 +366,7 @@ export default function FacturasPage() {
               onClick={() => handleSendEmail(factura.id)}
               className="h-9 w-9 p-0"
             >
-              <Mail className="h-4 w-4 text-purple-600" />
+              <Mail className="h-4 w-4 text-tertiary" />
             </Button>
             {/* Una autorizada no se cancela: se corrige con nota de crédito */}
             <Button
@@ -377,7 +377,7 @@ export default function FacturasPage() {
               onClick={() => setCreditNoteInvoiceId(factura.id)}
               className="h-9 w-9 p-0"
             >
-              <FileMinus className="h-4 w-4 text-orange-600" />
+              <FileMinus className="h-4 w-4 text-warning" />
             </Button>
           </>
         )}
@@ -390,7 +390,7 @@ export default function FacturasPage() {
             onClick={() => handleCancelClick(factura)}
             className="h-9 w-9 p-0"
           >
-            <Ban className="h-4 w-4 text-red-600" />
+            <Ban className="h-4 w-4 text-error" />
           </Button>
         )}
       </>
@@ -437,10 +437,10 @@ export default function FacturasPage() {
               <CardTitle className="text-xs sm:text-sm font-medium">
                 Autorizadas
               </CardTitle>
-              <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
+              <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-success" />
             </CardHeader>
             <CardContent>
-              <div className="text-xl sm:text-2xl font-bold text-green-600">{stats.authorized}</div>
+              <div className="text-xl sm:text-2xl font-bold text-success">{stats.authorized}</div>
               <p className="text-xs text-muted-foreground">
                 por el SRI
               </p>
@@ -452,10 +452,10 @@ export default function FacturasPage() {
               <CardTitle className="text-xs sm:text-sm font-medium">
                 Pendientes
               </CardTitle>
-              <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-600" />
+              <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-warning" />
             </CardHeader>
             <CardContent>
-              <div className="text-xl sm:text-2xl font-bold text-yellow-600">{stats.pending}</div>
+              <div className="text-xl sm:text-2xl font-bold text-warning">{stats.pending}</div>
               <p className="text-xs text-muted-foreground">
                 por enviar
               </p>
@@ -563,8 +563,8 @@ export default function FacturasPage() {
             </div>
           ) : filteredFacturas.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="rounded-full bg-slate-100 p-6 mb-4">
-                <FileText className="h-12 w-12 text-slate-400" />
+              <div className="rounded-full bg-surface-container-high p-6 mb-4">
+                <FileText className="h-12 w-12 text-on-surface-variant" />
               </div>
               <h3 className="text-lg font-semibold mb-2">
                 No hay facturas registradas
@@ -697,7 +697,7 @@ export default function FacturasPage() {
                 .map((factura) => (
                   <div
                     key={factura.id}
-                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 border rounded-lg bg-green-50/50"
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 border rounded-lg bg-success-container/50"
                   >
                     <div className="space-y-1 flex-1 min-w-0">
                       <p className="text-sm font-medium">
@@ -706,7 +706,7 @@ export default function FacturasPage() {
                       <p className="text-xs text-muted-foreground">
                         {factura.customerName} • {factura.customerIdentification}
                       </p>
-                      <p className="text-xs font-mono text-green-700 truncate" title={factura.authorizationNumber}>
+                      <p className="text-xs font-mono text-on-success-container truncate" title={factura.authorizationNumber}>
                         {factura.authorizationNumber}
                       </p>
                     </div>

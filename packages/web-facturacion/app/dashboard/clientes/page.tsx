@@ -187,8 +187,8 @@ export default function ClientesPage() {
             </div>
           ) : filteredCustomers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="rounded-full bg-slate-100 p-6 mb-4">
-                <Plus className="h-12 w-12 text-slate-400" />
+              <div className="rounded-full bg-surface-container-high p-6 mb-4">
+                <Plus className="h-12 w-12 text-on-surface-variant" />
               </div>
               <h3 className="text-lg font-semibold mb-2">
                 {customers.length === 0

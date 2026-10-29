@@ -87,7 +87,7 @@ function VerifyEmailContent() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-surface-container-low to-surface-container-high p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-2xl font-bold">
@@ -112,9 +112,9 @@ function VerifyEmailContent() {
           {/* Success */}
           {status === 'success' && (
             <div className="flex flex-col items-center justify-center py-8 space-y-4">
-              <CheckCircle2 className="h-16 w-16 text-green-600" />
+              <CheckCircle2 className="h-16 w-16 text-success" />
               <div className="text-center space-y-2">
-                <h3 className="text-lg font-semibold text-green-700">
+                <h3 className="text-lg font-semibold text-on-success-container">
                   ¡Email Verificado!
                 </h3>
                 <p className="text-muted-foreground">
@@ -133,9 +133,9 @@ function VerifyEmailContent() {
           {/* Already Verified */}
           {status === 'already-verified' && (
             <div className="flex flex-col items-center justify-center py-8 space-y-4">
-              <CheckCircle2 className="h-16 w-16 text-blue-600" />
+              <CheckCircle2 className="h-16 w-16 text-primary" />
               <div className="text-center space-y-2">
-                <h3 className="text-lg font-semibold text-blue-700">
+                <h3 className="text-lg font-semibold text-on-primary-container">
                   Email Ya Verificado
                 </h3>
                 <p className="text-muted-foreground">
@@ -154,9 +154,9 @@ function VerifyEmailContent() {
           {/* Expired */}
           {status === 'expired' && (
             <div className="flex flex-col items-center justify-center py-8 space-y-4">
-              <XCircle className="h-16 w-16 text-orange-600" />
+              <XCircle className="h-16 w-16 text-warning" />
               <div className="text-center space-y-2">
-                <h3 className="text-lg font-semibold text-orange-700">
+                <h3 className="text-lg font-semibold text-on-warning-container">
                   Token Expirado
                 </h3>
                 <p className="text-muted-foreground">
@@ -166,7 +166,7 @@ function VerifyEmailContent() {
 
               {resendSuccess ? (
                 <div className="w-full space-y-4">
-                  <div className="flex items-center gap-2 p-3 text-sm text-green-800 bg-green-50 border border-green-200 rounded-md">
+                  <div className="flex items-center gap-2 p-3 text-sm text-on-success-container bg-success-container border border-success-container rounded-md">
                     <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
                     <span>Email enviado exitosamente. Revisa tu bandeja de entrada.</span>
                   </div>
@@ -186,7 +186,7 @@ function VerifyEmailContent() {
                       placeholder="usuario@ejemplo.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-outline disabled:cursor-not-allowed disabled:opacity-50"
                       disabled={resendingEmail}
                     />
                   </div>
@@ -215,9 +215,9 @@ function VerifyEmailContent() {
           {/* Error */}
           {status === 'error' && (
             <div className="flex flex-col items-center justify-center py-8 space-y-4">
-              <XCircle className="h-16 w-16 text-red-600" />
+              <XCircle className="h-16 w-16 text-error" />
               <div className="text-center space-y-2">
-                <h3 className="text-lg font-semibold text-red-700">
+                <h3 className="text-lg font-semibold text-on-error-container">
                   Error de Verificación
                 </h3>
                 <p className="text-muted-foreground">
@@ -240,7 +240,7 @@ export default function VerifyEmailPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-surface-container-low to-surface-container-high p-4">
           <Card className="w-full max-w-md">
             <CardHeader className="space-y-1 text-center">
               <CardTitle className="text-2xl font-bold">Verificación de Email</CardTitle>
