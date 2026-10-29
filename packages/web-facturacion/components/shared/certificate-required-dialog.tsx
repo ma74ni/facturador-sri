@@ -35,8 +35,8 @@ export function CertificateRequiredDialog({
       <AlertDialogContent className="max-w-md">
         <AlertDialogHeader>
           <div className="flex items-center gap-3 mb-2">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100">
-              <ShieldAlert className="h-6 w-6 text-amber-600" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-warning-container">
+              <ShieldAlert className="h-6 w-6 text-warning" />
             </div>
             <AlertDialogTitle className="text-xl">
               Certificado Digital Requerido
@@ -44,7 +44,7 @@ export function CertificateRequiredDialog({
           </div>
           <AlertDialogDescription className="text-base leading-relaxed pt-2">
             Para firmar y enviar facturas electrónicas al SRI, necesitas cargar tu{' '}
-            <strong className="text-slate-700">archivo de firma electrónica (.p12)</strong>.
+            <strong className="text-on-surface">archivo de firma electrónica (.p12)</strong>.
             <br /><br />
             El certificado digital es obligatorio para la generación de documentos electrónicos
             autorizados por el Servicio de Rentas Internas.

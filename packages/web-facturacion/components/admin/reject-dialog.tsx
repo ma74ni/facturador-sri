@@ -54,7 +54,7 @@ export function RejectDialog({ companyId, companyName, open, onOpenChange }: Rej
             placeholder="Ej: El RUC registrado no coincide con el del certificado de firma."
           />
           {!valid && reason.length > 0 && (
-            <p className="text-xs text-red-600">Explica el motivo (al menos {MIN_REASON} caracteres).</p>
+            <p className="text-xs text-error">Explica el motivo (al menos {MIN_REASON} caracteres).</p>
           )}
         </div>
 

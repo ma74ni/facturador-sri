@@ -207,10 +207,10 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
                 value={formData.identification}
                 onChange={(e) => handleIdentificationChange(e.target.value)}
                 maxLength={isCompany ? 13 : formData.identificationType === ID_TYPE.CEDULA ? 10 : 20}
-                className={errors.identification ? 'border-red-500' : ''}
+                className={errors.identification ? 'border-error' : ''}
               />
               {errors.identification && (
-                <div className="flex items-center gap-1 text-sm text-red-500">
+                <div className="flex items-center gap-1 text-sm text-error">
                   <AlertCircle className="h-4 w-4" />
                   <span>{errors.identification}</span>
                 </div>
@@ -231,10 +231,10 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
                     setErrors({ ...errors, businessName: '' });
                   }
                 }}
-                className={errors.businessName ? 'border-red-500' : ''}
+                className={errors.businessName ? 'border-error' : ''}
               />
               {errors.businessName && (
-                <div className="flex items-center gap-1 text-sm text-red-500">
+                <div className="flex items-center gap-1 text-sm text-error">
                   <AlertCircle className="h-4 w-4" />
                   <span>{errors.businessName}</span>
                 </div>
@@ -253,10 +253,10 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
                       setErrors({ ...errors, firstName: '' });
                     }
                   }}
-                  className={errors.firstName ? 'border-red-500' : ''}
+                  className={errors.firstName ? 'border-error' : ''}
                 />
                 {errors.firstName && (
-                  <div className="flex items-center gap-1 text-sm text-red-500">
+                  <div className="flex items-center gap-1 text-sm text-error">
                     <AlertCircle className="h-4 w-4" />
                     <span>{errors.firstName}</span>
                   </div>
@@ -274,10 +274,10 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
                       setErrors({ ...errors, lastName: '' });
                     }
                   }}
-                  className={errors.lastName ? 'border-red-500' : ''}
+                  className={errors.lastName ? 'border-error' : ''}
                 />
                 {errors.lastName && (
-                  <div className="flex items-center gap-1 text-sm text-red-500">
+                  <div className="flex items-center gap-1 text-sm text-error">
                     <AlertCircle className="h-4 w-4" />
                     <span>{errors.lastName}</span>
                   </div>
@@ -300,10 +300,10 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
                     setErrors({ ...errors, email: '' });
                   }
                 }}
-                className={errors.email ? 'border-red-500' : ''}
+                className={errors.email ? 'border-error' : ''}
               />
               {errors.email && (
-                <div className="flex items-center gap-1 text-sm text-red-500">
+                <div className="flex items-center gap-1 text-sm text-error">
                   <AlertCircle className="h-4 w-4" />
                   <span>{errors.email}</span>
                 </div>
@@ -321,10 +321,10 @@ export function CustomerDialog({ open, onOpenChange, onSave, customer }: Custome
                     setErrors({ ...errors, phone: '' });
                   }
                 }}
-                className={errors.phone ? 'border-red-500' : ''}
+                className={errors.phone ? 'border-error' : ''}
               />
               {errors.phone && (
-                <div className="flex items-center gap-1 text-sm text-red-500">
+                <div className="flex items-center gap-1 text-sm text-error">
                   <AlertCircle className="h-4 w-4" />
                   <span>{errors.phone}</span>
                 </div>

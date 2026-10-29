@@ -140,7 +140,7 @@ npx tsx scripts/verify-user-email.ts <userId>
 - **Tokens:** Material Design 3 palette generated from seed `#1A5FB4` (`SchemeVibrant`) by `scripts/generate-tokens.mjs` into `src/tokens/tokens.css` (`--md-*` RGB triplets; light in `:root`, dark in `.dark`, not enabled yet). Never edit `tokens.css` by hand: change the script and run `pnpm --filter @facturador-sri/ui tokens`.
 - **Tailwind preset** (`src/tailwind-preset.ts`): MD3 color roles (`bg-primary`, `text-on-surface-variant`, `bg-surface-container`, `bg-success-container`…), type scale (`text-title-lg`, `text-body-md`, `text-label-lg`…), shape scale and `shadow-elevation-1..5`. Legacy shadcn names (`muted`, `destructive`, `border`…) are aliases of MD3 roles so old screens follow the palette.
 - **Components:** `src/atoms` (Button, Badge, Input, Textarea, Label, NativeSelect, Spinner), `src/molecules` (Card, Dialog: full screen on mobile with the actions at the end of the scroll, pinned footer on desktop), `src/organisms`. Export everything from `src/index.ts`.
-- **In the web:** import from `@facturador-sri/ui`. `components/ui/*` files that moved re-export the package so existing imports keep working. New code uses MD3 roles and the type scale, never raw Tailwind colors (`text-red-600`, `bg-slate-100`).
+- **In the web:** import from `@facturador-sri/ui`. `components/ui/*` files that moved re-export the package so existing imports keep working. Use MD3 roles and the type scale, never raw Tailwind colors (`text-red-600`, `bg-slate-100`): the web's ESLint rejects them (`no-restricted-syntax`).
 - Font: Roboto (`--font-sans`, set in `app/layout.tsx`).
 
 ### Frontend (web-facturacion)

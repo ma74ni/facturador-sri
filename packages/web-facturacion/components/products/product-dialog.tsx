@@ -164,10 +164,10 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
                   }
                 }}
                 placeholder="Ej: PROD001"
-                className={errors.mainCode ? 'border-red-500' : ''}
+                className={errors.mainCode ? 'border-error' : ''}
               />
               {errors.mainCode && (
-                <div className="flex items-center gap-1 text-sm text-red-500">
+                <div className="flex items-center gap-1 text-sm text-error">
                   <AlertCircle className="h-4 w-4" />
                   <span>{errors.mainCode}</span>
                 </div>
@@ -201,10 +201,10 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
                 }
               }}
               placeholder="Ej: Coca Cola 500ml"
-              className={errors.name ? 'border-red-500' : ''}
+              className={errors.name ? 'border-error' : ''}
             />
             {errors.name && (
-              <div className="flex items-center gap-1 text-sm text-red-500">
+              <div className="flex items-center gap-1 text-sm text-error">
                 <AlertCircle className="h-4 w-4" />
                 <span>{errors.name}</span>
               </div>
@@ -242,10 +242,10 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
                 decimalPlaces={2}
                 min={0}
                 placeholder="Ej: 15.99"
-                className={errors.unitPrice ? 'border-red-500' : ''}
+                className={errors.unitPrice ? 'border-error' : ''}
               />
               {errors.unitPrice ? (
-                <div className="flex items-center gap-1 text-sm text-red-500">
+                <div className="flex items-center gap-1 text-sm text-error">
                   <AlertCircle className="h-4 w-4" />
                   <span>{errors.unitPrice}</span>
                 </div>
@@ -274,10 +274,10 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
                 decimalPlaces={2}
                 min={0}
                 placeholder="Ej: 8.50"
-                className={errors.cost ? 'border-red-500' : ''}
+                className={errors.cost ? 'border-error' : ''}
               />
               {errors.cost && (
-                <div className="flex items-center gap-1 text-sm text-red-500">
+                <div className="flex items-center gap-1 text-sm text-error">
                   <AlertCircle className="h-4 w-4" />
                   <span>{errors.cost}</span>
                 </div>
@@ -312,7 +312,7 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
               </SelectContent>
             </Select>
             {errors.taxPercentageCode ? (
-              <div className="flex items-center gap-1 text-sm text-red-500">
+              <div className="flex items-center gap-1 text-sm text-error">
                 <AlertCircle className="h-4 w-4" />
                 <span>{errors.taxPercentageCode}</span>
               </div>
@@ -324,7 +324,7 @@ export function ProductDialog({ open, onOpenChange, onSave, product }: ProductDi
           </div>
           {/* Margen de Ganancia (Informativo) */}
           {/* {formData.cost && formData.cost > 0 && formData.unitPrice > 0 && (
-            <div className="rounded-lg bg-slate-100 p-4">
+            <div className="rounded-lg bg-surface-container-high p-4">
               jjjj
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Margen de Ganancia:</span>

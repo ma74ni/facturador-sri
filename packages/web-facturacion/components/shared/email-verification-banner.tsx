@@ -133,7 +133,7 @@ export function EmailVerificationBanner() {
             </div>
 
             {resendSuccess && (
-              <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md p-2">
+              <div className="flex items-center gap-2 text-sm text-on-success-container bg-success-container border border-success-container rounded-md p-2">
                 <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
                 <span>
                   Email enviado exitosamente. Revisa tu bandeja de entrada.
@@ -142,7 +142,7 @@ export function EmailVerificationBanner() {
             )}
 
             {resendError && (
-              <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md p-2">
+              <div className="flex items-center gap-2 text-sm text-on-error-container bg-error-container border border-error-container rounded-md p-2">
                 <AlertCircle className="h-4 w-4 flex-shrink-0" />
                 <span>{resendError}</span>
               </div>
@@ -153,7 +153,7 @@ export function EmailVerificationBanner() {
               variant="outline"
               onClick={handleResendVerification}
               disabled={resendingEmail || resendSuccess || cooldownSeconds > 0}
-              className="bg-white"
+              className="bg-surface-container-lowest"
             >
               {resendingEmail ? (
                 "Enviando..."

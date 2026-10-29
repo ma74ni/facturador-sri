@@ -190,7 +190,7 @@ export default function ReportesPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Facturas</CardTitle>
-            <FileText className="h-4 w-4 text-blue-600" />
+            <FileText className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
@@ -203,7 +203,7 @@ export default function ReportesPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Ingresos</CardTitle>
-            <DollarSign className="h-4 w-4 text-green-600" />
+            <DollarSign className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(stats.totalAmount)}</div>
@@ -216,7 +216,7 @@ export default function ReportesPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">IVA Recaudado</CardTitle>
-            <TrendingUp className="h-4 w-4 text-purple-600" />
+            <TrendingUp className="h-4 w-4 text-tertiary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(stats.totalTax)}</div>
@@ -229,7 +229,7 @@ export default function ReportesPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Promedio</CardTitle>
-            <DollarSign className="h-4 w-4 text-orange-600" />
+            <DollarSign className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -361,7 +361,7 @@ export default function ReportesPage() {
           <div className="grid gap-4 md:grid-cols-4">
             <div className="flex items-center justify-between p-4 border rounded-lg">
               <div className="flex items-center gap-3">
-                <CheckCircle2 className="h-8 w-8 text-green-600" />
+                <CheckCircle2 className="h-8 w-8 text-success" />
                 <div>
                   <p className="text-sm font-medium">Autorizadas</p>
                   <p className="text-2xl font-bold">{stats.authorized}</p>
@@ -376,7 +376,7 @@ export default function ReportesPage() {
 
             <div className="flex items-center justify-between p-4 border rounded-lg">
               <div className="flex items-center gap-3">
-                <Clock className="h-8 w-8 text-yellow-600" />
+                <Clock className="h-8 w-8 text-warning" />
                 <div>
                   <p className="text-sm font-medium">Pendientes</p>
                   <p className="text-2xl font-bold">{stats.pending}</p>
@@ -391,7 +391,7 @@ export default function ReportesPage() {
 
             <div className="flex items-center justify-between p-4 border rounded-lg">
               <div className="flex items-center gap-3">
-                <XCircle className="h-8 w-8 text-red-600" />
+                <XCircle className="h-8 w-8 text-error" />
                 <div>
                   <p className="text-sm font-medium">Rechazadas</p>
                   <p className="text-2xl font-bold">{stats.rejected}</p>
@@ -406,7 +406,7 @@ export default function ReportesPage() {
 
             <div className="flex items-center justify-between p-4 border rounded-lg">
               <div className="flex items-center gap-3">
-                <FileText className="h-8 w-8 text-blue-600" />
+                <FileText className="h-8 w-8 text-primary" />
                 <div>
                   <p className="text-sm font-medium">Total</p>
                   <p className="text-2xl font-bold">{stats.total}</p>

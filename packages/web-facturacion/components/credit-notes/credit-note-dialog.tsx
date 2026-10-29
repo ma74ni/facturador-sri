@@ -248,7 +248,7 @@ export function CreditNoteDialog({ invoiceId, onOpenChange, onIssued }: CreditNo
               </div>
               <div>
                 <p className="text-muted-foreground text-xs">Disponible</p>
-                <p className="font-semibold text-green-700">{formatCurrency(available)}</p>
+                <p className="font-semibold text-on-success-container">{formatCurrency(available)}</p>
               </div>
             </div>
 

@@ -147,7 +147,7 @@ export default function NotasCreditoPage() {
             disabled={busy}
             className="h-9 w-9 p-0"
           >
-            <Send className="h-4 w-4 text-blue-600" />
+            <Send className="h-4 w-4 text-primary" />
           </Button>
         )}
         {cn.xmlPath && (
@@ -161,7 +161,7 @@ export default function NotasCreditoPage() {
             className="h-9 w-9 p-0"
           >
             <FileDown
-              className={`h-4 w-4 ${cn.sriStatus === 'AUTHORIZED' ? 'text-green-600' : 'text-slate-500'}`}
+              className={`h-4 w-4 ${cn.sriStatus === 'AUTHORIZED' ? 'text-success' : 'text-on-surface-variant'}`}
             />
           </Button>
         )}
@@ -176,7 +176,7 @@ export default function NotasCreditoPage() {
               disabled={busy}
               className="h-9 w-9 p-0"
             >
-              <Download className="h-4 w-4 text-green-600" />
+              <Download className="h-4 w-4 text-success" />
             </Button>
             <Button
               variant="ghost"
@@ -187,7 +187,7 @@ export default function NotasCreditoPage() {
               disabled={busy}
               className="h-9 w-9 p-0"
             >
-              <Mail className="h-4 w-4 text-purple-600" />
+              <Mail className="h-4 w-4 text-tertiary" />
             </Button>
           </>
         )}
@@ -251,8 +251,8 @@ export default function NotasCreditoPage() {
             <p className="py-12 text-center text-sm text-muted-foreground">Cargando...</p>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="rounded-full bg-slate-100 p-6 mb-4">
-                <FileMinus className="h-12 w-12 text-slate-400" />
+              <div className="rounded-full bg-surface-container-high p-6 mb-4">
+                <FileMinus className="h-12 w-12 text-on-surface-variant" />
               </div>
               <h3 className="text-lg font-semibold mb-2">
                 {creditNotes.length === 0 ? 'No hay notas de crédito' : 'No se encontraron resultados'}

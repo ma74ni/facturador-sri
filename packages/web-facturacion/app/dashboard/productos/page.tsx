@@ -42,7 +42,7 @@ function getPricing(product: Product) {
 }
 
 function getMargenColor(margen: number) {
-  return margen > 30 ? 'text-green-600' : margen > 15 ? 'text-yellow-600' : 'text-red-600';
+  return margen > 30 ? 'text-success' : margen > 15 ? 'text-warning' : 'text-error';
 }
 
 export default function ProductosPage() {
@@ -201,8 +201,8 @@ export default function ProductosPage() {
             </div>
           ) : filteredProducts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="rounded-full bg-slate-100 p-6 mb-4">
-                <Package className="h-12 w-12 text-slate-400" />
+              <div className="rounded-full bg-surface-container-high p-6 mb-4">
+                <Package className="h-12 w-12 text-on-surface-variant" />
               </div>
               <h3 className="text-lg font-semibold mb-2">
                 {products.length === 0

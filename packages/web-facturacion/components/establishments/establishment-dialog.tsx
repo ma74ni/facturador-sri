@@ -126,10 +126,10 @@ export function EstablishmentDialog({ open, onOpenChange, onSave, establishment 
               placeholder="001"
               maxLength={3}
               disabled={!!establishment}
-              className={errors.code ? 'border-red-500' : ''}
+              className={errors.code ? 'border-error' : ''}
             />
             {errors.code && (
-              <div className="flex items-center gap-1 text-sm text-red-500">
+              <div className="flex items-center gap-1 text-sm text-error">
                 <AlertCircle className="h-4 w-4" />
                 <span>{errors.code}</span>
               </div>
@@ -152,10 +152,10 @@ export function EstablishmentDialog({ open, onOpenChange, onSave, establishment 
                 }
               }}
               placeholder="Matriz"
-              className={errors.name ? 'border-red-500' : ''}
+              className={errors.name ? 'border-error' : ''}
             />
             {errors.name && (
-              <div className="flex items-center gap-1 text-sm text-red-500">
+              <div className="flex items-center gap-1 text-sm text-error">
                 <AlertCircle className="h-4 w-4" />
                 <span>{errors.name}</span>
               </div>
@@ -175,10 +175,10 @@ export function EstablishmentDialog({ open, onOpenChange, onSave, establishment 
                 }
               }}
               placeholder="Av. Principal 123 y Secundaria"
-              className={errors.address ? 'border-red-500' : ''}
+              className={errors.address ? 'border-error' : ''}
             />
             {errors.address && (
-              <div className="flex items-center gap-1 text-sm text-red-500">
+              <div className="flex items-center gap-1 text-sm text-error">
                 <AlertCircle className="h-4 w-4" />
                 <span>{errors.address}</span>
               </div>

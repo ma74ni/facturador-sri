@@ -39,7 +39,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-surface-container-low to-surface-container-high p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">
@@ -52,7 +52,7 @@ export default function ForgotPasswordPage() {
         <CardContent>
           {sentTo ? (
             <div className="flex flex-col items-center py-4 space-y-4 text-center">
-              <CheckCircle2 className="h-12 w-12 text-green-600" />
+              <CheckCircle2 className="h-12 w-12 text-success" />
               <p className="text-sm text-muted-foreground">
                 Si <strong className="text-foreground">{sentTo}</strong> está registrado, te
                 llegará un correo con el enlace en unos minutos. Vence en 1 hora.
@@ -67,7 +67,7 @@ export default function ForgotPasswordPage() {
           ) : (
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               {error && (
-                <div className="flex items-center gap-2 p-3 text-sm text-red-800 bg-red-50 border border-red-200 rounded-md">
+                <div className="flex items-center gap-2 p-3 text-sm text-on-error-container bg-error-container border border-error-container rounded-md">
                   <AlertCircle className="h-4 w-4 flex-shrink-0" />
                   <span>{error}</span>
                 </div>
@@ -84,7 +84,7 @@ export default function ForgotPasswordPage() {
                   disabled={isLoading}
                 />
                 {errors.email && (
-                  <p className="text-sm text-red-600">{errors.email.message}</p>
+                  <p className="text-sm text-error">{errors.email.message}</p>
                 )}
               </div>
 

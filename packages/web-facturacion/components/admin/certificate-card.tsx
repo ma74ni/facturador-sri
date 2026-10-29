@@ -31,11 +31,11 @@ export function CertificateExpiry({
   readiness: CompanyReadiness;
 }) {
   if (!hasCertificate || !expiry) {
-    return <span className="text-sm text-red-600">{hasCertificate ? 'Sin fecha' : 'Sin certificado'}</span>;
+    return <span className="text-sm text-error">{hasCertificate ? 'Sin fecha' : 'Sin certificado'}</span>;
   }
   const days = readiness.certificateDaysLeft;
   const expired = days !== null && days < 0;
-  const tone = expired ? 'text-red-600' : readiness.certificateExpiringSoon ? 'text-yellow-700' : 'text-slate-700';
+  const tone = expired ? 'text-error' : readiness.certificateExpiringSoon ? 'text-on-warning-container' : 'text-on-surface';
   return (
     <div className={`text-sm ${tone}`}>
       <p>{formatDate(expiry)}</p>

@@ -184,7 +184,8 @@ export function CertificateManager() {
     return (
       <Badge variant="success" className="gap-1">
         <CheckCircle2 className="h-3 w-3" />
-        Válido ({status.daysUntilExpiry} días)
+        {/* Certificados subidos antes de leer su vigencia no traen la fecha. */}
+        {status.daysUntilExpiry != null ? `Válido (${status.daysUntilExpiry} días)` : 'Válido'}
       </Badge>
     );
   };
@@ -339,10 +340,10 @@ export function CertificateManager() {
                 type="file"
                 accept=".p12"
                 onChange={handleFileChange}
-                className={uploadErrors.file ? 'border-red-500' : ''}
+                className={uploadErrors.file ? 'border-error' : ''}
               />
               {uploadErrors.file && (
-                <div className="flex items-center gap-1 text-sm text-red-500">
+                <div className="flex items-center gap-1 text-sm text-error">
                   <AlertCircle className="h-4 w-4" />
                   <span>{uploadErrors.file}</span>
                 </div>
@@ -364,10 +365,10 @@ export function CertificateManager() {
                   setUploadErrors({ ...uploadErrors, password: '' });
                 }}
                 placeholder="Ingresa la contraseña"
-                className={uploadErrors.password ? 'border-red-500' : ''}
+                className={uploadErrors.password ? 'border-error' : ''}
               />
               {uploadErrors.password && (
-                <div className="flex items-center gap-1 text-sm text-red-500">
+                <div className="flex items-center gap-1 text-sm text-error">
                   <AlertCircle className="h-4 w-4" />
                   <span>{uploadErrors.password}</span>
                 </div>

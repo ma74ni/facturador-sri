@@ -25,8 +25,8 @@ export function EmailVerificationRequiredDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-amber-100 rounded-full">
-              <Mail className="h-6 w-6 text-amber-600" />
+            <div className="p-2 bg-warning-container rounded-full">
+              <Mail className="h-6 w-6 text-warning" />
             </div>
             <AlertDialogTitle>Verificación de Email Requerida</AlertDialogTitle>
           </div>

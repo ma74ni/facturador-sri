@@ -88,9 +88,9 @@ export function SearchableSelect<T>({
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          'flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus:outline-none focus-visible:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
-          open && 'border-slate-400',
-          error && 'border-red-500'
+          'flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus:outline-none focus-visible:border-outline disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
+          open && 'border-outline',
+          error && 'border-error'
         )}
       >
         <span className={cn('truncate text-left', !selectedItem && 'text-muted-foreground')}>
@@ -100,16 +100,16 @@ export function SearchableSelect<T>({
       </button>
 
       {open && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg flex flex-col max-h-80">
+        <div className="absolute z-50 w-full mt-1 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg flex flex-col max-h-80">
           <div className="relative p-2 border-b flex-shrink-0">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant" />
             <input
               ref={searchInputRef}
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={searchPlaceholder}
-              className="w-full h-9 rounded-md border border-input bg-background pl-8 pr-3 text-base focus:outline-none focus:border-slate-400 md:text-sm"
+              className="w-full h-9 rounded-md border border-input bg-background pl-8 pr-3 text-base focus:outline-none focus:border-outline md:text-sm"
             />
           </div>
 
@@ -127,14 +127,14 @@ export function SearchableSelect<T>({
                       setOpen(false);
                     }}
                     className={cn(
-                      'w-full px-3 py-2 text-left hover:bg-slate-100 flex items-center justify-between gap-2',
+                      'w-full px-3 py-2 text-left hover:bg-surface-container-high flex items-center justify-between gap-2',
                       isSelected && 'bg-primary/5'
                     )}
                   >
                     <div className="min-w-0">
                       <div className="font-medium text-sm truncate">{getLabel(item)}</div>
                       {getSubLabel && (
-                        <div className="text-xs text-slate-500 truncate">{getSubLabel(item)}</div>
+                        <div className="text-xs text-on-surface-variant truncate">{getSubLabel(item)}</div>
                       )}
                     </div>
                     {isSelected && <Check className="h-4 w-4 text-primary flex-shrink-0" />}
@@ -142,7 +142,7 @@ export function SearchableSelect<T>({
                 );
               })
             ) : (
-              <div className="px-3 py-6 text-center text-sm text-slate-500">{emptyMessage}</div>
+              <div className="px-3 py-6 text-center text-sm text-on-surface-variant">{emptyMessage}</div>
             )}
           </div>
 
@@ -153,7 +153,7 @@ export function SearchableSelect<T>({
                 setOpen(false);
                 onAddNew();
               }}
-              className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-primary border-t hover:bg-slate-50 flex-shrink-0"
+              className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-primary border-t hover:bg-surface-container-low flex-shrink-0"
             >
               <Plus className="h-4 w-4" />
               {addNewLabel}

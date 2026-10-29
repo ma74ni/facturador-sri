@@ -38,7 +38,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </p>
       </div>
 
-      <nav className="flex gap-1 border-b border-slate-200">
+      <nav className="flex gap-1 border-b border-outline-variant">
         {TABS.map((tab) => {
           const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
           return (
@@ -48,7 +48,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
                 active
                   ? 'border-primary text-primary'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
+                  : 'border-transparent text-on-surface-variant hover:text-on-surface'
               }`}
             >
               {tab.name}

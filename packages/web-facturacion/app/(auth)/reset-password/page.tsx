@@ -51,7 +51,7 @@ function ResetPasswordContent() {
   if (!token) {
     return (
       <div className="flex flex-col items-center py-4 space-y-4 text-center">
-        <XCircle className="h-12 w-12 text-red-600" />
+        <XCircle className="h-12 w-12 text-error" />
         <p className="text-sm text-muted-foreground">
           El enlace está incompleto. Ábrelo de nuevo desde el correo o solicita uno nuevo.
         </p>
@@ -65,7 +65,7 @@ function ResetPasswordContent() {
   if (done) {
     return (
       <div className="flex flex-col items-center py-4 space-y-4 text-center">
-        <CheckCircle2 className="h-12 w-12 text-green-600" />
+        <CheckCircle2 className="h-12 w-12 text-success" />
         <p className="text-sm text-muted-foreground">
           Tu contraseña fue actualizada. Las sesiones abiertas en otros dispositivos se cerraron.
         </p>
@@ -79,7 +79,7 @@ function ResetPasswordContent() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       {error && (
-        <div className="flex items-start gap-2 p-3 text-sm text-red-800 bg-red-50 border border-red-200 rounded-md">
+        <div className="flex items-start gap-2 p-3 text-sm text-on-error-container bg-error-container border border-error-container rounded-md">
           <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
           <span>
             {error}{' '}
@@ -100,7 +100,7 @@ function ResetPasswordContent() {
           disabled={isLoading}
         />
         {errors.password && (
-          <p className="text-sm text-red-600">{errors.password.message}</p>
+          <p className="text-sm text-error">{errors.password.message}</p>
         )}
       </div>
 
@@ -113,7 +113,7 @@ function ResetPasswordContent() {
           disabled={isLoading}
         />
         {errors.confirmPassword && (
-          <p className="text-sm text-red-600">{errors.confirmPassword.message}</p>
+          <p className="text-sm text-error">{errors.confirmPassword.message}</p>
         )}
       </div>
 
@@ -136,7 +136,7 @@ function ResetPasswordContent() {
 
 export default function ResetPasswordPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-surface-container-low to-surface-container-high p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">
