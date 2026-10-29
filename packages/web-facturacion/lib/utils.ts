@@ -1,6 +1,2 @@
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
+// El mismo `cn` del design system: conoce la escala tipográfica MD3 (`text-title-lg`…).
+export { cn } from '@facturador-sri/ui';
