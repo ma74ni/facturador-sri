@@ -4,10 +4,18 @@ import { useState } from 'react';
 import { useAuth } from '@/lib/context/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@facturador-sri/ui';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
@@ -34,14 +42,14 @@ import {
   Info,
   Key,
   Mail,
-  User
+  User,
 } from 'lucide-react';
 import {
   Establishment,
   EmissionPoint,
   CreateEstablishmentDto,
   UpdateEstablishmentDto,
-  CreateEmissionPointDto
+  CreateEmissionPointDto,
 } from '@/lib/api/establishments';
 import { EstablishmentDialog } from '@/components/establishments/establishment-dialog';
 import { EmissionPointDialog } from '@/components/establishments/emission-point-dialog';
@@ -69,7 +77,9 @@ interface UserData {
 export default function ConfiguracionPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<'establishments' | 'users' | 'security' | 'certificate'>('establishments');
+  const [activeTab, setActiveTab] = useState<
+    'establishments' | 'users' | 'security' | 'certificate'
+  >('establishments');
 
   // React Query hooks
   const { data: establishments = [], isLoading: loading } = useEstablishments();
@@ -114,7 +124,7 @@ export default function ConfiguracionPage() {
       if (selectedEstablishment) {
         await updateEstablishment.mutateAsync({
           id: selectedEstablishment.id,
-          data: data as UpdateEstablishmentDto
+          data: data as UpdateEstablishmentDto,
         });
       } else {
         await createEstablishment.mutateAsync(data as CreateEstablishmentDto);
@@ -148,7 +158,7 @@ export default function ConfiguracionPage() {
     try {
       await createEmissionPoint.mutateAsync({
         establishmentId: emissionPointEstablishment.id,
-        data
+        data,
       });
       setEmissionPointDialogOpen(false);
       setEmissionPointEstablishment(null);
@@ -202,7 +212,9 @@ export default function ConfiguracionPage() {
               title={tab.label}
             >
               <Icon className="h-4 w-4 flex-shrink-0" />
-              <span className="text-center text-label-md leading-tight sm:text-label-lg">{tab.label}</span>
+              <span className="text-center text-label-md leading-tight sm:text-label-lg">
+                {tab.label}
+              </span>
             </button>
           );
         })}
@@ -215,8 +227,9 @@ export default function ConfiguracionPage() {
             <Info className="h-4 w-4" />
             <AlertTitle>Establecimientos y Puntos de Emisión</AlertTitle>
             <AlertDescription>
-              Los establecimientos representan ubicaciones físicas de tu negocio.
-              Cada establecimiento puede tener múltiples puntos de emisión para generar documentos electrónicos.
+              Los establecimientos representan ubicaciones físicas de tu negocio. Cada
+              establecimiento puede tener múltiples puntos de emisión para generar documentos
+              electrónicos.
             </AlertDescription>
           </Alert>
 
@@ -225,9 +238,7 @@ export default function ConfiguracionPage() {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <CardTitle>Establecimientos</CardTitle>
-                  <CardDescription>
-                    Administra las ubicaciones de tu empresa
-                  </CardDescription>
+                  <CardDescription>Administra las ubicaciones de tu empresa</CardDescription>
                 </div>
                 <Button onClick={handleCreateEstablishment} className="w-full sm:w-auto">
                   <Plus className="mr-2 h-4 w-4" />
@@ -262,7 +273,9 @@ export default function ConfiguracionPage() {
                             <Badge variant="outline" className="font-mono text-xs w-fit">
                               {establishment.code}
                             </Badge>
-                            <h3 className="text-base sm:text-lg font-semibold truncate">{establishment.name}</h3>
+                            <h3 className="text-base sm:text-lg font-semibold truncate">
+                              {establishment.name}
+                            </h3>
                           </div>
                           <div className="flex items-start text-xs sm:text-sm text-muted-foreground">
                             <MapPin className="mr-1 h-3 w-3 flex-shrink-0 mt-0.5" />
@@ -270,22 +283,19 @@ export default function ConfiguracionPage() {
                           </div>
                         </div>
                         <div className="flex gap-2 sm:flex-shrink-0">
-                          <Button
-                            variant="ghost"
-                            size="sm"
+                          <IconButton
+                            label="Editar establecimiento"
                             onClick={() => handleEditEstablishment(establishment)}
-                            className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                           >
-                            <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
+                            <Edit />
+                          </IconButton>
+                          <IconButton
+                            label="Eliminar establecimiento"
+                            tone="destructive"
                             onClick={() => setDeleteEstablishmentId(establishment.id)}
-                            className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                           >
-                            <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-destructive" />
-                          </Button>
+                            <Trash2 />
+                          </IconButton>
                         </div>
                       </div>
 
@@ -296,7 +306,9 @@ export default function ConfiguracionPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleCreateEmissionPoint(establishment.id, establishment.name)}
+                            onClick={() =>
+                              handleCreateEmissionPoint(establishment.id, establishment.name)
+                            }
                             className="w-full sm:w-auto"
                           >
                             <Plus className="mr-1 h-3 w-3" />
@@ -315,18 +327,25 @@ export default function ConfiguracionPage() {
                                 className="flex items-center justify-between p-2 sm:p-3 border rounded-lg bg-surface-container-low"
                               >
                                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                                  <Badge variant="secondary" className="font-mono text-xs flex-shrink-0">
+                                  <Badge
+                                    variant="secondary"
+                                    className="font-mono text-xs flex-shrink-0"
+                                  >
                                     {point.code}
                                   </Badge>
-                                  <span className="text-xs sm:text-sm truncate">Punto de Emisión {point.code}</span>
+                                  <span className="text-xs sm:text-sm truncate">
+                                    Punto de Emisión {point.code}
+                                  </span>
                                 </div>
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => setDeleteEmissionPoint({
-                                    establishmentId: establishment.id,
-                                    emissionPointId: point.id,
-                                  })}
+                                  onClick={() =>
+                                    setDeleteEmissionPoint({
+                                      establishmentId: establishment.id,
+                                      emissionPointId: point.id,
+                                    })
+                                  }
                                   className="h-7 w-7 p-0 sm:h-8 sm:w-8 flex-shrink-0"
                                 >
                                   <Trash2 className="h-3 w-3 text-destructive" />
@@ -351,16 +370,16 @@ export default function ConfiguracionPage() {
             <CardContent>
               <div className="space-y-3 text-sm text-muted-foreground">
                 <p>
-                  <strong>Código de Establecimiento:</strong> Debe ser un número de 3 dígitos (ej: 001, 002).
-                  El establecimiento matriz generalmente usa el código 001.
+                  <strong>Código de Establecimiento:</strong> Debe ser un número de 3 dígitos (ej:
+                  001, 002). El establecimiento matriz generalmente usa el código 001.
                 </p>
                 <p>
-                  <strong>Código de Punto de Emisión:</strong> Debe ser un número de 3 dígitos (ej: 001, 002).
-                  Cada punto de emisión representa una caja o terminal de facturación.
+                  <strong>Código de Punto de Emisión:</strong> Debe ser un número de 3 dígitos (ej:
+                  001, 002). Cada punto de emisión representa una caja o terminal de facturación.
                 </p>
                 <p>
-                  <strong>Secuencial de Factura:</strong> Se forma con: Establecimiento-PuntoEmisión-Secuencial
-                  (ej: 001-001-000000001)
+                  <strong>Secuencial de Factura:</strong> Se forma con:
+                  Establecimiento-PuntoEmisión-Secuencial (ej: 001-001-000000001)
                 </p>
               </div>
             </CardContent>
@@ -382,8 +401,8 @@ export default function ConfiguracionPage() {
             <Info className="h-4 w-4" />
             <AlertTitle>Gestión de Usuarios</AlertTitle>
             <AlertDescription>
-              Administra los usuarios que tienen acceso al sistema.
-              Los usuarios ADMIN tienen acceso completo, mientras que los OPERADOR tienen permisos limitados.
+              Administra los usuarios que tienen acceso al sistema. Los usuarios ADMIN tienen acceso
+              completo, mientras que los OPERADOR tienen permisos limitados.
             </AlertDescription>
           </Alert>
 
@@ -392,9 +411,7 @@ export default function ConfiguracionPage() {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <CardTitle>Usuarios del Sistema</CardTitle>
-                  <CardDescription>
-                    Usuarios con acceso a tu empresa
-                  </CardDescription>
+                  <CardDescription>Usuarios con acceso a tu empresa</CardDescription>
                 </div>
                 <Button>
                   <Plus className="mr-2 h-4 w-4" />
@@ -408,9 +425,7 @@ export default function ConfiguracionPage() {
                   <div className="rounded-full bg-surface-container-high p-6 mb-4">
                     <Users className="h-12 w-12 text-on-surface-variant" />
                   </div>
-                  <h3 className="text-lg font-semibold mb-2">
-                    Solo tú tienes acceso
-                  </h3>
+                  <h3 className="text-lg font-semibold mb-2">Solo tú tienes acceso</h3>
                   <p className="text-sm text-muted-foreground mb-4 max-w-sm">
                     Invita a otros usuarios de tu empresa para que puedan usar el sistema.
                   </p>
@@ -432,7 +447,9 @@ export default function ConfiguracionPage() {
                                 {userData.firstName} {userData.lastName}
                               </span>
                               {userData.id === user?.id && (
-                                <Badge variant="outline" className="text-xs">Tú</Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  Tú
+                                </Badge>
                               )}
                             </div>
                             <div className="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
@@ -445,13 +462,13 @@ export default function ConfiguracionPage() {
                           </Badge>
                         </div>
                         <div className="flex items-center justify-end gap-1 border-t pt-2">
-                          <Button variant="ghost" size="sm" className="h-9 w-9 p-0" aria-label="Editar usuario">
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                          <IconButton label="Editar usuario">
+                            <Edit />
+                          </IconButton>
                           {userData.id !== user?.id && (
-                            <Button variant="ghost" size="sm" className="h-9 w-9 p-0" aria-label="Eliminar usuario">
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            <IconButton label="Eliminar usuario" tone="destructive">
+                              <Trash2 />
+                            </IconButton>
                           )}
                         </div>
                       </div>
@@ -479,7 +496,9 @@ export default function ConfiguracionPage() {
                                   {userData.firstName} {userData.lastName}
                                 </span>
                                 {userData.id === user?.id && (
-                                  <Badge variant="outline" className="text-xs">Tú</Badge>
+                                  <Badge variant="outline" className="text-xs">
+                                    Tú
+                                  </Badge>
                                 )}
                               </div>
                             </TableCell>
@@ -587,10 +606,7 @@ export default function ConfiguracionPage() {
                   <Label htmlFor="newPassword">Nueva Contraseña</Label>
                   <div className="flex items-center">
                     <Key className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <PasswordInput
-                      id="newPassword"
-                      placeholder="Mínimo 6 caracteres"
-                    />
+                    <PasswordInput id="newPassword" placeholder="Mínimo 6 caracteres" />
                   </div>
                 </div>
 
@@ -598,10 +614,7 @@ export default function ConfiguracionPage() {
                   <Label htmlFor="confirmPassword">Confirmar Nueva Contraseña</Label>
                   <div className="flex items-center">
                     <Key className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <PasswordInput
-                      id="confirmPassword"
-                      placeholder="Repite la nueva contraseña"
-                    />
+                    <PasswordInput id="confirmPassword" placeholder="Repite la nueva contraseña" />
                   </div>
                 </div>
 
@@ -617,9 +630,7 @@ export default function ConfiguracionPage() {
           <Card>
             <CardHeader>
               <CardTitle>Información de Sesión</CardTitle>
-              <CardDescription>
-                Detalles de tu sesión actual
-              </CardDescription>
+              <CardDescription>Detalles de tu sesión actual</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -667,7 +678,8 @@ export default function ConfiguracionPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar establecimiento?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará el establecimiento y todos sus puntos de emisión.
+              Esta acción no se puede deshacer. Se eliminará el establecimiento y todos sus puntos
+              de emisión.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -706,7 +718,7 @@ export default function ConfiguracionPage() {
                 if (deleteEmissionPoint) {
                   handleDeleteEmissionPoint(
                     deleteEmissionPoint.establishmentId,
-                    deleteEmissionPoint.emissionPointId
+                    deleteEmissionPoint.emissionPointId,
                   );
                   setDeleteEmissionPoint(null);
                 }

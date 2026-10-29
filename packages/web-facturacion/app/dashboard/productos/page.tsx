@@ -3,7 +3,15 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { IconButton, StatCard } from '@facturador-sri/ui';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
@@ -107,26 +115,28 @@ export default function ProductosPage() {
   // Solo los tipos de IVA que efectivamente usa algún producto
   const taxOptions = Array.from(new Set(products.map((p) => p.taxPercentageCode))).sort();
 
-  const filteredProducts = products.filter(product => {
-    const searchLower = searchTerm.toLowerCase();
-    const matchesSearch =
-      product.name.toLowerCase().includes(searchLower) ||
-      product.mainCode.toLowerCase().includes(searchLower) ||
-      product.description?.toLowerCase().includes(searchLower);
-    const matchesTax = taxFilter === 'all' || product.taxPercentageCode === taxFilter;
-    return matchesSearch && matchesTax;
-  }).sort((a, b) => {
-    switch (sortBy) {
-      case 'name':
-        return a.name.localeCompare(b.name, 'es');
-      case 'priceAsc':
-        return Number(a.unitPrice) - Number(b.unitPrice);
-      case 'priceDesc':
-        return Number(b.unitPrice) - Number(a.unitPrice);
-      default:
-        return b.createdAt.localeCompare(a.createdAt);
-    }
-  });
+  const filteredProducts = products
+    .filter((product) => {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch =
+        product.name.toLowerCase().includes(searchLower) ||
+        product.mainCode.toLowerCase().includes(searchLower) ||
+        product.description?.toLowerCase().includes(searchLower);
+      const matchesTax = taxFilter === 'all' || product.taxPercentageCode === taxFilter;
+      return matchesSearch && matchesTax;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return a.name.localeCompare(b.name, 'es');
+        case 'priceAsc':
+          return Number(a.unitPrice) - Number(b.unitPrice);
+        case 'priceDesc':
+          return Number(b.unitPrice) - Number(a.unitPrice);
+        default:
+          return b.createdAt.localeCompare(a.createdAt);
+      }
+    });
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -161,9 +171,7 @@ export default function ProductosPage() {
               : `${filteredProducts.length} de ${products.length}`}
             )
           </CardTitle>
-          <CardDescription>
-            Todos los productos y servicios registrados
-          </CardDescription>
+          <CardDescription>Todos los productos y servicios registrados</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {products.length > 0 && (
@@ -185,7 +193,10 @@ export default function ProductosPage() {
                 </NativeSelect>
               </FilterField>
               <FilterField label="Ordenar por">
-                <NativeSelect value={sortBy} onChange={(e) => setSortBy(e.target.value as ProductSort)}>
+                <NativeSelect
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as ProductSort)}
+                >
                   <option value="recent">Más recientes</option>
                   <option value="name">Nombre (A–Z)</option>
                   <option value="priceAsc">Menor precio</option>
@@ -235,13 +246,19 @@ export default function ProductosPage() {
                     <div key={product.id} className="border rounded-lg p-4 space-y-2">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="font-mono text-xs text-muted-foreground">{product.mainCode}</p>
+                          <p className="font-mono text-xs text-muted-foreground">
+                            {product.mainCode}
+                          </p>
                           <p className="font-medium text-sm break-words">{product.name}</p>
                         </div>
-                        <p className="font-semibold text-sm flex-shrink-0">{formatCurrency(unitPrice)}</p>
+                        <p className="font-semibold text-sm flex-shrink-0">
+                          {formatCurrency(unitPrice)}
+                        </p>
                       </div>
                       {product.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-2">{product.description}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {product.description}
+                        </p>
                       )}
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -250,28 +267,22 @@ export default function ProductosPage() {
                           </Badge>
                           {cost !== null && <span>Costo: {formatCurrency(cost)}</span>}
                           {margen !== null && (
-                            <span className={getMargenColor(margen)}>Margen: {margen.toFixed(1)}%</span>
+                            <span className={getMargenColor(margen)}>
+                              Margen: {margen.toFixed(1)}%
+                            </span>
                           )}
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(product)}
-                            className="h-9 w-9 p-0"
-                            aria-label="Editar producto"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
+                          <IconButton label="Editar producto" onClick={() => handleEdit(product)}>
+                            <Edit />
+                          </IconButton>
+                          <IconButton
+                            label="Eliminar producto"
+                            tone="destructive"
                             onClick={() => handleDeleteClick(product)}
-                            className="h-9 w-9 p-0"
-                            aria-label="Eliminar producto"
                           >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                            <Trash2 />
+                          </IconButton>
                         </div>
                       </div>
                     </div>
@@ -301,19 +312,22 @@ export default function ProductosPage() {
                               <span className="font-mono text-xs text-muted-foreground">
                                 {product.mainCode}
                               </span>
-                              <span className="font-medium text-sm">
-                                {product.name}
-                              </span>
+                              <span className="font-medium text-sm">{product.name}</span>
                               {/* IVA debajo del nombre cuando no hay columna IVA */}
                               <div className="lg:hidden">
                                 <Badge variant="outline" className="text-xs">
-                                  {getTaxLabel(taxCodesData?.taxCodes || [], product.taxPercentageCode)}
+                                  {getTaxLabel(
+                                    taxCodesData?.taxCodes || [],
+                                    product.taxPercentageCode,
+                                  )}
                                 </Badge>
                               </div>
                               <div className="flex gap-2 text-xs text-muted-foreground mt-1">
                                 {cost !== null && <span>Costo: {formatCurrency(cost)}</span>}
                                 {margen !== null && (
-                                  <span className={getMargenColor(margen)}>Margen: {margen.toFixed(1)}%</span>
+                                  <span className={getMargenColor(margen)}>
+                                    Margen: {margen.toFixed(1)}%
+                                  </span>
                                 )}
                               </div>
                             </div>
@@ -331,24 +345,19 @@ export default function ProductosPage() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
+                              <IconButton
+                                label="Editar producto"
                                 onClick={() => handleEdit(product)}
-                                className="h-9 w-9 p-0"
-                                aria-label="Editar producto"
                               >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
+                                <Edit />
+                              </IconButton>
+                              <IconButton
+                                label="Eliminar producto"
+                                tone="destructive"
                                 onClick={() => handleDeleteClick(product)}
-                                className="h-9 w-9 p-0"
-                                aria-label="Eliminar producto"
                               >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
+                                <Trash2 />
+                              </IconButton>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -367,79 +376,48 @@ export default function ProductosPage() {
       {/* Stats */}
       {products.length > 0 && (
         <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total Productos
-              </CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{products.length}</div>
-              <p className="text-xs text-muted-foreground">
-                productos registrados
-              </p>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Total Productos"
+            value={products.length}
+            description="productos registrados"
+            icon={Package}
+          />
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Precio Promedio
-              </CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatCurrency(products.length > 0 ? products.reduce((sum, p) => sum + Number(p.unitPrice), 0) / products.length : 0)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                precio venta
-              </p>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Precio Promedio"
+            value={formatCurrency(
+              products.length > 0
+                ? products.reduce((sum, p) => sum + Number(p.unitPrice), 0) / products.length
+                : 0,
+            )}
+            description="precio venta"
+            icon={DollarSign}
+          />
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Costo Promedio
-              </CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                ${products.filter(p => p.cost).length > 0
-                  ? (products.reduce((sum, p) => sum + Number(p.cost || 0), 0) / products.filter(p => p.cost).length).toFixed(2)
-                  : '0.00'}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                costo promedio
-              </p>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Costo Promedio"
+            value={formatCurrency(
+              products.filter((p) => p.cost).length > 0
+                ? products.reduce((sum, p) => sum + Number(p.cost || 0), 0) /
+                    products.filter((p) => p.cost).length
+                : 0,
+            )}
+            description="costo promedio"
+            icon={DollarSign}
+          />
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Con IVA
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {
-                  products.filter((p) =>
-                    taxCodesData?.taxCodes.some(
-                      (taxCode) =>
-                        taxCode.code === p.taxPercentageCode && taxCode.treatment === 'TAXED'
-                    )
-                  ).length
-                }
-              </div>
-              <p className="text-xs text-muted-foreground">
-                productos gravados
-              </p>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Con IVA"
+            value={
+              products.filter((p) =>
+                taxCodesData?.taxCodes.some(
+                  (taxCode) =>
+                    taxCode.code === p.taxPercentageCode && taxCode.treatment === 'TAXED',
+                ),
+              ).length
+            }
+            description="productos gravados"
+          />
         </div>
       )}
 

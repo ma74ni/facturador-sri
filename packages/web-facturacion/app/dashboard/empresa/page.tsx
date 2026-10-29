@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/lib/context/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatCard } from '@facturador-sri/ui';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,7 +21,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Shield,
-  Info
+  Info,
 } from 'lucide-react';
 import { companyApi, UpdateCompanyDto } from '@/lib/api/company';
 import { useToast } from '@/hooks/use-toast';
@@ -111,7 +112,10 @@ export default function EmpresaPage() {
     if (!company) return null;
 
     return (
-      <Badge variant={company.environment === 'PRODUCTION' ? 'default' : 'secondary'} className="text-sm">
+      <Badge
+        variant={company.environment === 'PRODUCTION' ? 'default' : 'secondary'}
+        className="text-sm"
+      >
         <Shield className="mr-1 h-4 w-4" />
         {company.environment === 'PRODUCTION' ? 'Producción' : 'Pruebas'}
       </Badge>
@@ -135,7 +139,12 @@ export default function EmpresaPage() {
           </Button>
         ) : (
           <div className="flex md:flex-row flex-col gap-2">
-            <Button variant="outline" onClick={handleCancel} disabled={loading} className="flex-1 sm:flex-initial">
+            <Button
+              variant="outline"
+              onClick={handleCancel}
+              disabled={loading}
+              className="flex-1 sm:flex-initial"
+            >
               <X className="mr-2 h-4 w-4" />
               Cancelar
             </Button>
@@ -155,7 +164,8 @@ export default function EmpresaPage() {
           <AlertDescription>
             <p className="mb-2">{company.rejectionReason}</p>
             <p className="text-sm">
-              Por favor, corrige la información y contacta con soporte para solicitar una nueva revisión.
+              Por favor, corrige la información y contacta con soporte para solicitar una nueva
+              revisión.
             </p>
           </AlertDescription>
         </Alert>
@@ -177,60 +187,44 @@ export default function EmpresaPage() {
           <Info className="h-4 w-4" />
           <AlertTitle>Modo de Pruebas</AlertTitle>
           <AlertDescription>
-            Tu empresa está aprobada pero en modo de pruebas. Contacta con soporte para activar el ambiente de producción.
+            Tu empresa está aprobada pero en modo de pruebas. Contacta con soporte para activar el
+            ambiente de producción.
           </AlertDescription>
         </Alert>
       )}
 
       {/* Status Cards */}
       <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Estado de la Empresa</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              {getStatusBadge()}
-            </div>
-            {company?.approvedAt && (
-              <p className="text-xs text-muted-foreground mt-2">
-                Aprobada el {new Date(company.approvedAt).toLocaleDateString('es-EC')}
-              </p>
-            )}
-            {company?.rejectedAt && (
-              <p className="text-xs text-muted-foreground mt-2">
-                Rechazada el {new Date(company.rejectedAt).toLocaleDateString('es-EC')}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Estado de la Empresa"
+          icon={CheckCircle2}
+          value={<div className="flex items-center gap-2 pt-1">{getStatusBadge()}</div>}
+          description={
+            company?.approvedAt
+              ? `Aprobada el ${new Date(company.approvedAt).toLocaleDateString('es-EC')}`
+              : company?.rejectedAt
+                ? `Rechazada el ${new Date(company.rejectedAt).toLocaleDateString('es-EC')}`
+                : undefined
+          }
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ambiente</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              {getEnvironmentBadge()}
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              {company?.environment === 'PRODUCTION'
-                ? 'Documentos enviados al SRI en producción'
-                : 'Documentos enviados al SRI en ambiente de pruebas'}
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Ambiente"
+          icon={Shield}
+          value={<div className="flex items-center gap-2 pt-1">{getEnvironmentBadge()}</div>}
+          description={
+            company?.environment === 'PRODUCTION'
+              ? 'Documentos enviados al SRI en producción'
+              : 'Documentos enviados al SRI en ambiente de pruebas'
+          }
+        />
       </div>
 
       {/* Company Information */}
       <Card>
         <CardHeader>
           <CardTitle>Información General</CardTitle>
-          <CardDescription>
-            Datos fiscales y de contacto de tu empresa
-          </CardDescription>
+          <CardDescription>Datos fiscales y de contacto de tu empresa</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
@@ -333,17 +327,20 @@ export default function EmpresaPage() {
           <div className="space-y-4">
             <Alert variant="info">
               <Info className="h-4 w-4" />
-              <AlertTitle>Ambiente de {company?.environment === 'PRODUCTION' ? 'Producción' : 'Pruebas'}</AlertTitle>
+              <AlertTitle>
+                Ambiente de {company?.environment === 'PRODUCTION' ? 'Producción' : 'Pruebas'}
+              </AlertTitle>
               <AlertDescription>
                 {company?.environment === 'PRODUCTION' ? (
                   <>
-                    Tus documentos están siendo enviados al ambiente de <strong>producción</strong> del SRI.
-                    Los documentos autorizados tienen validez legal.
+                    Tus documentos están siendo enviados al ambiente de <strong>producción</strong>{' '}
+                    del SRI. Los documentos autorizados tienen validez legal.
                   </>
                 ) : (
                   <>
-                    Tus documentos están siendo enviados al ambiente de <strong>pruebas</strong> del SRI.
-                    Los documentos autorizados NO tienen validez legal. Contacta con soporte para activar producción.
+                    Tus documentos están siendo enviados al ambiente de <strong>pruebas</strong> del
+                    SRI. Los documentos autorizados NO tienen validez legal. Contacta con soporte
+                    para activar producción.
                   </>
                 )}
               </AlertDescription>
@@ -356,15 +353,13 @@ export default function EmpresaPage() {
       <Card>
         <CardHeader>
           <CardTitle>¿Necesitas Ayuda?</CardTitle>
-          <CardDescription>
-            Información de soporte y asistencia
-          </CardDescription>
+          <CardDescription>Información de soporte y asistencia</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Si necesitas modificar el estado de tu empresa, cambiar al ambiente de producción,
-              o tienes alguna duda sobre la configuración, contacta con nuestro equipo de soporte.
+              Si necesitas modificar el estado de tu empresa, cambiar al ambiente de producción, o
+              tienes alguna duda sobre la configuración, contacta con nuestro equipo de soporte.
             </p>
             <div className="flex flex-col lg:flex-row gap-2">
               <Button variant="outline" size="sm">

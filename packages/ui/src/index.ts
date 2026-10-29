@@ -10,6 +10,7 @@
 export { cn } from './lib/cn';
 
 export { Button, buttonVariants, type ButtonProps } from './atoms/button';
+export { IconButton, type IconButtonProps } from './atoms/icon-button';
 export { Badge, badgeVariants, type BadgeProps } from './atoms/badge';
 export { Input, type InputProps } from './atoms/input';
 export { PasswordInput } from './atoms/password-input';
@@ -106,3 +107,5 @@ export {
 export { SearchableSelect, type SearchableSelectProps } from './molecules/searchable-select';
 
 export { FilterBar, FilterField, type FilterBarProps } from './molecules/filter-bar';
+
+export { StatCard, type StatCardProps, type StatCardTone } from './molecules/stat-card';
