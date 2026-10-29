@@ -1,0 +1,95 @@
+/*
+ * Tokens Material Design 3 del facturador. GENERADO por scripts/generate-tokens.mjs
+ * (semilla #1A5FB4): no editar a mano, cambiar el script y volver a correrlo.
+ *
+ * El tema oscuro existe pero no está activado: se aplica con la clase .dark en <html>.
+ */
+:root {
+  --md-primary: 0 93 184; /* #005db8 */
+  --md-on-primary: 255 255 255; /* #ffffff */
+  --md-primary-container: 214 227 255; /* #d6e3ff */
+  --md-on-primary-container: 0 69 141; /* #00458d */
+  --md-secondary: 87 92 126; /* #575c7e */
+  --md-on-secondary: 255 255 255; /* #ffffff */
+  --md-secondary-container: 222 225 255; /* #dee1ff */
+  --md-on-secondary-container: 63 69 101; /* #3f4565 */
+  --md-tertiary: 95 88 138; /* #5f588a */
+  --md-on-tertiary: 255 255 255; /* #ffffff */
+  --md-tertiary-container: 229 222 255; /* #e5deff */
+  --md-on-tertiary-container: 71 64 112; /* #474070 */
+  --md-error: 186 26 26; /* #ba1a1a */
+  --md-on-error: 255 255 255; /* #ffffff */
+  --md-error-container: 255 218 214; /* #ffdad6 */
+  --md-on-error-container: 147 0 10; /* #93000a */
+  --md-surface: 249 249 255; /* #f9f9ff */
+  --md-on-surface: 23 28 37; /* #171c25 */
+  --md-surface-variant: 221 226 242; /* #dde2f2 */
+  --md-on-surface-variant: 65 71 83; /* #414753 */
+  --md-surface-dim: 214 218 230; /* #d6dae6 */
+  --md-surface-bright: 249 249 255; /* #f9f9ff */
+  --md-surface-container-lowest: 255 255 255; /* #ffffff */
+  --md-surface-container-low: 240 243 255; /* #f0f3ff */
+  --md-surface-container: 234 237 250; /* #eaedfa */
+  --md-surface-container-high: 228 232 245; /* #e4e8f5 */
+  --md-surface-container-highest: 223 226 239; /* #dfe2ef */
+  --md-inverse-surface: 44 48 58; /* #2c303a */
+  --md-inverse-on-surface: 237 240 253; /* #edf0fd */
+  --md-inverse-primary: 170 199 255; /* #aac7ff */
+  --md-outline: 113 119 133; /* #717785 */
+  --md-outline-variant: 193 198 214; /* #c1c6d6 */
+  --md-shadow: 0 0 0; /* #000000 */
+  --md-scrim: 0 0 0; /* #000000 */
+  --md-success: 0 109 67; /* #006d43 */
+  --md-on-success: 255 255 255; /* #ffffff */
+  --md-success-container: 146 247 188; /* #92f7bc */
+  --md-on-success-container: 0 33 17; /* #002111 */
+  --md-warning: 151 72 6; /* #974806 */
+  --md-on-warning: 255 255 255; /* #ffffff */
+  --md-warning-container: 255 219 200; /* #ffdbc8 */
+  --md-on-warning-container: 50 19 0; /* #321300 */
+}
+
+.dark {
+  --md-primary: 170 199 255; /* #aac7ff */
+  --md-on-primary: 0 47 100; /* #002f64 */
+  --md-primary-container: 0 69 141; /* #00458d */
+  --md-on-primary-container: 214 227 255; /* #d6e3ff */
+  --md-secondary: 191 196 235; /* #bfc4eb */
+  --md-on-secondary: 41 46 77; /* #292e4d */
+  --md-secondary-container: 63 69 101; /* #3f4565 */
+  --md-on-secondary-container: 222 225 255; /* #dee1ff */
+  --md-tertiary: 201 192 248; /* #c9c0f8 */
+  --md-on-tertiary: 49 42 88; /* #312a58 */
+  --md-tertiary-container: 71 64 112; /* #474070 */
+  --md-on-tertiary-container: 229 222 255; /* #e5deff */
+  --md-error: 255 180 171; /* #ffb4ab */
+  --md-on-error: 105 0 5; /* #690005 */
+  --md-error-container: 147 0 10; /* #93000a */
+  --md-on-error-container: 255 218 214; /* #ffdad6 */
+  --md-surface: 15 19 28; /* #0f131c */
+  --md-on-surface: 223 226 239; /* #dfe2ef */
+  --md-surface-variant: 65 71 83; /* #414753 */
+  --md-on-surface-variant: 193 198 214; /* #c1c6d6 */
+  --md-surface-dim: 15 19 28; /* #0f131c */
+  --md-surface-bright: 53 57 67; /* #353943 */
+  --md-surface-container-lowest: 10 14 23; /* #0a0e17 */
+  --md-surface-container-low: 23 28 37; /* #171c25 */
+  --md-surface-container: 27 32 41; /* #1b2029 */
+  --md-surface-container-high: 38 42 51; /* #262a33 */
+  --md-surface-container-highest: 48 53 62; /* #30353e */
+  --md-inverse-surface: 223 226 239; /* #dfe2ef */
+  --md-inverse-on-surface: 44 48 58; /* #2c303a */
+  --md-inverse-primary: 0 93 184; /* #005db8 */
+  --md-outline: 139 145 159; /* #8b919f */
+  --md-outline-variant: 65 71 83; /* #414753 */
+  --md-shadow: 0 0 0; /* #000000 */
+  --md-scrim: 0 0 0; /* #000000 */
+  --md-success: 118 218 161; /* #76daa1 */
+  --md-on-success: 0 57 32; /* #003920 */
+  --md-success-container: 0 82 49; /* #005231 */
+  --md-on-success-container: 146 247 188; /* #92f7bc */
+  --md-warning: 255 182 138; /* #ffb68a */
+  --md-on-warning: 82 35 0; /* #522300 */
+  --md-warning-container: 116 52 0; /* #743400 */
+  --md-on-warning-container: 255 219 200; /* #ffdbc8 */
+}

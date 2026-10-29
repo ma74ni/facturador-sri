@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Monorepo Structure:**
 - `packages/facturacion-core` - NestJS backend API (port 3000), deployed on Render
 - `packages/web-facturacion` - Next.js frontend (port 3001), deployed on Netlify
+- `packages/ui` - Design system: Material Design 3 tokens + atomic components (Tailwind + Radix), consumed by the web as TypeScript source
 - `signing-service` - Java XAdES-BES signing microservice (port 18081 locally), deployed on Render
 
 The POS (Lattia) lives in a separate repository (`new-lattia-pos`) and consumes this API. The GitHub repo is public: never commit certificates, `.env` files or customer data.
@@ -133,6 +134,14 @@ npx tsx scripts/verify-user-email.ts <userId>
 - Main models: User, Company, Customer, Product, Establishment, EmissionPoint, Invoice, InvoiceItem, CreditNote
 - Enums: Role (ADMIN, MANAGER, USER, VIEWER), SRIEnvironment (TEST, PRODUCTION), SRIStatus (PENDING, SENT, AUTHORIZED, REJECTED, ERROR)
 - Email verification: Users must verify email before creating customers/invoices (emailVerified field)
+
+### Design system (packages/ui)
+
+- **Tokens:** Material Design 3 palette generated from seed `#1A5FB4` (`SchemeVibrant`) by `scripts/generate-tokens.mjs` into `src/tokens/tokens.css` (`--md-*` RGB triplets; light in `:root`, dark in `.dark`, not enabled yet). Never edit `tokens.css` by hand: change the script and run `pnpm --filter @facturador-sri/ui tokens`.
+- **Tailwind preset** (`src/tailwind-preset.ts`): MD3 color roles (`bg-primary`, `text-on-surface-variant`, `bg-surface-container`, `bg-success-container`…), type scale (`text-title-lg`, `text-body-md`, `text-label-lg`…), shape scale and `shadow-elevation-1..5`. Legacy shadcn names (`muted`, `destructive`, `border`…) are aliases of MD3 roles so old screens follow the palette.
+- **Components:** `src/atoms` (Button, Badge, Input, Textarea, Label, NativeSelect, Spinner), `src/molecules` (Card), `src/organisms`. Export everything from `src/index.ts`.
+- **In the web:** import from `@facturador-sri/ui`. `components/ui/*` files that moved re-export the package so existing imports keep working. New code uses MD3 roles and the type scale, never raw Tailwind colors (`text-red-600`, `bg-slate-100`).
+- Font: Roboto (`--font-sans`, set in `app/layout.tsx`).
 
 ### Frontend (web-facturacion)
 
