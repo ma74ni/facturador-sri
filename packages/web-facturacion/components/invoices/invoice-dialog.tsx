@@ -1,7 +1,8 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { IconButton } from '@facturador-sri/ui';
 import {
   Dialog,
   DialogBody,
@@ -10,18 +11,18 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { NumberInput } from "@/components/ui/number-input";
-import { Label } from "@/components/ui/label";
-import { SearchableSelect } from "@/components/ui/searchable-select";
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { NumberInput } from '@/components/ui/number-input';
+import { Label } from '@/components/ui/label';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -29,24 +30,21 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { CreateInvoiceDto, InvoiceItemDto } from "@/lib/api/invoices";
-import { Customer, CreateCustomerDto } from "@/lib/api/customers";
-import { Product, CreateProductDto } from "@/lib/api/products";
-import { Establishment } from "@/lib/api/establishments";
-import { AlertCircle, Plus, Trash2 } from "lucide-react";
-import { CustomerDialog } from "@/components/customers/customer-dialog";
-import { CustomerInfoCard } from "@/components/customers/customer-info-card";
-import { ProductDialog } from "@/components/products/product-dialog";
-import { useToast } from "@/hooks/use-toast";
-import {
-  useCreateCustomer,
-  useUpdateCustomer,
-} from "@/lib/hooks/use-customers";
-import { useCreateProduct } from "@/lib/hooks/use-products";
-import { useTaxCodes, getTaxLabel, getTaxPercentage } from "@/lib/hooks/use-tax-codes";
-import { useCertificateStatus } from "@/lib/hooks/use-certificate";
-import { CertificateRequiredDialog } from "@/components/shared/certificate-required-dialog";
+} from '@/components/ui/table';
+import { CreateInvoiceDto, InvoiceItemDto } from '@/lib/api/invoices';
+import { Customer, CreateCustomerDto } from '@/lib/api/customers';
+import { Product, CreateProductDto } from '@/lib/api/products';
+import { Establishment } from '@/lib/api/establishments';
+import { AlertCircle, Plus, Trash2 } from 'lucide-react';
+import { CustomerDialog } from '@/components/customers/customer-dialog';
+import { CustomerInfoCard } from '@/components/customers/customer-info-card';
+import { ProductDialog } from '@/components/products/product-dialog';
+import { useToast } from '@/hooks/use-toast';
+import { useCreateCustomer, useUpdateCustomer } from '@/lib/hooks/use-customers';
+import { useCreateProduct } from '@/lib/hooks/use-products';
+import { useTaxCodes, getTaxLabel, getTaxPercentage } from '@/lib/hooks/use-tax-codes';
+import { useCertificateStatus } from '@/lib/hooks/use-certificate';
+import { CertificateRequiredDialog } from '@/components/shared/certificate-required-dialog';
 import { formatCurrency } from '@/lib/utils/formatters';
 
 interface InvoiceDialogProps {
@@ -68,29 +66,29 @@ interface InvoiceItemWithCalc extends InvoiceItemDto {
 // Formas de pago del SRI
 const PAYMENT_METHODS = [
   {
-    code: "01",
-    label: "Efectivo",
-    description: "Sin utilización del sistema financiero",
+    code: '01',
+    label: 'Efectivo',
+    description: 'Sin utilización del sistema financiero',
   },
   {
-    code: "19",
-    label: "Tarjeta de Crédito",
-    description: "Visa, Mastercard, etc.",
+    code: '19',
+    label: 'Tarjeta de Crédito',
+    description: 'Visa, Mastercard, etc.',
   },
-  { code: "16", label: "Tarjeta de Débito", description: "Débito bancario" },
+  { code: '16', label: 'Tarjeta de Débito', description: 'Débito bancario' },
   {
-    code: "17",
-    label: "Transferencia / Dinero Electrónico",
-    description: "Transferencias bancarias",
+    code: '17',
+    label: 'Transferencia / Dinero Electrónico',
+    description: 'Transferencias bancarias',
   },
   {
-    code: "20",
-    label: "Otros con Sistema Financiero",
-    description: "Otros métodos bancarios",
+    code: '20',
+    label: 'Otros con Sistema Financiero',
+    description: 'Otros métodos bancarios',
   },
-  { code: "15", label: "Compensación de Deudas", description: "Compensación" },
-  { code: "18", label: "Tarjeta Prepago", description: "Tarjetas prepagadas" },
-  { code: "21", label: "Endoso de Títulos", description: "Endoso" },
+  { code: '15', label: 'Compensación de Deudas', description: 'Compensación' },
+  { code: '18', label: 'Tarjeta Prepago', description: 'Tarjetas prepagadas' },
+  { code: '21', label: 'Endoso de Títulos', description: 'Endoso' },
 ];
 
 // Fecha LOCAL del navegador (asumido Ecuador) en formato YYYY-MM-DD — NO
@@ -99,8 +97,8 @@ const PAYMENT_METHODS = [
 const getTodayLocalDateString = (): string => {
   const now = new Date();
   const year = now.getFullYear();
-  const month = (now.getMonth() + 1).toString().padStart(2, "0");
-  const day = now.getDate().toString().padStart(2, "0");
+  const month = (now.getMonth() + 1).toString().padStart(2, '0');
+  const day = now.getDate().toString().padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
 
@@ -137,18 +135,16 @@ export function InvoiceDialog({
   const { data: certificateStatus } = useCertificateStatus();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [selectedCustomer, setSelectedCustomer] = useState<string>("");
-  const [selectedEstablishment, setSelectedEstablishment] =
-    useState<string>("");
-  const [selectedEmissionPoint, setSelectedEmissionPoint] =
-    useState<string>("");
+  const [selectedCustomer, setSelectedCustomer] = useState<string>('');
+  const [selectedEstablishment, setSelectedEstablishment] = useState<string>('');
+  const [selectedEmissionPoint, setSelectedEmissionPoint] = useState<string>('');
   const [issueDate, setIssueDate] = useState<string>(getTodayLocalDateString);
   const [items, setItems] = useState<InvoiceItemWithCalc[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<string>("01");
+  const [paymentMethod, setPaymentMethod] = useState<string>('01');
   const [isRimpe, setIsRimpe] = useState<boolean>(false);
 
   // Item being added
-  const [selectedProduct, setSelectedProduct] = useState<string>("");
+  const [selectedProduct, setSelectedProduct] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
   const [discount, setDiscount] = useState<number>(0);
 
@@ -158,9 +154,7 @@ export function InvoiceDialog({
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [showCertificateDialog, setShowCertificateDialog] = useState(false);
 
-  const selectedEstablishmentData = establishments.find(
-    (e) => e.id === selectedEstablishment
-  );
+  const selectedEstablishmentData = establishments.find((e) => e.id === selectedEstablishment);
   const emissionPoints = selectedEstablishmentData?.emissionPoints || [];
 
   // Get selected customer
@@ -169,14 +163,14 @@ export function InvoiceDialog({
   useEffect(() => {
     if (!open) {
       // Reset form
-      setSelectedCustomer("");
-      setSelectedEstablishment("");
-      setSelectedEmissionPoint("");
+      setSelectedCustomer('');
+      setSelectedEstablishment('');
+      setSelectedEmissionPoint('');
       setIssueDate(getTodayLocalDateString());
       setItems([]);
-      setPaymentMethod("01");
+      setPaymentMethod('01');
       setIsRimpe(false);
-      setSelectedProduct("");
+      setSelectedProduct('');
       setQuantity(1);
       setDiscount(0);
       setErrors({});
@@ -188,14 +182,11 @@ export function InvoiceDialog({
     unitPrice: number,
     qty: number,
     disc: number,
-    taxCode: string
+    taxCode: string,
   ): { subtotal: number; taxValue: number; total: number } => {
     const subtotal = unitPrice * qty;
     const subtotalAfterDiscount = subtotal - disc;
-    const taxPercentage = getTaxPercentage(
-      taxCodesData?.taxCodes || [],
-      taxCode
-    );
+    const taxPercentage = getTaxPercentage(taxCodesData?.taxCodes || [], taxCode);
     const taxValue = subtotalAfterDiscount * (taxPercentage / 100);
     const total = subtotalAfterDiscount + taxValue;
 
@@ -208,7 +199,7 @@ export function InvoiceDialog({
 
   const handleAddItem = () => {
     if (!selectedProduct) {
-      setErrors({ ...errors, product: "Selecciona un producto" });
+      setErrors({ ...errors, product: 'Selecciona un producto' });
       return;
     }
 
@@ -216,17 +207,12 @@ export function InvoiceDialog({
     if (!product) return;
 
     if (quantity <= 0) {
-      setErrors({ ...errors, quantity: "La cantidad debe ser mayor a 0" });
+      setErrors({ ...errors, quantity: 'La cantidad debe ser mayor a 0' });
       return;
     }
 
     const unitPrice = Number(product.unitPrice);
-    const totals = calculateItemTotals(
-      unitPrice,
-      quantity,
-      discount,
-      product.taxPercentageCode
-    );
+    const totals = calculateItemTotals(unitPrice, quantity, discount, product.taxPercentageCode);
 
     const newItem: InvoiceItemWithCalc = {
       mainCode: product.mainCode,
@@ -240,10 +226,10 @@ export function InvoiceDialog({
     };
 
     setItems([...items, newItem]);
-    setSelectedProduct("");
+    setSelectedProduct('');
     setQuantity(1);
     setDiscount(0);
-    setErrors({ ...errors, product: "", quantity: "", items: "" });
+    setErrors({ ...errors, product: '', quantity: '', items: '' });
   };
 
   const handleRemoveItem = (index: number) => {
@@ -260,7 +246,7 @@ export function InvoiceDialog({
   const ivaGroups = Array.from(
     normalized
       .reduce((groups, item) => {
-        const code = item.taxPercentageCode ?? "";
+        const code = item.taxPercentageCode ?? '';
         const group = groups.get(code) ?? { taxBase: 0, ivaValue: 0 };
         groups.set(code, {
           taxBase: group.taxBase + item.subtotal - item.discount,
@@ -268,7 +254,7 @@ export function InvoiceDialog({
         });
         return groups;
       }, new Map<string, { taxBase: number; ivaValue: number }>())
-      .entries()
+      .entries(),
   ).map(([code, amounts]) => ({
     code,
     label: getTaxLabel(taxCodesData?.taxCodes || [], code),
@@ -283,30 +269,30 @@ export function InvoiceDialog({
       tax: acc.tax + item.taxValue,
       total: acc.total + item.total,
     }),
-    { subtotal: 0, discount: 0, tax: 0, total: 0 }
+    { subtotal: 0, discount: 0, tax: 0, total: 0 },
   );
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
     if (!selectedCustomer) {
-      newErrors.customer = "Selecciona un cliente";
+      newErrors.customer = 'Selecciona un cliente';
     }
 
     if (!selectedEstablishment) {
-      newErrors.establishment = "Selecciona un establecimiento";
+      newErrors.establishment = 'Selecciona un establecimiento';
     }
 
     if (!selectedEmissionPoint) {
-      newErrors.emissionPoint = "Selecciona un punto de emisión";
+      newErrors.emissionPoint = 'Selecciona un punto de emisión';
     }
 
     if (!issueDate) {
-      newErrors.issueDate = "Ingresa la fecha de emisión";
+      newErrors.issueDate = 'Ingresa la fecha de emisión';
     }
 
     if (items.length === 0) {
-      newErrors.items = "Agrega al menos un producto";
+      newErrors.items = 'Agrega al menos un producto';
     }
 
     setErrors(newErrors);
@@ -327,12 +313,12 @@ export function InvoiceDialog({
         emissionPointId: selectedEmissionPoint,
         items: items.map(
           // La tarifa de cada línea viaja al backend; los totales los recalcula él.
-          ({ subtotal, taxValue, total, ...item }) => item
+          ({ subtotal, taxValue, total, ...item }) => item,
         ),
         metadata: {
           paymentMethod,
           isRimpe,
-          source: "WEB_FACTURACION",
+          source: 'WEB_FACTURACION',
           sendToSri, // Indicar si debe enviar al SRI
         },
       };
@@ -340,7 +326,7 @@ export function InvoiceDialog({
       await onSave(invoiceData);
       onOpenChange(false);
     } catch (error) {
-      console.error("Error creating invoice:", error);
+      console.error('Error creating invoice:', error);
     } finally {
       setLoading(false);
     }
@@ -397,23 +383,18 @@ export function InvoiceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="full">
         <DialogHeader>
-          <DialogTitle className="text-2xl">
-            Nueva Factura Electrónica
-          </DialogTitle>
+          <DialogTitle className="text-2xl">Nueva Factura Electrónica</DialogTitle>
           <DialogDescription className="text-base">
-            Complete los datos para generar la factura. Todos los campos
-            marcados con * son obligatorios.
+            Complete los datos para generar la factura. Todos los campos marcados con * son
+            obligatorios.
           </DialogDescription>
         </DialogHeader>
 
         <DialogBody className="pr-1">
-
-        <div className="space-y-6">
+          <div className="space-y-6">
             {/* SECCIÓN 1: Datos Generales */}
             <div className="border-b pb-4">
-              <h3 className="text-lg font-semibold text-on-surface mb-4">
-                1. Datos Generales
-              </h3>
+              <h3 className="text-lg font-semibold text-on-surface mb-4">1. Datos Generales</h3>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 {/* Cliente - Select con búsqueda */}
                 <div className="space-y-2 md:col-span-2">
@@ -424,7 +405,7 @@ export function InvoiceDialog({
                     value={selectedCustomer}
                     onChange={(id) => {
                       setSelectedCustomer(id);
-                      setErrors({ ...errors, customer: "" });
+                      setErrors({ ...errors, customer: '' });
                     }}
                     getId={(c) => c.id}
                     getLabel={getCustomerDisplayName}
@@ -450,8 +431,8 @@ export function InvoiceDialog({
                       customer={selectedCustomerData}
                       onEdit={handleEditCustomer}
                       onClose={() => {
-                        setSelectedCustomer("");
-                        setErrors({ ...errors, customer: "" });
+                        setSelectedCustomer('');
+                        setErrors({ ...errors, customer: '' });
                       }}
                       compact={true}
                     />
@@ -465,7 +446,7 @@ export function InvoiceDialog({
                     type="date"
                     value={issueDate}
                     onChange={(e) => setIssueDate(e.target.value)}
-                    className={errors.issueDate ? "border-error" : ""}
+                    className={errors.issueDate ? 'border-error' : ''}
                   />
                   {errors.issueDate && (
                     <div className="flex items-center gap-1 text-sm text-error">
@@ -482,12 +463,10 @@ export function InvoiceDialog({
                     value={selectedEstablishment}
                     onValueChange={(value) => {
                       setSelectedEstablishment(value);
-                      setSelectedEmissionPoint("");
+                      setSelectedEmissionPoint('');
                     }}
                   >
-                    <SelectTrigger
-                      className={errors.establishment ? "border-error" : ""}
-                    >
+                    <SelectTrigger className={errors.establishment ? 'border-error' : ''}>
                       <SelectValue placeholder="Seleccionar establecimiento" />
                     </SelectTrigger>
                     <SelectContent>
@@ -514,9 +493,7 @@ export function InvoiceDialog({
                     onValueChange={setSelectedEmissionPoint}
                     disabled={!selectedEstablishment}
                   >
-                    <SelectTrigger
-                      className={errors.emissionPoint ? "border-error" : ""}
-                    >
+                    <SelectTrigger className={errors.emissionPoint ? 'border-error' : ''}>
                       <SelectValue placeholder="Seleccionar punto" />
                     </SelectTrigger>
                     <SelectContent>
@@ -543,9 +520,7 @@ export function InvoiceDialog({
                 2. Productos y Servicios
               </h3>
               <div className="border rounded-lg p-4 bg-surface-container-low">
-                <h4 className="font-medium mb-4 text-on-surface-variant">
-                  Agregar Producto
-                </h4>
+                <h4 className="font-medium mb-4 text-on-surface-variant">Agregar Producto</h4>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
                   <div className="md:col-span-2 lg:col-span-3 space-y-2">
                     <Label htmlFor="product">Producto</Label>
@@ -591,11 +566,7 @@ export function InvoiceDialog({
                     />
                   </div>
                 </div>
-                <Button
-                  type="button"
-                  onClick={handleAddItem}
-                  className="mt-4 w-full lg:w-auto"
-                >
+                <Button type="button" onClick={handleAddItem} className="mt-4 w-full lg:w-auto">
                   <Plus className="mr-2 h-4 w-4" />
                   Agregar Producto
                 </Button>
@@ -620,14 +591,14 @@ export function InvoiceDialog({
                               Cantidad: {item.quantity} × {formatCurrency(item.unitPrice)}
                             </p>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
+                          <IconButton
+                            label="Quitar producto"
+                            tone="destructive"
                             onClick={() => handleRemoveItem(index)}
-                            className="h-8 w-8 p-0 -mt-1 -mr-1"
+                            className="-mr-1 -mt-1"
                           >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                            <Trash2 />
+                          </IconButton>
                         </div>
 
                         <div className="grid grid-cols-2 gap-2 text-sm">
@@ -679,9 +650,7 @@ export function InvoiceDialog({
                         {normalized.map((item, index) => (
                           <TableRow key={index}>
                             <TableCell>{item.description}</TableCell>
-                            <TableCell className="text-right">
-                              {item.quantity}
-                            </TableCell>
+                            <TableCell className="text-right">{item.quantity}</TableCell>
                             <TableCell className="text-right">
                               {formatCurrency(item.unitPrice)}
                             </TableCell>
@@ -698,13 +667,13 @@ export function InvoiceDialog({
                               {formatCurrency(item.total)}
                             </TableCell>
                             <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="sm"
+                              <IconButton
+                                label="Quitar producto"
+                                tone="destructive"
                                 onClick={() => handleRemoveItem(index)}
                               >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
+                                <Trash2 />
+                              </IconButton>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -797,26 +766,19 @@ export function InvoiceDialog({
             </h3>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label
-                  htmlFor="paymentMethod"
-                  className="text-base font-semibold"
-                >
+                <Label htmlFor="paymentMethod" className="text-base font-semibold">
                   Forma de Pago *
                 </Label>
                 <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                   <SelectTrigger className="h-12 text-base">
                     <SelectValue>
-                      {PAYMENT_METHODS.find((m) => m.code === paymentMethod)
-                        ?.label || "Seleccionar forma de pago"}
+                      {PAYMENT_METHODS.find((m) => m.code === paymentMethod)?.label ||
+                        'Seleccionar forma de pago'}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {PAYMENT_METHODS.map((method) => (
-                      <SelectItem
-                        key={method.code}
-                        value={method.code}
-                        className="py-3"
-                      >
+                      <SelectItem key={method.code} value={method.code} className="py-3">
                         <div className="flex flex-col">
                           <span className="font-medium">{method.label}</span>
                           <span className="text-xs text-on-surface-variant">
@@ -833,9 +795,7 @@ export function InvoiceDialog({
               </div>
 
               <div className="space-y-2">
-                <Label className="text-base font-semibold">
-                  Opciones Tributarias
-                </Label>
+                <Label className="text-base font-semibold">Opciones Tributarias</Label>
                 <div className="flex items-center space-x-3 p-3 bg-surface-container-low border border-outline-variant rounded-lg h-12">
                   <input
                     type="checkbox"
@@ -844,13 +804,8 @@ export function InvoiceDialog({
                     onChange={(e) => setIsRimpe(e.target.checked)}
                     className="w-5 h-5 text-primary border-outline-variant rounded focus:ring-primary cursor-pointer"
                   />
-                  <label
-                    htmlFor="rimpe-checkbox"
-                    className="cursor-pointer flex-1"
-                  >
-                    <span className="text-sm font-semibold text-on-surface">
-                      Régimen RIMPE
-                    </span>
+                  <label htmlFor="rimpe-checkbox" className="cursor-pointer flex-1">
+                    <span className="text-sm font-semibold text-on-surface">Régimen RIMPE</span>
                   </label>
                 </div>
               </div>
@@ -859,10 +814,9 @@ export function InvoiceDialog({
             {isRimpe && (
               <div className="rounded-lg bg-primary-container border border-primary-container p-4 mt-4">
                 <p className="text-sm text-on-primary-container">
-                  <strong>Nota RIMPE:</strong> Esta factura incluirá la leyenda
-                  &ldquo;CONTRIBUYENTE NEGOCIO POPULAR - RÉGIMEN RIMPE&rdquo; en la
-                  información adicional del XML. No se aplicará retención de IVA
-                  ni renta.
+                  <strong>Nota RIMPE:</strong> Esta factura incluirá la leyenda &ldquo;CONTRIBUYENTE
+                  NEGOCIO POPULAR - RÉGIMEN RIMPE&rdquo; en la información adicional del XML. No se
+                  aplicará retención de IVA ni renta.
                 </p>
               </div>
             )}
@@ -886,7 +840,7 @@ export function InvoiceDialog({
             disabled={loading}
             className="sm:px-6"
           >
-            {loading ? "Guardando..." : "Guardar Borrador"}
+            {loading ? 'Guardando...' : 'Guardar Borrador'}
           </Button>
           <Button
             type="button"
@@ -894,7 +848,7 @@ export function InvoiceDialog({
             disabled={loading}
             className="sm:px-6"
           >
-            {loading ? "Procesando..." : "Firmar y Enviar al SRI"}
+            {loading ? 'Procesando...' : 'Firmar y Enviar al SRI'}
           </Button>
         </DialogFooter>
 

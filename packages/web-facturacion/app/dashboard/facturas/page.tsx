@@ -3,8 +3,16 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { IconButton, StatCard } from '@facturador-sri/ui';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,7 +35,7 @@ import {
   Calendar,
   FileDown,
   FileMinus,
-  Ban
+  Ban,
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { CreditNoteDialog } from '@/components/credit-notes/credit-note-dialog';
@@ -68,7 +76,11 @@ function sriResultToast(result: Awaited<ReturnType<typeof invoicesApi.sendToSri>
   if (result.status === 'SENT') {
     return { title: 'Factura enviada', description: detail };
   }
-  return { variant: 'destructive' as const, title: 'El SRI no autorizó la factura', description: detail };
+  return {
+    variant: 'destructive' as const,
+    title: 'El SRI no autorizó la factura',
+    description: detail,
+  };
 }
 
 export default function FacturasPage() {
@@ -81,13 +93,18 @@ export default function FacturasPage() {
   const dateRange = getPeriodRange(period, customRange);
 
   // React Query hooks - Se ejecutan en paralelo y usan caché
-  const { data: invoices = [], isLoading: loadingInvoices, refetch: refetchInvoices } = useInvoices();
+  const {
+    data: invoices = [],
+    isLoading: loadingInvoices,
+    refetch: refetchInvoices,
+  } = useInvoices();
   const { data: customers = [], isLoading: loadingCustomers } = useCustomers();
   const { data: products = [], isLoading: loadingProducts } = useProducts();
   const { data: establishments = [], isLoading: loadingEstablishments } = useEstablishments();
   const { data: stats, isLoading: loadingStats, refetch: refetchStats } = useInvoiceStats();
 
-  const loading = loadingInvoices || loadingCustomers || loadingProducts || loadingEstablishments || loadingStats;
+  const loading =
+    loadingInvoices || loadingCustomers || loadingProducts || loadingEstablishments || loadingStats;
 
   // Dialog states
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
@@ -107,7 +124,6 @@ export default function FacturasPage() {
     await Promise.all([refetchInvoices(), refetchStats()]);
   };
 
-
   // Handlers
   const handleCreateInvoice = async (data: CreateInvoiceDto) => {
     try {
@@ -118,20 +134,31 @@ export default function FacturasPage() {
       if (warnings.length > 0) {
         // Sin firma no se puede enviar: mostrar el motivo real
         if (signatureStatus === 'sin_certificado') setCertificateDialogOpen(true);
-        toast({ variant: 'destructive', title: 'Factura creada sin firmar', description: warnings[0] });
+        toast({
+          variant: 'destructive',
+          title: 'Factura creada sin firmar',
+          description: warnings[0],
+        });
       } else if (sendToSri) {
         try {
           toast(sriResultToast(await invoicesApi.sendToSri(invoice.id)));
         } catch (sriError: any) {
           console.error('Error sending to SRI:', sriError);
-          const errorMessage = sriError.response?.data?.message || 'La factura se creó pero hubo un error al enviar al SRI';
+          const errorMessage =
+            sriError.response?.data?.message ||
+            'La factura se creó pero hubo un error al enviar al SRI';
 
           // Si el error es por falta de certificado, mostrar diálogo específico
-          if (errorMessage.includes('certificado') || errorMessage.includes('firmada') || errorMessage.includes('firma')) {
+          if (
+            errorMessage.includes('certificado') ||
+            errorMessage.includes('firmada') ||
+            errorMessage.includes('firma')
+          ) {
             setCertificateDialogOpen(true);
             toast({
               title: 'Factura creada',
-              description: 'La factura fue creada pero no se pudo enviar al SRI. Se requiere certificado digital.',
+              description:
+                'La factura fue creada pero no se pudo enviar al SRI. Se requiere certificado digital.',
             });
           } else {
             toast({
@@ -274,28 +301,30 @@ export default function FacturasPage() {
     }
   };
 
-  const filteredFacturas = facturas.filter(factura => {
-    const searchLower = searchTerm.toLowerCase();
-    const matchesSearch =
-      factura.sequential.toLowerCase().includes(searchLower) ||
-      factura.customerName.toLowerCase().includes(searchLower) ||
-      factura.customerIdentification.includes(searchLower);
+  const filteredFacturas = facturas
+    .filter((factura) => {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch =
+        factura.sequential.toLowerCase().includes(searchLower) ||
+        factura.customerName.toLowerCase().includes(searchLower) ||
+        factura.customerIdentification.includes(searchLower);
 
-    const matchesStatus = statusFilter === 'all' || factura.status === statusFilter;
+      const matchesStatus = statusFilter === 'all' || factura.status === statusFilter;
 
-    return matchesSearch && matchesStatus && isInRange(factura.issueDate, dateRange);
-  }).sort((a, b) => {
-    switch (sortBy) {
-      case 'amountDesc':
-        return Number(b.totalAmount) - Number(a.totalAmount);
-      case 'amountAsc':
-        return Number(a.totalAmount) - Number(b.totalAmount);
-      case 'oldest':
-        return a.issueDate.localeCompare(b.issueDate) || a.sequential.localeCompare(b.sequential);
-      default:
-        return b.issueDate.localeCompare(a.issueDate) || b.sequential.localeCompare(a.sequential);
-    }
-  });
+      return matchesSearch && matchesStatus && isInRange(factura.issueDate, dateRange);
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'amountDesc':
+          return Number(b.totalAmount) - Number(a.totalAmount);
+        case 'amountAsc':
+          return Number(a.totalAmount) - Number(b.totalAmount);
+        case 'oldest':
+          return a.issueDate.localeCompare(b.issueDate) || a.sequential.localeCompare(b.sequential);
+        default:
+          return b.issueDate.localeCompare(a.issueDate) || b.sequential.localeCompare(a.sequential);
+      }
+    });
 
   // El orden no cuenta como filtro: no oculta nada
   const activeFilterCount = (statusFilter !== 'all' ? 1 : 0) + (period !== 'all' ? 1 : 0);
@@ -310,7 +339,7 @@ export default function FacturasPage() {
   const pagination = usePagination(
     filteredFacturas,
     10,
-    `${searchTerm}|${statusFilter}|${dateRange.from}|${dateRange.to}|${sortBy}`
+    `${searchTerm}|${statusFilter}|${dateRange.from}|${dateRange.to}|${sortBy}`,
   );
 
   // Botones de acción según estado — compartidos entre la card mobile y la tabla
@@ -319,84 +348,63 @@ export default function FacturasPage() {
     return (
       <>
         {(factura.status === 'PENDING' || factura.status === 'SENT') && (
-          <Button
-            variant="ghost"
-            size="sm"
-            title="Enviar al SRI"
-            aria-label="Enviar al SRI"
+          <IconButton
+            label="Enviar al SRI"
+            tone="primary"
             onClick={() => handleSendToSri(factura.id)}
-            className="h-9 w-9 p-0"
           >
-            <Send className="h-4 w-4 text-primary" />
-          </Button>
+            <Send />
+          </IconButton>
         )}
         {/* El XML existe desde que se genera, aunque el SRI lo haya rechazado:
             sirve para revisar qué se envió. */}
         {factura.xmlPath && (
-          <Button
-            variant="ghost"
-            size="sm"
-            title="Descargar XML"
-            aria-label="Descargar XML"
+          <IconButton
+            label="Descargar XML"
+            tone={factura.status === 'AUTHORIZED' ? 'success' : 'neutral'}
             onClick={() => handleDownloadXml(factura.id, numero)}
-            className="h-9 w-9 p-0"
           >
-            <FileDown
-              className={`h-4 w-4 ${factura.status === 'AUTHORIZED' ? 'text-success' : 'text-on-surface-variant'}`}
-            />
-          </Button>
+            <FileDown />
+          </IconButton>
         )}
         {factura.status === 'AUTHORIZED' && (
           <>
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Descargar PDF"
-              aria-label="Descargar PDF"
+            <IconButton
+              label="Descargar PDF"
+              tone="success"
               onClick={() => handleDownloadPdf(factura.id, numero)}
-              className="h-9 w-9 p-0"
             >
-              <Download className="h-4 w-4 text-success" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Enviar por email"
-              aria-label="Enviar por email"
+              <Download />
+            </IconButton>
+            <IconButton
+              label="Enviar por email"
+              tone="tertiary"
               onClick={() => handleSendEmail(factura.id)}
-              className="h-9 w-9 p-0"
             >
-              <Mail className="h-4 w-4 text-tertiary" />
-            </Button>
+              <Mail />
+            </IconButton>
             {/* Una autorizada no se cancela: se corrige con nota de crédito */}
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Emitir nota de crédito"
-              aria-label="Emitir nota de crédito"
+            <IconButton
+              label="Emitir nota de crédito"
+              tone="warning"
               onClick={() => setCreditNoteInvoiceId(factura.id)}
-              className="h-9 w-9 p-0"
             >
-              <FileMinus className="h-4 w-4 text-warning" />
-            </Button>
+              <FileMinus />
+            </IconButton>
           </>
         )}
         {CANCELLABLE_STATUSES.includes(factura.status) && (
-          <Button
-            variant="ghost"
-            size="sm"
-            title="Cancelar factura"
-            aria-label="Cancelar factura"
+          <IconButton
+            label="Cancelar factura"
+            tone="destructive"
             onClick={() => handleCancelClick(factura)}
-            className="h-9 w-9 p-0"
           >
-            <Ban className="h-4 w-4 text-error" />
-          </Button>
+            <Ban />
+          </IconButton>
         )}
       </>
     );
   };
-
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -417,65 +425,35 @@ export default function FacturasPage() {
       {/* Stats */}
       {facturas.length > 0 && stats && (
         <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">
-                Total Facturas
-              </CardTitle>
-              <FileText className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold">{stats.total}</div>
-              <p className="text-xs text-muted-foreground">
-                facturas emitidas
-              </p>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Total Facturas"
+            value={stats.total}
+            description="facturas emitidas"
+            icon={FileText}
+          />
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">
-                Autorizadas
-              </CardTitle>
-              <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-success" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold text-success">{stats.authorized}</div>
-              <p className="text-xs text-muted-foreground">
-                por el SRI
-              </p>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Autorizadas"
+            value={stats.authorized}
+            description="por el SRI"
+            icon={CheckCircle2}
+            tone="success"
+          />
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">
-                Pendientes
-              </CardTitle>
-              <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-warning" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold text-warning">{stats.pending}</div>
-              <p className="text-xs text-muted-foreground">
-                por enviar
-              </p>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Pendientes"
+            value={stats.pending}
+            description="por enviar"
+            icon={Clock}
+            tone="warning"
+          />
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">
-                Monto Total
-              </CardTitle>
-              <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold">{formatCurrency(stats.totalAmount)}</div>
-              <p className="text-xs text-muted-foreground">
-                suma de facturas
-              </p>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Monto Total"
+            value={formatCurrency(stats.totalAmount)}
+            description="suma de facturas"
+            icon={DollarSign}
+          />
         </div>
       )}
 
@@ -489,9 +467,7 @@ export default function FacturasPage() {
               : `${filteredFacturas.length} de ${facturas.length}`}
             )
           </CardTitle>
-          <CardDescription>
-            Todas las facturas electrónicas emitidas
-          </CardDescription>
+          <CardDescription>Todas las facturas electrónicas emitidas</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {facturas.length > 0 && (
@@ -503,7 +479,10 @@ export default function FacturasPage() {
               onClear={clearFilters}
             >
               <FilterField label="Estado">
-                <NativeSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <NativeSelect
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
                   <option value="all">Todos</option>
                   <option value="PENDING">Pendiente</option>
                   <option value="SENT">Enviada</option>
@@ -514,9 +493,14 @@ export default function FacturasPage() {
                 </NativeSelect>
               </FilterField>
               <FilterField label="Período">
-                <NativeSelect value={period} onChange={(e) => setPeriod(e.target.value as PeriodPreset)}>
+                <NativeSelect
+                  value={period}
+                  onChange={(e) => setPeriod(e.target.value as PeriodPreset)}
+                >
                   {PERIOD_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
                   ))}
                 </NativeSelect>
               </FilterField>
@@ -541,7 +525,10 @@ export default function FacturasPage() {
                 </>
               )}
               <FilterField label="Ordenar por">
-                <NativeSelect value={sortBy} onChange={(e) => setSortBy(e.target.value as InvoiceSort)}>
+                <NativeSelect
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as InvoiceSort)}
+                >
                   <option value="recent">Más recientes</option>
                   <option value="oldest">Más antiguas</option>
                   <option value="amountDesc">Mayor monto</option>
@@ -566,9 +553,7 @@ export default function FacturasPage() {
               <div className="rounded-full bg-surface-container-high p-6 mb-4">
                 <FileText className="h-12 w-12 text-on-surface-variant" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">
-                No hay facturas registradas
-              </h3>
+              <h3 className="text-lg font-semibold mb-2">No hay facturas registradas</h3>
               <p className="text-sm text-muted-foreground mb-4 max-w-sm">
                 Comienza emitiendo tu primera factura electrónica para tus clientes.
               </p>
@@ -586,11 +571,14 @@ export default function FacturasPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="font-mono text-sm">
-                          {factura.establishmentCode}-{factura.emissionPointCode}-{factura.sequential}
+                          {factura.establishmentCode}-{factura.emissionPointCode}-
+                          {factura.sequential}
                         </p>
                         <p className="flex items-center text-xs text-muted-foreground">
                           <Calendar className="mr-1 h-3 w-3" />
-                          {new Date(factura.issueDate).toLocaleDateString('es-EC', { timeZone: 'UTC' })}
+                          {new Date(factura.issueDate).toLocaleDateString('es-EC', {
+                            timeZone: 'UTC',
+                          })}
                         </p>
                       </div>
                       <SriStatusBadge status={factura.status} />
@@ -598,7 +586,9 @@ export default function FacturasPage() {
                     <div className="flex items-end justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-sm break-words">{factura.customerName}</p>
-                        <p className="font-mono text-xs text-muted-foreground">{factura.customerIdentification}</p>
+                        <p className="font-mono text-xs text-muted-foreground">
+                          {factura.customerIdentification}
+                        </p>
                       </div>
                       <p className="font-semibold text-sm flex-shrink-0">
                         {formatCurrency(Number(factura.totalAmount))}
@@ -631,7 +621,8 @@ export default function FacturasPage() {
                         <TableCell className="font-medium">
                           <div className="flex flex-col gap-1">
                             <span className="font-mono text-sm">
-                              {factura.establishmentCode}-{factura.emissionPointCode}-{factura.sequential}
+                              {factura.establishmentCode}-{factura.emissionPointCode}-
+                              {factura.sequential}
                             </span>
                             {/* Estado debajo del secuencial cuando no hay columna Estado */}
                             <span className="lg:hidden">
@@ -642,7 +633,9 @@ export default function FacturasPage() {
                         <TableCell>
                           <div className="flex items-center text-sm">
                             <Calendar className="mr-1 h-3 w-3 text-muted-foreground" />
-                            {new Date(factura.issueDate).toLocaleDateString('es-EC', { timeZone: 'UTC' })}
+                            {new Date(factura.issueDate).toLocaleDateString('es-EC', {
+                              timeZone: 'UTC',
+                            })}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -681,18 +674,16 @@ export default function FacturasPage() {
       </Card>
 
       {/* Authorization Info */}
-      {facturas.some(f => f.status === 'AUTHORIZED' && f.authorizationNumber) && (
+      {facturas.some((f) => f.status === 'AUTHORIZED' && f.authorizationNumber) && (
         <Card>
           <CardHeader>
             <CardTitle>Últimas Autorizaciones</CardTitle>
-            <CardDescription>
-              Facturas autorizadas recientemente por el SRI
-            </CardDescription>
+            <CardDescription>Facturas autorizadas recientemente por el SRI</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {facturas
-                .filter(f => f.status === 'AUTHORIZED' && f.authorizationNumber)
+                .filter((f) => f.status === 'AUTHORIZED' && f.authorizationNumber)
                 .slice(0, 5)
                 .map((factura) => (
                   <div
@@ -706,12 +697,17 @@ export default function FacturasPage() {
                       <p className="text-xs text-muted-foreground">
                         {factura.customerName} • {factura.customerIdentification}
                       </p>
-                      <p className="text-xs font-mono text-on-success-container truncate" title={factura.authorizationNumber}>
+                      <p
+                        className="text-xs font-mono text-on-success-container truncate"
+                        title={factura.authorizationNumber}
+                      >
                         {factura.authorizationNumber}
                       </p>
                     </div>
                     <div className="text-left sm:text-right flex-shrink-0">
-                      <p className="text-sm font-medium">{formatCurrency(Number(factura.totalAmount))}</p>
+                      <p className="text-sm font-medium">
+                        {formatCurrency(Number(factura.totalAmount))}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {factura.authorizationDate &&
                           new Date(factura.authorizationDate).toLocaleDateString('es-EC')}
@@ -744,12 +740,14 @@ export default function FacturasPage() {
                 <>
                   La factura{' '}
                   <strong className="font-mono">
-                    {invoiceToCancel.establishmentCode}-{invoiceToCancel.emissionPointCode}-{invoiceToCancel.sequential}
+                    {invoiceToCancel.establishmentCode}-{invoiceToCancel.emissionPointCode}-
+                    {invoiceToCancel.sequential}
                   </strong>{' '}
                   no fue autorizada por el SRI. Al cancelarla queda marcada como{' '}
                   <strong>Cancelada</strong>: no se envía al SRI ni cuenta como deuda del cliente.
                   Sigue en la lista para tu registro y su número no se reutiliza.
-                  <br /><br />
+                  <br />
+                  <br />
                   <span className="text-xs text-muted-foreground">
                     Las facturas autorizadas no se cancelan: se corrigen con una nota de crédito.
                   </span>

@@ -4,16 +4,16 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { IconButton } from '@facturador-sri/ui';
 import {
-  Calendar,
-  Download,
-  FileDown,
-  FileMinus,
-  Mail,
-  Send,
-  } from 'lucide-react';
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Calendar, Download, FileDown, FileMinus, Mail, Send } from 'lucide-react';
 import {
   creditNotesApi,
   CreditNote,
@@ -28,7 +28,6 @@ import { NativeSelect } from '@/components/ui/native-select';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { SriStatusBadge } from '@/components/shared/sri-status-badge';
-
 
 // Se pueden (re)enviar las que no quedaron autorizadas, si tienen XML firmado.
 // Una SENT quedó sin respuesta del SRI: reenviarla vuelve a consultar su autorización.
@@ -82,9 +81,15 @@ export default function NotasCreditoPage() {
         const result = await creditNotesApi.sendToSri(cn.id);
         toast(
           result.status === 'AUTHORIZED'
-            ? { title: `Nota ${cn.formattedNumber} autorizada`, description: 'El SRI autorizó la nota de crédito' }
+            ? {
+                title: `Nota ${cn.formattedNumber} autorizada`,
+                description: 'El SRI autorizó la nota de crédito',
+              }
             : result.status === 'SENT'
-              ? { title: `Nota ${cn.formattedNumber} enviada`, description: result.errors?.join(' ') ?? result.message }
+              ? {
+                  title: `Nota ${cn.formattedNumber} enviada`,
+                  description: result.errors?.join(' ') ?? result.message,
+                }
               : {
                   variant: 'destructive',
                   title: `El SRI rechazó la nota ${cn.formattedNumber}`,
@@ -99,14 +104,19 @@ export default function NotasCreditoPage() {
   const handleDownloadXml = (cn: CreditNote) =>
     run(
       cn.id,
-      async () => saveBlob(await creditNotesApi.downloadXml(cn.id), `NOTA_CREDITO_${cn.formattedNumber}.xml`),
+      async () =>
+        saveBlob(await creditNotesApi.downloadXml(cn.id), `NOTA_CREDITO_${cn.formattedNumber}.xml`),
       'Error al descargar el XML',
     );
 
   const handleDownloadPdf = (cn: CreditNote) =>
     run(
       cn.id,
-      async () => saveBlob(await creditNotesApi.downloadRide(cn.id), `NOTA_CREDITO_${cn.formattedNumber}.pdf`),
+      async () =>
+        saveBlob(
+          await creditNotesApi.downloadRide(cn.id),
+          `NOTA_CREDITO_${cn.formattedNumber}.pdf`,
+        ),
       'Error al descargar el PDF',
     );
 
@@ -132,63 +142,48 @@ export default function NotasCreditoPage() {
 
   const pagination = usePagination(filtered, 10, `${searchTerm}|${statusFilter}`);
 
-
   const renderActions = (cn: CreditNote) => {
     const busy = busyId === cn.id;
     return (
       <>
         {canSend(cn) && (
-          <Button
-            variant="ghost"
-            size="sm"
-            title="Enviar al SRI"
-            aria-label="Enviar al SRI"
+          <IconButton
+            label="Enviar al SRI"
+            tone="primary"
             onClick={() => handleSendToSri(cn)}
             disabled={busy}
-            className="h-9 w-9 p-0"
           >
-            <Send className="h-4 w-4 text-primary" />
-          </Button>
+            <Send />
+          </IconButton>
         )}
         {cn.xmlPath && (
-          <Button
-            variant="ghost"
-            size="sm"
-            title="Descargar XML"
-            aria-label="Descargar XML"
+          <IconButton
+            label="Descargar XML"
+            tone={cn.sriStatus === 'AUTHORIZED' ? 'success' : 'neutral'}
             onClick={() => handleDownloadXml(cn)}
             disabled={busy}
-            className="h-9 w-9 p-0"
           >
-            <FileDown
-              className={`h-4 w-4 ${cn.sriStatus === 'AUTHORIZED' ? 'text-success' : 'text-on-surface-variant'}`}
-            />
-          </Button>
+            <FileDown />
+          </IconButton>
         )}
         {cn.sriStatus === 'AUTHORIZED' && (
           <>
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Descargar PDF"
-              aria-label="Descargar PDF"
+            <IconButton
+              label="Descargar PDF"
+              tone="success"
               onClick={() => handleDownloadPdf(cn)}
               disabled={busy}
-              className="h-9 w-9 p-0"
             >
-              <Download className="h-4 w-4 text-success" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Enviar por email"
-              aria-label="Enviar por email"
+              <Download />
+            </IconButton>
+            <IconButton
+              label="Enviar por email"
+              tone="tertiary"
               onClick={() => handleSendEmail(cn)}
               disabled={busy}
-              className="h-9 w-9 p-0"
             >
-              <Mail className="h-4 w-4 text-tertiary" />
-            </Button>
+              <Mail />
+            </IconButton>
           </>
         )}
       </>
@@ -235,13 +230,18 @@ export default function NotasCreditoPage() {
               }}
             >
               <FilterField label="Estado">
-                <NativeSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <NativeSelect
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
                   <option value="all">Todos</option>
-                  {(['PENDING', 'AUTHORIZED', 'REJECTED', 'ERROR'] as CreditNoteStatus[]).map((s) => (
-                    <option key={s} value={s}>
-                      {CREDIT_NOTE_STATUS_LABEL[s]}
-                    </option>
-                  ))}
+                  {(['PENDING', 'AUTHORIZED', 'REJECTED', 'ERROR'] as CreditNoteStatus[]).map(
+                    (s) => (
+                      <option key={s} value={s}>
+                        {CREDIT_NOTE_STATUS_LABEL[s]}
+                      </option>
+                    ),
+                  )}
                 </NativeSelect>
               </FilterField>
             </FilterBar>
@@ -255,7 +255,9 @@ export default function NotasCreditoPage() {
                 <FileMinus className="h-12 w-12 text-on-surface-variant" />
               </div>
               <h3 className="text-lg font-semibold mb-2">
-                {creditNotes.length === 0 ? 'No hay notas de crédito' : 'No se encontraron resultados'}
+                {creditNotes.length === 0
+                  ? 'No hay notas de crédito'
+                  : 'No se encontraron resultados'}
               </h3>
               <p className="text-sm text-muted-foreground max-w-sm">
                 {creditNotes.length === 0
@@ -272,7 +274,9 @@ export default function NotasCreditoPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="font-mono text-sm">{cn.formattedNumber}</p>
-                        <p className="text-xs text-muted-foreground">Factura {cn.modifiedInvoiceNumber}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Factura {cn.modifiedInvoiceNumber}
+                        </p>
                         <p className="flex items-center text-xs text-muted-foreground">
                           <Calendar className="mr-1 h-3 w-3" />
                           {formatDate(cn.issueDate)}
@@ -285,7 +289,9 @@ export default function NotasCreditoPage() {
                         <p className="text-sm break-words">{cn.customerName}</p>
                         <p className="text-xs text-muted-foreground break-words">{cn.reason}</p>
                       </div>
-                      <p className="font-semibold text-sm flex-shrink-0">{formatCurrency(cn.total)}</p>
+                      <p className="font-semibold text-sm flex-shrink-0">
+                        {formatCurrency(cn.total)}
+                      </p>
                     </div>
                     <div className="flex items-center justify-end gap-1 border-t pt-2">
                       {renderActions(cn)}
@@ -328,10 +334,16 @@ export default function NotasCreditoPage() {
                         <TableCell className="hidden lg:table-cell text-sm text-muted-foreground max-w-[16rem]">
                           {cn.reason}
                         </TableCell>
-                        <TableCell><SriStatusBadge status={cn.sriStatus} /></TableCell>
-                        <TableCell className="text-right font-medium text-sm">{formatCurrency(cn.total)}</TableCell>
+                        <TableCell>
+                          <SriStatusBadge status={cn.sriStatus} />
+                        </TableCell>
+                        <TableCell className="text-right font-medium text-sm">
+                          {formatCurrency(cn.total)}
+                        </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">{renderActions(cn)}</div>
+                          <div className="flex items-center justify-end gap-2">
+                            {renderActions(cn)}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}

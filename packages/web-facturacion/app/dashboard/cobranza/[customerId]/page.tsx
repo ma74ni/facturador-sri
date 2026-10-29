@@ -5,8 +5,16 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@facturador-sri/ui';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { ArrowLeft, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useAccountStatement, useDeletePayment } from '@/lib/hooks/use-payments';
 import { InvoicePaymentStatus } from '@/lib/api/payments';
@@ -47,7 +55,7 @@ export default function CobranzaClientePage() {
       ? true
       : paymentFilter === 'withBalance'
         ? invoice.balance > 0
-        : invoice.paymentStatus === paymentFilter
+        : invoice.paymentStatus === paymentFilter,
   );
   const emptyInvoicesMessage =
     allInvoices.length === 0
@@ -101,7 +109,11 @@ export default function CobranzaClientePage() {
             </button>
           </div>
           <div className="flex gap-2 w-full sm:w-auto">
-            <Button variant="outline" onClick={() => setAddInvoiceOpen(true)} className="w-full sm:w-auto">
+            <Button
+              variant="outline"
+              onClick={() => setAddInvoiceOpen(true)}
+              className="w-full sm:w-auto"
+            >
               <Plus className="mr-2 h-4 w-4" />
               Agregar factura
             </Button>
@@ -123,7 +135,9 @@ export default function CobranzaClientePage() {
                 : `${filteredInvoices.length} de ${allInvoices.length}`}
               )
             </CardTitle>
-            <CardDescription>Estado de cobro de cada factura emitida a este cliente</CardDescription>
+            <CardDescription>
+              Estado de cobro de cada factura emitida a este cliente
+            </CardDescription>
           </div>
           {allInvoices.length > 0 && (
             <NativeSelect
@@ -163,7 +177,11 @@ export default function CobranzaClientePage() {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Retenido</p>
-                    <p>{invoice.retainedAmount > 0 ? `${formatCurrency(invoice.retainedAmount)}` : '—'}</p>
+                    <p>
+                      {invoice.retainedAmount > 0
+                        ? `${formatCurrency(invoice.retainedAmount)}`
+                        : '—'}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Saldo</p>
@@ -199,7 +217,9 @@ export default function CobranzaClientePage() {
                     <TableCell>{new Date(invoice.issueDate).toLocaleDateString('es-EC')}</TableCell>
                     <TableCell>{formatCurrency(invoice.total)}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {invoice.retainedAmount > 0 ? `${formatCurrency(invoice.retainedAmount)}` : '—'}
+                      {invoice.retainedAmount > 0
+                        ? `${formatCurrency(invoice.retainedAmount)}`
+                        : '—'}
                     </TableCell>
                     <TableCell>{formatCurrency(invoice.balance)}</TableCell>
                     <TableCell>
@@ -239,19 +259,19 @@ export default function CobranzaClientePage() {
                     <p className="text-sm font-medium">
                       {new Date(payment.paymentDate).toLocaleDateString('es-EC')}
                     </p>
-                    <p className="text-xs text-muted-foreground">{payment.reference || 'Sin referencia'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {payment.reference || 'Sin referencia'}
+                    </p>
                   </div>
                   <div className="flex items-center gap-1">
                     <p className="text-sm font-semibold">{formatCurrency(payment.totalAmount)}</p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0"
+                    <IconButton
+                      label="Eliminar pago"
+                      tone="destructive"
                       onClick={() => deletePayment.mutate(payment.id)}
-                      aria-label="Eliminar pago"
                     >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                      <Trash2 />
+                    </IconButton>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -288,7 +308,9 @@ export default function CobranzaClientePage() {
               <TableBody>
                 {paymentsPage.pageItems.map((payment) => (
                   <TableRow key={payment.id}>
-                    <TableCell>{new Date(payment.paymentDate).toLocaleDateString('es-EC')}</TableCell>
+                    <TableCell>
+                      {new Date(payment.paymentDate).toLocaleDateString('es-EC')}
+                    </TableCell>
                     <TableCell>{payment.reference || '—'}</TableCell>
                     <TableCell>{formatCurrency(payment.totalAmount)}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
@@ -302,15 +324,13 @@ export default function CobranzaClientePage() {
                         .join(', ')}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0"
+                      <IconButton
+                        label="Eliminar pago"
+                        tone="destructive"
                         onClick={() => deletePayment.mutate(payment.id)}
-                        aria-label="Eliminar pago"
                       >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                        <Trash2 />
+                      </IconButton>
                     </TableCell>
                   </TableRow>
                 ))}

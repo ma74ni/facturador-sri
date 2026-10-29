@@ -2,8 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatCard } from '@facturador-sri/ui';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   FileText,
   DollarSign,
@@ -12,7 +20,7 @@ import {
   CheckCircle2,
   Clock,
   XCircle,
-  Calendar
+  Calendar,
 } from 'lucide-react';
 import { invoicesApi, Invoice } from '@/lib/api/invoices';
 import { formatCurrency } from '@/lib/utils/formatters';
@@ -44,7 +52,7 @@ export default function ReportesPage() {
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
-    return invoices.filter(inv => {
+    return invoices.filter((inv) => {
       // issueDate llega como "YYYY-MM-DD" (medianoche UTC) — comparar con
       // getMonth/getFullYear (locales) puede correr la fecha un día hacia
       // atrás en un navegador en Ecuador (UTC-5), sacando facturas del mes/año
@@ -52,7 +60,9 @@ export default function ReportesPage() {
       const invoiceDate = new Date(inv.issueDate);
 
       if (selectedPeriod === 'month') {
-        return invoiceDate.getUTCMonth() === currentMonth && invoiceDate.getUTCFullYear() === currentYear;
+        return (
+          invoiceDate.getUTCMonth() === currentMonth && invoiceDate.getUTCFullYear() === currentYear
+        );
       } else if (selectedPeriod === 'year') {
         return invoiceDate.getUTCFullYear() === currentYear;
       }
@@ -65,9 +75,10 @@ export default function ReportesPage() {
   // Calcular estadísticas
   const stats = {
     total: filteredInvoices.length,
-    authorized: filteredInvoices.filter(inv => inv.status === 'AUTHORIZED').length,
-    pending: filteredInvoices.filter(inv => inv.status === 'PENDING').length,
-    rejected: filteredInvoices.filter(inv => inv.status === 'REJECTED' || inv.status === 'ERROR').length,
+    authorized: filteredInvoices.filter((inv) => inv.status === 'AUTHORIZED').length,
+    pending: filteredInvoices.filter((inv) => inv.status === 'PENDING').length,
+    rejected: filteredInvoices.filter((inv) => inv.status === 'REJECTED' || inv.status === 'ERROR')
+      .length,
     totalAmount: filteredInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0),
     totalTax: filteredInvoices.reduce((sum, inv) => sum + inv.totalTax, 0),
   };
@@ -76,8 +87,12 @@ export default function ReportesPage() {
   const topCustomers = (() => {
     const customerSales = new Map<string, { name: string; total: number; count: number }>();
 
-    filteredInvoices.forEach(inv => {
-      const existing = customerSales.get(inv.customerId) || { name: inv.customerName, total: 0, count: 0 };
+    filteredInvoices.forEach((inv) => {
+      const existing = customerSales.get(inv.customerId) || {
+        name: inv.customerName,
+        total: 0,
+        count: 0,
+      };
       customerSales.set(inv.customerId, {
         name: inv.customerName,
         total: existing.total + inv.totalAmount,
@@ -92,11 +107,18 @@ export default function ReportesPage() {
 
   // Productos más vendidos (aproximación desde items de facturas)
   const topProducts = (() => {
-    const productSales = new Map<string, { description: string; quantity: number; total: number }>();
+    const productSales = new Map<
+      string,
+      { description: string; quantity: number; total: number }
+    >();
 
-    filteredInvoices.forEach(inv => {
-      inv.items?.forEach(item => {
-        const existing = productSales.get(item.mainCode) || { description: item.description, quantity: 0, total: 0 };
+    filteredInvoices.forEach((inv) => {
+      inv.items?.forEach((item) => {
+        const existing = productSales.get(item.mainCode) || {
+          description: item.description,
+          quantity: 0,
+          total: 0,
+        };
         productSales.set(item.mainCode, {
           description: item.description,
           quantity: existing.quantity + item.quantity,
@@ -110,11 +132,9 @@ export default function ReportesPage() {
       .slice(0, 10);
   })();
 
-
-
   const exportToCSV = () => {
     const headers = ['Número', 'Fecha', 'Cliente', 'Subtotal', 'IVA', 'Total', 'Estado'];
-    const rows = filteredInvoices.map(inv => [
+    const rows = filteredInvoices.map((inv) => [
       `${inv.establishmentCode}-${inv.emissionPointCode}-${inv.sequential}`,
       new Date(inv.issueDate).toLocaleDateString('es-EC', { timeZone: 'UTC' }),
       inv.customerName,
@@ -124,7 +144,7 @@ export default function ReportesPage() {
       inv.status,
     ]);
 
-    const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const csv = [headers, ...rows].map((row) => row.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -147,9 +167,7 @@ export default function ReportesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Reportes</h1>
-          <p className="text-muted-foreground">
-            Análisis de ventas y facturación
-          </p>
+          <p className="text-muted-foreground">Análisis de ventas y facturación</p>
         </div>
         <Button onClick={exportToCSV} variant="outline" className="w-full sm:w-auto">
           <Download className="h-4 w-4 mr-2" />
@@ -187,59 +205,41 @@ export default function ReportesPage() {
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Facturas</CardTitle>
-            <FileText className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground">
+        <StatCard
+          title="Total Facturas"
+          value={stats.total}
+          description={
+            <>
               {stats.authorized} autorizadas, {stats.pending} pendientes
-            </p>
-          </CardContent>
-        </Card>
+            </>
+          }
+          icon={FileText}
+          tone="primary"
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ingresos</CardTitle>
-            <DollarSign className="h-4 w-4 text-success" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.totalAmount)}</div>
-            <p className="text-xs text-muted-foreground">
-              Total facturado
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Ingresos"
+          value={formatCurrency(stats.totalAmount)}
+          description="Total facturado"
+          icon={DollarSign}
+          tone="success"
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">IVA Recaudado</CardTitle>
-            <TrendingUp className="h-4 w-4 text-tertiary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.totalTax)}</div>
-            <p className="text-xs text-muted-foreground">
-              Total de impuestos
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="IVA Recaudado"
+          value={formatCurrency(stats.totalTax)}
+          description="Total de impuestos"
+          icon={TrendingUp}
+          tone="tertiary"
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Promedio</CardTitle>
-            <DollarSign className="h-4 w-4 text-warning" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats.total > 0 ? formatCurrency(stats.totalAmount / stats.total) : '$0.00'}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Por factura
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Promedio"
+          value={stats.total > 0 ? formatCurrency(stats.totalAmount / stats.total) : '$0.00'}
+          description="Por factura"
+          icon={DollarSign}
+          tone="warning"
+        />
       </div>
 
       {/* Reports Grid */}
@@ -252,23 +252,25 @@ export default function ReportesPage() {
           </CardHeader>
           <CardContent>
             {topCustomers.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No hay datos disponibles
-              </div>
+              <div className="text-center py-8 text-muted-foreground">No hay datos disponibles</div>
             ) : (
               <>
                 {/* Vista mobile: ranking en lista */}
                 <ol className="md:hidden divide-y">
                   {topCustomers.map((customer, index) => (
                     <li key={index} className="flex items-center gap-3 py-3">
-                      <span className="w-5 text-sm text-muted-foreground tabular-nums">{index + 1}</span>
+                      <span className="w-5 text-sm text-muted-foreground tabular-nums">
+                        {index + 1}
+                      </span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium break-words">{customer.name}</p>
                         <p className="text-xs text-muted-foreground">
                           {customer.count} {customer.count === 1 ? 'factura' : 'facturas'}
                         </p>
                       </div>
-                      <p className="text-sm font-semibold flex-shrink-0">{formatCurrency(customer.total)}</p>
+                      <p className="text-sm font-semibold flex-shrink-0">
+                        {formatCurrency(customer.total)}
+                      </p>
                     </li>
                   ))}
                 </ol>
@@ -287,7 +289,9 @@ export default function ReportesPage() {
                         <TableRow key={index}>
                           <TableCell className="font-medium">{customer.name}</TableCell>
                           <TableCell className="text-right">{customer.count}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(customer.total)}</TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(customer.total)}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -306,21 +310,25 @@ export default function ReportesPage() {
           </CardHeader>
           <CardContent>
             {topProducts.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No hay datos disponibles
-              </div>
+              <div className="text-center py-8 text-muted-foreground">No hay datos disponibles</div>
             ) : (
               <>
                 {/* Vista mobile: ranking en lista */}
                 <ol className="md:hidden divide-y">
                   {topProducts.map((product, index) => (
                     <li key={index} className="flex items-center gap-3 py-3">
-                      <span className="w-5 text-sm text-muted-foreground tabular-nums">{index + 1}</span>
+                      <span className="w-5 text-sm text-muted-foreground tabular-nums">
+                        {index + 1}
+                      </span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium break-words">{product.description}</p>
-                        <p className="text-xs text-muted-foreground">Cantidad: {product.quantity}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Cantidad: {product.quantity}
+                        </p>
                       </div>
-                      <p className="text-sm font-semibold flex-shrink-0">{formatCurrency(product.total)}</p>
+                      <p className="text-sm font-semibold flex-shrink-0">
+                        {formatCurrency(product.total)}
+                      </p>
                     </li>
                   ))}
                 </ol>
@@ -339,7 +347,9 @@ export default function ReportesPage() {
                         <TableRow key={index}>
                           <TableCell className="font-medium">{product.description}</TableCell>
                           <TableCell className="text-right">{product.quantity}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(product.total)}</TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(product.total)}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -413,9 +423,7 @@ export default function ReportesPage() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-xs text-muted-foreground">
-                  100%
-                </p>
+                <p className="text-xs text-muted-foreground">100%</p>
               </div>
             </div>
           </div>
