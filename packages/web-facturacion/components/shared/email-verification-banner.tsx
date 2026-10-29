@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Mail, CheckCircle2, Clock, AlertCircle } from "lucide-react";
-import { useAuth } from "@/lib/context/auth-context";
-import { authApi } from "@/lib/api/auth";
+import { useState, useEffect } from 'react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Mail, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
+import { useAuth } from '@/lib/context/auth-context';
+import { authApi } from '@/lib/api/auth';
 
 export function EmailVerificationBanner() {
   const { user, isLoading } = useAuth();
@@ -82,12 +82,11 @@ export function EmailVerificationBanner() {
         setResendSuccess(false);
       }, 5000);
     } catch (err: any) {
-      const errorMessage =
-        err.response?.data?.message || "Error al enviar el email";
+      const errorMessage = err.response?.data?.message || 'Error al enviar el email';
       setResendError(errorMessage);
 
       // Si el error indica cooldown, extraer los minutos y sincronizar
-      if (errorMessage.includes("Debes esperar")) {
+      if (errorMessage.includes('Debes esperar')) {
         const minutesMatch = errorMessage.match(/(\d+) minutos/);
         if (minutesMatch) {
           const minutes = parseInt(minutesMatch[1]);
@@ -114,7 +113,7 @@ export function EmailVerificationBanner() {
   const formatCooldownTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -126,26 +125,23 @@ export function EmailVerificationBanner() {
             <div>
               <AlertTitle>Verifica tu correo electrónico</AlertTitle>
               <AlertDescription>
-                Hemos enviado un email de verificación a{" "}
-                <strong>{user.email}</strong>. Por favor revisa tu bandeja de
-                entrada y sigue las instrucciones.
+                Hemos enviado un email de verificación a <strong>{user.email}</strong>. Por favor
+                revisa tu bandeja de entrada y sigue las instrucciones.
               </AlertDescription>
             </div>
 
             {resendSuccess && (
               <div className="flex items-center gap-2 text-sm text-on-success-container bg-success-container border border-success-container rounded-md p-2">
                 <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
-                <span>
-                  Email enviado exitosamente. Revisa tu bandeja de entrada.
-                </span>
+                <span>Email enviado exitosamente. Revisa tu bandeja de entrada.</span>
               </div>
             )}
 
             {resendError && (
-              <div className="flex items-center gap-2 text-sm text-on-error-container bg-error-container border border-error-container rounded-md p-2">
-                <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                <span>{resendError}</span>
-              </div>
+              <Alert variant="destructive">
+                <AlertCircle />
+                <AlertDescription>{resendError}</AlertDescription>
+              </Alert>
             )}
 
             <Button
@@ -156,7 +152,7 @@ export function EmailVerificationBanner() {
               className="bg-surface-container-lowest"
             >
               {resendingEmail ? (
-                "Enviando..."
+                'Enviando...'
               ) : resendSuccess ? (
                 <>
                   <CheckCircle2 className="mr-2 h-4 w-4" />

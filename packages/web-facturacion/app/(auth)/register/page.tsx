@@ -1,17 +1,35 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+
 import { useForm } from 'react-hook-form';
+
 import { zodResolver } from '@hookform/resolvers/zod';
+
 import { useRouter } from 'next/navigation';
+
 import Link from 'next/link';
 import { useAuth } from '@/lib/context/auth-context';
+
 import { registerSchema, RegisterFormData } from '@/lib/validations/schemas';
+
 import { Button } from '@/components/ui/button';
+
 import { Input } from '@/components/ui/input';
+
 import { PasswordInput } from '@/components/ui/password-input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+
+import { FormField, Alert, AlertDescription } from '@facturador-sri/ui';
+
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+
 import { UserPlus, AlertCircle, Building2, User } from 'lucide-react';
 
 export default function RegisterPage() {
@@ -68,9 +86,7 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-surface-container-low to-surface-container-high p-4">
       <Card className="w-full max-w-2xl">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">
-            Crear Cuenta
-          </CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">Crear Cuenta</CardTitle>
           <CardDescription className="text-center">
             Registra tu empresa para empezar a facturar electrónicamente
           </CardDescription>
@@ -78,10 +94,10 @@ export default function RegisterPage() {
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             {error && (
-              <div className="flex items-center gap-2 p-3 text-sm text-on-error-container bg-error-container border border-error-container rounded-md">
-                <AlertCircle className="h-4 w-4" />
-                <span>{error}</span>
-              </div>
+              <Alert variant="destructive">
+                <AlertCircle />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
 
             {/* Datos de la Empresa */}
@@ -92,8 +108,7 @@ export default function RegisterPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="ruc">RUC *</Label>
+                <FormField label="RUC *" htmlFor="ruc" error={errors.ruc?.message}>
                   <Input
                     id="ruc"
                     placeholder="1234567890001"
@@ -101,66 +116,54 @@ export default function RegisterPage() {
                     {...register('ruc')}
                     disabled={isLoading}
                   />
-                  {errors.ruc && (
-                    <p className="text-sm text-error">{errors.ruc.message}</p>
-                  )}
-                </div>
+                </FormField>
 
-                <div className="space-y-2">
-                  <Label htmlFor="businessName">Razón Social *</Label>
+                <FormField
+                  label="Razón Social *"
+                  htmlFor="businessName"
+                  error={errors.businessName?.message}
+                >
                   <Input
                     id="businessName"
                     placeholder="Mi Empresa S.A."
                     {...register('businessName')}
                     disabled={isLoading}
                   />
-                  {errors.businessName && (
-                    <p className="text-sm text-error">{errors.businessName.message}</p>
-                  )}
-                </div>
+                </FormField>
 
-                <div className="space-y-2">
-                  <Label htmlFor="tradeName">Nombre Comercial</Label>
+                <FormField
+                  label="Nombre Comercial"
+                  htmlFor="tradeName"
+                  error={errors.tradeName?.message}
+                >
                   <Input
                     id="tradeName"
                     placeholder="Mi Negocio"
                     {...register('tradeName')}
                     disabled={isLoading}
                   />
-                  {errors.tradeName && (
-                    <p className="text-sm text-error">{errors.tradeName.message}</p>
-                  )}
-                </div>
+                </FormField>
 
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Teléfono</Label>
+                <FormField label="Teléfono" htmlFor="phone" error={errors.phone?.message}>
                   <Input
                     id="phone"
                     placeholder="0987654321"
                     {...register('phone')}
                     disabled={isLoading}
                   />
-                  {errors.phone && (
-                    <p className="text-sm text-error">{errors.phone.message}</p>
-                  )}
-                </div>
+                </FormField>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="address">Dirección *</Label>
+              <FormField label="Dirección *" htmlFor="address" error={errors.address?.message}>
                 <Input
                   id="address"
                   placeholder="Av. Principal y Calle Secundaria"
                   {...register('address')}
                   disabled={isLoading}
                 />
-                {errors.address && (
-                  <p className="text-sm text-error">{errors.address.message}</p>
-                )}
-              </div>
+              </FormField>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Empresa *</Label>
+              <FormField label="Email Empresa *" htmlFor="email" error={errors.email?.message}>
                 <Input
                   id="email"
                   type="email"
@@ -168,10 +171,7 @@ export default function RegisterPage() {
                   {...register('email')}
                   disabled={isLoading}
                 />
-                {errors.email && (
-                  <p className="text-sm text-error">{errors.email.message}</p>
-                )}
-              </div>
+              </FormField>
             </div>
 
             {/* Datos del Usuario */}
@@ -182,34 +182,29 @@ export default function RegisterPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">Nombre *</Label>
+                <FormField label="Nombre *" htmlFor="firstName" error={errors.firstName?.message}>
                   <Input
                     id="firstName"
                     placeholder="Juan"
                     {...register('firstName')}
                     disabled={isLoading}
                   />
-                  {errors.firstName && (
-                    <p className="text-sm text-error">{errors.firstName.message}</p>
-                  )}
-                </div>
+                </FormField>
 
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Apellido *</Label>
+                <FormField label="Apellido *" htmlFor="lastName" error={errors.lastName?.message}>
                   <Input
                     id="lastName"
                     placeholder="Pérez"
                     {...register('lastName')}
                     disabled={isLoading}
                   />
-                  {errors.lastName && (
-                    <p className="text-sm text-error">{errors.lastName.message}</p>
-                  )}
-                </div>
+                </FormField>
 
-                <div className="space-y-2">
-                  <Label htmlFor="userEmail">Email Usuario *</Label>
+                <FormField
+                  label="Email Usuario *"
+                  htmlFor="userEmail"
+                  error={errors.userEmail?.message}
+                >
                   <Input
                     id="userEmail"
                     type="email"
@@ -217,44 +212,34 @@ export default function RegisterPage() {
                     {...register('userEmail')}
                     disabled={isLoading}
                   />
-                  {errors.userEmail && (
-                    <p className="text-sm text-error">{errors.userEmail.message}</p>
-                  )}
-                </div>
+                </FormField>
 
-                <div className="space-y-2">
-                  <Label htmlFor="password">Contraseña *</Label>
+                <FormField label="Contraseña *" htmlFor="password" error={errors.password?.message}>
                   <PasswordInput
                     id="password"
                     placeholder="••••••••"
                     {...register('password')}
                     disabled={isLoading}
                   />
-                  {errors.password && (
-                    <p className="text-sm text-error">{errors.password.message}</p>
-                  )}
-                </div>
+                </FormField>
 
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="confirmPassword">Confirmar Contraseña *</Label>
+                <FormField
+                  label="Confirmar Contraseña *"
+                  htmlFor="confirmPassword"
+                  error={errors.confirmPassword?.message}
+                  className="md:col-span-2"
+                >
                   <PasswordInput
                     id="confirmPassword"
                     placeholder="••••••••"
                     {...register('confirmPassword')}
                     disabled={isLoading}
                   />
-                  {errors.confirmPassword && (
-                    <p className="text-sm text-error">{errors.confirmPassword.message}</p>
-                  )}
-                </div>
+                </FormField>
               </div>
             </div>
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isLoading}
-            >
+            <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (
                 'Registrando...'
               ) : (

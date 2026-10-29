@@ -1,8 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+
 import { Button } from '@/components/ui/button';
-import { IconButton } from '@facturador-sri/ui';
+
+import { IconButton, FormField, FieldError } from '@facturador-sri/ui';
+
 import {
   Dialog,
   DialogBody,
@@ -12,10 +15,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+
 import { Input } from '@/components/ui/input';
+
 import { NumberInput } from '@/components/ui/number-input';
+
 import { Label } from '@/components/ui/label';
+
 import { SearchableSelect } from '@/components/ui/searchable-select';
+
 import {
   Select,
   SelectContent,
@@ -23,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+
 import {
   Table,
   TableBody,
@@ -31,20 +40,34 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+
 import { CreateInvoiceDto, InvoiceItemDto } from '@/lib/api/invoices';
+
 import { Customer, CreateCustomerDto } from '@/lib/api/customers';
+
 import { Product, CreateProductDto } from '@/lib/api/products';
+
 import { Establishment } from '@/lib/api/establishments';
-import { AlertCircle, Plus, Trash2 } from 'lucide-react';
+
+import { Plus, Trash2 } from 'lucide-react';
 import { CustomerDialog } from '@/components/customers/customer-dialog';
+
 import { CustomerInfoCard } from '@/components/customers/customer-info-card';
+
 import { ProductDialog } from '@/components/products/product-dialog';
+
 import { useToast } from '@/hooks/use-toast';
+
 import { useCreateCustomer, useUpdateCustomer } from '@/lib/hooks/use-customers';
+
 import { useCreateProduct } from '@/lib/hooks/use-products';
+
 import { useTaxCodes, getTaxLabel, getTaxPercentage } from '@/lib/hooks/use-tax-codes';
+
 import { useCertificateStatus } from '@/lib/hooks/use-certificate';
+
 import { CertificateRequiredDialog } from '@/components/shared/certificate-required-dialog';
+
 import { formatCurrency } from '@/lib/utils/formatters';
 
 interface InvoiceDialogProps {
@@ -417,12 +440,7 @@ export function InvoiceDialog({
                     addNewLabel="Nuevo Cliente"
                     error={!!errors.customer}
                   />
-                  {errors.customer && (
-                    <div className="flex items-center gap-1 text-sm text-error">
-                      <AlertCircle className="h-4 w-4" />
-                      <span>{errors.customer}</span>
-                    </div>
-                  )}
+                  <FieldError message={errors.customer} />
                 </div>
                 {/* Customer Info Card - Mostrar cuando hay un cliente seleccionado */}
                 {selectedCustomerData && (
@@ -446,19 +464,18 @@ export function InvoiceDialog({
                     type="date"
                     value={issueDate}
                     onChange={(e) => setIssueDate(e.target.value)}
-                    className={errors.issueDate ? 'border-error' : ''}
+                    aria-invalid={!!errors.issueDate}
                   />
-                  {errors.issueDate && (
-                    <div className="flex items-center gap-1 text-sm text-error">
-                      <AlertCircle className="h-4 w-4" />
-                      <span>{errors.issueDate}</span>
-                    </div>
-                  )}
+                  <FieldError message={errors.issueDate} />
                 </div>
 
                 {/* Establecimiento */}
-                <div className="space-y-2 md:col-span-1 lg:col-span-1">
-                  <Label htmlFor="establishment">Establecimiento *</Label>
+                <FormField
+                  label="Establecimiento *"
+                  htmlFor="establishment"
+                  error={errors.establishment}
+                  className="md:col-span-1 lg:col-span-1"
+                >
                   <Select
                     value={selectedEstablishment}
                     onValueChange={(value) => {
@@ -466,7 +483,7 @@ export function InvoiceDialog({
                       setSelectedEmissionPoint('');
                     }}
                   >
-                    <SelectTrigger className={errors.establishment ? 'border-error' : ''}>
+                    <SelectTrigger aria-invalid={!!errors.establishment}>
                       <SelectValue placeholder="Seleccionar establecimiento" />
                     </SelectTrigger>
                     <SelectContent>
@@ -477,23 +494,21 @@ export function InvoiceDialog({
                       ))}
                     </SelectContent>
                   </Select>
-                  {errors.establishment && (
-                    <div className="flex items-center gap-1 text-sm text-error">
-                      <AlertCircle className="h-4 w-4" />
-                      <span>{errors.establishment}</span>
-                    </div>
-                  )}
-                </div>
+                </FormField>
 
                 {/* Punto de Emisión */}
-                <div className="space-y-2 md:col-span-1 lg:col-span-1">
-                  <Label htmlFor="emissionPoint">Punto de Emisión *</Label>
+                <FormField
+                  label="Punto de Emisión *"
+                  htmlFor="emissionPoint"
+                  error={errors.emissionPoint}
+                  className="md:col-span-1 lg:col-span-1"
+                >
                   <Select
                     value={selectedEmissionPoint}
                     onValueChange={setSelectedEmissionPoint}
                     disabled={!selectedEstablishment}
                   >
-                    <SelectTrigger className={errors.emissionPoint ? 'border-error' : ''}>
+                    <SelectTrigger aria-invalid={!!errors.emissionPoint}>
                       <SelectValue placeholder="Seleccionar punto" />
                     </SelectTrigger>
                     <SelectContent>
@@ -504,13 +519,7 @@ export function InvoiceDialog({
                       ))}
                     </SelectContent>
                   </Select>
-                  {errors.emissionPoint && (
-                    <div className="flex items-center gap-1 text-sm text-error">
-                      <AlertCircle className="h-4 w-4" />
-                      <span>{errors.emissionPoint}</span>
-                    </div>
-                  )}
-                </div>
+                </FormField>
               </div>
             </div>
 
@@ -750,12 +759,7 @@ export function InvoiceDialog({
                 </div>
               )}
 
-              {errors.items && (
-                <div className="flex items-center gap-1 text-sm text-error mt-2">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>{errors.items}</span>
-                </div>
-              )}
+              <FieldError message={errors.items} className="mt-2" />
             </div>
           </div>
 

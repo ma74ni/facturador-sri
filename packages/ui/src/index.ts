@@ -19,6 +19,7 @@ export { fieldStyles } from './atoms/field-styles';
 export { Textarea } from './atoms/textarea';
 export { NativeSelect } from './atoms/native-select';
 export { Label } from './atoms/label';
+export { FieldError, type FieldErrorProps } from './atoms/field-error';
 export { Spinner, type SpinnerProps } from './atoms/spinner';
 
 export {
@@ -109,3 +110,5 @@ export { SearchableSelect, type SearchableSelectProps } from './molecules/search
 export { FilterBar, FilterField, type FilterBarProps } from './molecules/filter-bar';
 
 export { StatCard, type StatCardProps, type StatCardTone } from './molecules/stat-card';
+
+export { FormField, type FormFieldProps } from './molecules/form-field';
