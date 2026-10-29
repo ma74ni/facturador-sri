@@ -5,7 +5,7 @@
  * El tema oscuro existe pero no está activado: se aplica con la clase .dark en <html>.
  */
 :root {
-  --md-primary: 0 93 184; /* #005db8 */
+  --md-primary: 0 71 144; /* #004790 */
   --md-on-primary: 255 255 255; /* #ffffff */
   --md-primary-container: 214 227 255; /* #d6e3ff */
   --md-on-primary-container: 0 69 141; /* #00458d */
@@ -39,14 +39,14 @@
   --md-outline-variant: 193 198 214; /* #c1c6d6 */
   --md-shadow: 0 0 0; /* #000000 */
   --md-scrim: 0 0 0; /* #000000 */
-  --md-success: 0 109 67; /* #006d43 */
+  --md-success: 27 109 36; /* #1b6d24 */
   --md-on-success: 255 255 255; /* #ffffff */
-  --md-success-container: 146 247 188; /* #92f7bc */
-  --md-on-success-container: 0 33 17; /* #002111 */
-  --md-warning: 151 72 6; /* #974806 */
+  --md-success-container: 163 246 156; /* #a3f69c */
+  --md-on-success-container: 0 34 4; /* #002204 */
+  --md-warning: 116 92 0; /* #745c00 */
   --md-on-warning: 255 255 255; /* #ffffff */
-  --md-warning-container: 255 219 200; /* #ffdbc8 */
-  --md-on-warning-container: 50 19 0; /* #321300 */
+  --md-warning-container: 255 224 137; /* #ffe089 */
+  --md-on-warning-container: 36 26 0; /* #241a00 */
 }
 
 .dark {
@@ -79,17 +79,17 @@
   --md-surface-container-highest: 48 53 62; /* #30353e */
   --md-inverse-surface: 223 226 239; /* #dfe2ef */
   --md-inverse-on-surface: 44 48 58; /* #2c303a */
-  --md-inverse-primary: 0 93 184; /* #005db8 */
+  --md-inverse-primary: 23 93 178; /* #175db2 */
   --md-outline: 139 145 159; /* #8b919f */
   --md-outline-variant: 65 71 83; /* #414753 */
   --md-shadow: 0 0 0; /* #000000 */
   --md-scrim: 0 0 0; /* #000000 */
-  --md-success: 118 218 161; /* #76daa1 */
-  --md-on-success: 0 57 32; /* #003920 */
-  --md-success-container: 0 82 49; /* #005231 */
-  --md-on-success-container: 146 247 188; /* #92f7bc */
-  --md-warning: 255 182 138; /* #ffb68a */
-  --md-on-warning: 82 35 0; /* #522300 */
-  --md-warning-container: 116 52 0; /* #743400 */
-  --md-on-warning-container: 255 219 200; /* #ffdbc8 */
+  --md-success: 136 217 130; /* #88d982 */
+  --md-on-success: 0 57 9; /* #003909 */
+  --md-success-container: 0 83 18; /* #005312 */
+  --md-on-success-container: 163 246 156; /* #a3f69c */
+  --md-warning: 237 194 49; /* #edc231 */
+  --md-on-warning: 61 47 0; /* #3d2f00 */
+  --md-warning-container: 87 69 0; /* #574500 */
+  --md-on-warning-container: 255 224 137; /* #ffe089 */
 }
