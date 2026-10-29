@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { CheckCircle2, XCircle, Loader2, Mail } from 'lucide-react';
 import apiClient from '@/lib/api/client';
 import { authApi } from '@/lib/api/auth';
@@ -180,13 +181,12 @@ function VerifyEmailContent() {
                     <label htmlFor="email" className="text-sm font-medium">
                       Ingresa tu email para recibir un nuevo link:
                     </label>
-                    <input
+                    <Input
                       id="email"
                       type="email"
                       placeholder="usuario@ejemplo.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-outline disabled:cursor-not-allowed disabled:opacity-50"
                       disabled={resendingEmail}
                     />
                   </div>

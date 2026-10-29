@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Plus, Search } from 'lucide-react';
+import { fieldStyles } from '@facturador-sri/ui';
 import { cn } from '@/lib/utils';
 
 interface SearchableSelectProps<T> {
@@ -49,7 +50,7 @@ export function SearchableSelect<T>({
 
   const selectedItem = useMemo(
     () => items.find((item) => getId(item) === value),
-    [items, value, getId]
+    [items, value, getId],
   );
 
   const filteredItems = useMemo(() => {
@@ -88,9 +89,10 @@ export function SearchableSelect<T>({
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          'flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus:outline-none focus-visible:border-outline disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
-          open && 'border-outline',
-          error && 'border-error'
+          fieldStyles,
+          'h-10 items-center justify-between py-2',
+          open && 'border-primary ring-1 ring-primary',
+          error && 'border-error ring-1 ring-error',
         )}
       >
         <span className={cn('truncate text-left', !selectedItem && 'text-muted-foreground')}>
@@ -109,7 +111,7 @@ export function SearchableSelect<T>({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={searchPlaceholder}
-              className="w-full h-9 rounded-md border border-input bg-background pl-8 pr-3 text-base focus:outline-none focus:border-outline md:text-sm"
+              className={cn(fieldStyles, 'h-9 pl-8')}
             />
           </div>
 
@@ -128,13 +130,15 @@ export function SearchableSelect<T>({
                     }}
                     className={cn(
                       'w-full px-3 py-2 text-left hover:bg-surface-container-high flex items-center justify-between gap-2',
-                      isSelected && 'bg-primary/5'
+                      isSelected && 'bg-primary/5',
                     )}
                   >
                     <div className="min-w-0">
                       <div className="font-medium text-sm truncate">{getLabel(item)}</div>
                       {getSubLabel && (
-                        <div className="text-xs text-on-surface-variant truncate">{getSubLabel(item)}</div>
+                        <div className="text-xs text-on-surface-variant truncate">
+                          {getSubLabel(item)}
+                        </div>
                       )}
                     </div>
                     {isSelected && <Check className="h-4 w-4 text-primary flex-shrink-0" />}
@@ -142,7 +146,9 @@ export function SearchableSelect<T>({
                 );
               })
             ) : (
-              <div className="px-3 py-6 text-center text-sm text-on-surface-variant">{emptyMessage}</div>
+              <div className="px-3 py-6 text-center text-sm text-on-surface-variant">
+                {emptyMessage}
+              </div>
             )}
           </div>
 
