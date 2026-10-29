@@ -29,6 +29,8 @@ import {
   unusableCertificateReason,
 } from '../../../invoices/domain/signing-status';
 import { syncInvoicePaymentStatus } from '../../../payments/application/services/invoice-payment-status';
+import { errorMessage } from '../../../../shared/errors/error-message';
+import { Prisma } from '@prisma/client';
 
 /** Lo que necesita el envío por email: cliente, factura modificada y la configuración de email. */
 const CREDIT_NOTE_EMAIL_INCLUDE = {
@@ -270,10 +272,10 @@ export class CreditNotesService {
           xmlSignedPath = await this.xmlStorage.saveSignedXml(accessKey, signedXml, companyId);
           this.logger.log(`✅ XML firmado digitalmente con XAdES-BES: ${xmlSignedPath}`);
           signatureStatus = 'firmado';
-        } catch (signError: any) {
-          this.logger.error(`❌ No se pudo firmar la nota de crédito ${sequential}: ${signError.message}`);
+        } catch (signError: unknown) {
+          this.logger.error(`❌ No se pudo firmar la nota de crédito ${sequential}: ${errorMessage(signError)}`);
           signatureStatus = 'error_firma';
-          signatureDetail = signError.message;
+          signatureDetail = errorMessage(signError);
         }
       } else {
         this.logger.warn('⚠️ La empresa no tiene certificado digital configurado');
@@ -288,10 +290,10 @@ export class CreditNotesService {
           ...(signatureDetail ? { sriErrors: { errors: [`Firma: ${signatureDetail}`] } } : {}),
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error('❌ Error generando/firmando XML:', error);
       signatureStatus = 'error_generacion';
-      signatureDetail = error.message;
+      signatureDetail = errorMessage(error);
     }
 
     const warning = signatureWarning('La nota de crédito', signatureStatus, signatureDetail);
@@ -481,8 +483,8 @@ export class CreditNotesService {
             await this.sendCreditNoteByEmail(creditNote.id, companyId);
             emailSent = true;
             this.logger.log('✅ Email enviado automáticamente al cliente');
-          } catch (emailError: any) {
-            this.logger.warn(`⚠️ No se pudo enviar email automático: ${emailError.message}`);
+          } catch (emailError: unknown) {
+            this.logger.warn(`⚠️ No se pudo enviar email automático: ${errorMessage(emailError)}`);
             // No lanzamos error, solo advertencia
           }
         } else {
@@ -527,9 +529,9 @@ export class CreditNotesService {
         status,
         errors: result.errors,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error('❌ Error enviando al SRI:', error);
-      throw new BadRequestException(`Error al enviar al SRI: ${error.message}`);
+      throw new BadRequestException(`Error al enviar al SRI: ${errorMessage(error)}`);
     }
   }
 
@@ -608,9 +610,9 @@ export class CreditNotesService {
         message: 'RIDE generado exitosamente',
         ridePath,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error('❌ Error generando RIDE:', error);
-      throw new BadRequestException(`Error al generar RIDE: ${error.message}`);
+      throw new BadRequestException(`Error al generar RIDE: ${errorMessage(error)}`);
     }
   }
 
@@ -637,7 +639,7 @@ export class CreditNotesService {
         filename: `NC-${creditNote.establishmentCode}-${creditNote.emissionPointCode}-${creditNote.sequential}.pdf`,
         contentType: 'application/pdf',
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error('❌ Error descargando RIDE desde R2:', error);
       throw new NotFoundException('Error al descargar RIDE');
     }
@@ -667,7 +669,7 @@ export class CreditNotesService {
         filename: `NC-${creditNote.establishmentCode}-${creditNote.emissionPointCode}-${creditNote.sequential}.xml`,
         contentType: 'application/xml',
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error('❌ Error descargando XML desde R2:', error);
       throw new NotFoundException('Error al descargar XML');
     }
@@ -811,21 +813,18 @@ export class CreditNotesService {
     );
 
     // Construir filtros para la consulta
-    const whereClause: any = {
+    const issueDate: Prisma.DateTimeFilter = {};
+    if (dateFrom) {
+      issueDate.gte = new Date(dateFrom);
+    }
+    if (dateTo) {
+      issueDate.lte = new Date(dateTo);
+    }
+    const whereClause: Prisma.CreditNoteWhereInput = {
       companyId,
       sriStatus: 'PENDING',
+      ...((dateFrom || dateTo) && { issueDate }),
     };
-
-    // Agregar filtro de fechas si se proporcionan
-    if (dateFrom || dateTo) {
-      whereClause.issueDate = {};
-      if (dateFrom) {
-        whereClause.issueDate.gte = new Date(dateFrom);
-      }
-      if (dateTo) {
-        whereClause.issueDate.lte = new Date(dateTo);
-      }
-    }
 
     // Obtener notas de crédito pendientes
     const pendingCreditNotes = await this.prisma.creditNote.findMany({

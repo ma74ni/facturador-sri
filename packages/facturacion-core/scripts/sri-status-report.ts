@@ -14,8 +14,9 @@
  */
 import { Logger } from '@nestjs/common';
 import { PrismaClient, SRIStatus } from '@prisma/client';
-import { SriWebServiceService } from '../src/modules/invoices/infrastructure/sri/sri-web-service.service';
+import { SriMessage, SriWebServiceService } from '../src/modules/invoices/infrastructure/sri/sri-web-service.service';
 import { classifyAuthorizationState } from '../src/modules/invoices/infrastructure/sri/sri-authorization-state';
+import { R2StorageService } from '../src/shared/storage/r2-storage.service';
 
 const STATUSES: SRIStatus[] = ['PENDING', 'SENT', 'REJECTED', 'ERROR', 'CANCELLED'];
 
@@ -49,7 +50,7 @@ async function main() {
   Logger.overrideLogger(['error']); // sin los logs de cada consulta
   const prisma = new PrismaClient();
   // checkAuthorization no usa R2
-  const sri = new SriWebServiceService(null as any);
+  const sri = new SriWebServiceService(null as unknown as R2StorageService);
 
   try {
     const select = {
@@ -105,7 +106,7 @@ async function main() {
           } else if (verdict === 'REJECTED') {
             result = 'NO AUTORIZADO';
             detail = (auth.mensajes ?? [])
-              .map((m: any) => [m.mensaje, m.informacionAdicional].filter(Boolean).join(': '))
+              .map((m: SriMessage) => [m.mensaje, m.informacionAdicional].filter(Boolean).join(': '))
               .join('; ');
           } else {
             result = 'EN PROCESO';

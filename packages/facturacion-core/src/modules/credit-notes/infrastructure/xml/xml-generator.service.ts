@@ -9,6 +9,13 @@ import {
   IvaGroup,
   TaxCalculatorService,
 } from '../../../tax-codes/domain/services/tax-calculator.service';
+import { Prisma } from '@prisma/client';
+import { CompanyForXml } from '../../../invoices/infrastructure/xml/xml-generator.service';
+
+/** La nota de crédito con sus líneas, su cliente y la fecha de la factura que modifica. */
+export type CreditNoteForXml = Prisma.CreditNoteGetPayload<{
+  include: { items: true; customer: true; modifiedInvoice: { select: { issueDate: true } } };
+}>;
 
 @Injectable()
 export class CreditNoteXmlGeneratorService {
@@ -31,7 +38,7 @@ export class CreditNoteXmlGeneratorService {
    * Código de documento: 04
    * Estructura basada en ANEXO 1 - Ficha Técnica SRI v2.28+
    */
-  generateCreditNoteXml(creditNote: any, company: any): string {
+  generateCreditNoteXml(creditNote: CreditNoteForXml, company: CompanyForXml): string {
     const root = create({ version: '1.0', encoding: 'UTF-8' }).ele('notaCredito', {
       id: 'comprobante',
       version: '1.1.0',
@@ -148,9 +155,9 @@ export class CreditNoteXmlGeneratorService {
       const impuesto = impuestos.ele('impuesto');
       impuesto.ele('codigo').txt(SRI_IVA_TAX_CODE);
       impuesto.ele('codigoPorcentaje').txt(item.ivaCode);
-      impuesto.ele('tarifa').txt(parseFloat(item.ivaRate).toFixed(2));
-      impuesto.ele('baseImponible').txt(parseFloat(item.subtotal).toFixed(2));
-      impuesto.ele('valor').txt(parseFloat(item.ivaValue).toFixed(2));
+      impuesto.ele('tarifa').txt(parseFloat(item.ivaRate.toString()).toFixed(2));
+      impuesto.ele('baseImponible').txt(parseFloat(item.subtotal.toString()).toFixed(2));
+      impuesto.ele('valor').txt(parseFloat(item.ivaValue.toString()).toFixed(2));
     }
 
     // ==================== INFO ADICIONAL (OPCIONAL) ====================

@@ -92,7 +92,7 @@ export class ImportedInvoicesEnrichmentService {
 
   private async enrichTaxes(imported: ImportedInvoice[]): Promise<EnrichReport> {
     const pending = imported.filter(
-      (invoice) => !(invoice.metadata as any)?.sriEnrichedAt && /^\d{49}$/.test(invoice.accessKey),
+      (invoice) => !(invoice.metadata as { sriEnrichedAt?: string } | null)?.sriEnrichedAt && /^\d{49}$/.test(invoice.accessKey),
     );
     const fromSri = await mapWithConcurrency(pending, SRI_CONCURRENCY, (invoice) =>
       this.sriLookup.fetchAuthorized(invoice.accessKey),

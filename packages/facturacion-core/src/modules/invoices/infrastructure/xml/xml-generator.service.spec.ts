@@ -58,7 +58,7 @@ describe('XmlGeneratorService', () => {
     items,
   };
 
-  const xml = generator.generateInvoiceXml(invoice, company);
+  const xml = generator.generateInvoiceXml(invoice as never, company as never);
   const parsed = new XMLParser({ parseTagValue: false }).parse(xml).factura;
   const info = parsed.infoFactura;
   const totals = [info.totalConImpuestos.totalImpuesto].flat();

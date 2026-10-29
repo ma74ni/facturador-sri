@@ -6,6 +6,7 @@ import {
   SriAuthorizedInvoice,
 } from '../../domain/sri-authorized-invoice';
 import { BuyerContact } from '../../domain/buyer-contact';
+import { errorMessage } from '../../../../shared/errors/error-message';
 
 // El SRI responde lento (crea el cliente SOAP en cada consulta); unas pocas a
 // la vez acortan un archivo grande sin saturarlo.
@@ -65,8 +66,8 @@ export class SriInvoiceLookupService {
         found.phone ??= buyer.phone;
         found.address ??= buyer.address;
         if (found.email) break;
-      } catch (e: any) {
-        lastError = e?.message ?? 'error desconocido';
+      } catch (e: unknown) {
+        lastError = errorMessage(e);
       }
     }
     if (!anyAnswer) throw new Error(lastError);

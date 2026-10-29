@@ -39,9 +39,15 @@ function normalizeName(name: string): string {
     .replace(/[^a-z]/g, '');
 }
 
+/** Un `totalImpuesto` del XML autorizado, tal como lo deja el parser. */
+interface SriTaxTotal {
+  codigo?: unknown;
+  valor?: unknown;
+}
+
 function text(value: unknown): string | null {
   if (value === undefined || value === null) return null;
-  const raw = typeof value === 'object' ? (value as any)['#text'] : value;
+  const raw = typeof value === 'object' ? (value as { '#text'?: unknown })['#text'] : value;
   const trimmed = String(raw ?? '').trim();
   return trimmed || null;
 }
@@ -78,8 +84,8 @@ export function readSriAuthorizedInvoice(xml: string): SriAuthorizedInvoice {
   };
 
   const ivaValue = (info.totalConImpuestos?.totalImpuesto ?? [])
-    .filter((tax: any) => text(tax.codigo) === IVA_TAX_CODE)
-    .reduce((sum: number, tax: any) => sum + amount(tax.valor), 0);
+    .filter((tax: SriTaxTotal) => text(tax.codigo) === IVA_TAX_CODE)
+    .reduce((sum: number, tax: SriTaxTotal) => sum + amount(tax.valor), 0);
 
   return {
     buyer: {

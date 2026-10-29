@@ -19,6 +19,8 @@ import {
   LineIvaResolverService,
   toBadRequest,
 } from '../../../tax-codes/application/services/line-iva-resolver.service';
+import { errorMessage } from '../../../../shared/errors/error-message';
+import { Prisma } from '@prisma/client';
 
 /** Lo que necesita el envío por email: cliente y la configuración de email de la empresa. */
 const INVOICE_EMAIL_INCLUDE = {
@@ -200,10 +202,10 @@ export class InvoicesService {
           xmlSignedPath = await this.xmlStorage.saveSignedXml(accessKey, signedXml, companyId);
           signatureStatus = 'firmado';
 
-        } catch (signError: any) {
+        } catch (signError: unknown) {
           signatureStatus = 'error_firma';
-          signatureDetail = signError.message;
-          this.logger.error(`❌ No se pudo firmar la factura ${sequential}: ${signError.message}`);
+          signatureDetail = errorMessage(signError);
+          this.logger.error(`❌ No se pudo firmar la factura ${sequential}: ${errorMessage(signError)}`);
         }
       }
 
@@ -456,9 +458,9 @@ export class InvoicesService {
         this.logger.warn('⚠️ Cliente sin email configurado, no se envió automáticamente');
         emailError = 'Cliente sin email configurado';
       }
-    } catch (error: any) {
-      this.logger.error('⚠️ Error en proceso post-autorización:', error.message);
-      emailError = error.message;
+    } catch (error: unknown) {
+      this.logger.error('⚠️ Error en proceso post-autorización:', errorMessage(error));
+      emailError = errorMessage(error);
       // No fallar la autorización si el email o RIDE fallan
     }
 
@@ -689,7 +691,7 @@ async sendInvoiceByEmail(invoiceId: string, companyId: string, recipientEmail?: 
     this.logger.log('📦 Iniciando procesamiento masivo de facturas...');
 
     // 1. Construir filtro de fechas
-    const dateFilter: any = {};
+    const dateFilter: Prisma.DateTimeFilter = {};
     if (dateFrom) {
       dateFilter.gte = new Date(dateFrom);
     }
@@ -753,11 +755,11 @@ async sendInvoiceByEmail(invoiceId: string, companyId: string, recipientEmail?: 
               emailSent: result.emailSent || false,
               success: true,
             };
-          } catch (error: any) {
+          } catch (error: unknown) {
             throw {
               invoiceId: invoice.id,
               invoiceNumber: `${invoice.establishmentCode}-${invoice.emissionPointCode}-${invoice.sequential}`,
-              error: error.message,
+              error: errorMessage(error),
             };
           }
         }),

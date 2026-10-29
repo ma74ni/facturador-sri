@@ -26,6 +26,7 @@ import {
   AuthenticatedUser,
   CurrentUser,
 } from '../../../auth/infrastructure/decorators/current-user.decorator';
+import { UpdateMailjetConfigDto } from '../../application/dto/update-mailjet-config.dto';
 
 @ApiTags('companies')
 @Controller('companies')
@@ -182,21 +183,17 @@ export class CompaniesController {
       },
     },
   })
-  async updateMailjetConfig(@Body() dto: any, @CurrentUser() user: AuthenticatedUser) {
+  async updateMailjetConfig(
+    @Body() dto: UpdateMailjetConfigDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     const { companyId } = user;
-
-    // Validar que se proporcionen las credenciales
-    if (!dto.mailjetApiKey || !dto.mailjetSecretKey) {
-      throw new BadRequestException('Se requieren mailjetApiKey y mailjetSecretKey');
-    }
 
     // Verificar conexión antes de guardar
     const isValid = await this.emailService.verifyConnection({
       emailProvider: 'MAILJET',
       mailjetApiKey: dto.mailjetApiKey,
       mailjetSecretKey: dto.mailjetSecretKey,
-      businessName: '', // No se usa en la verificación
-      email: '',
     });
 
     if (!isValid) {

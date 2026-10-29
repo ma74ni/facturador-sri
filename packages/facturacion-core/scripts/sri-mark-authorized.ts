@@ -18,13 +18,14 @@ import { Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { SriWebServiceService } from '../src/modules/invoices/infrastructure/sri/sri-web-service.service';
 import { classifyAuthorizationState } from '../src/modules/invoices/infrastructure/sri/sri-authorization-state';
+import { R2StorageService } from '../src/shared/storage/r2-storage.service';
 
 async function main() {
   const apply = process.argv.includes('--apply');
   Logger.overrideLogger(['error']); // sin los logs de cada consulta
   const prisma = new PrismaClient();
   // checkAuthorization no usa R2
-  const sri = new SriWebServiceService(null as any);
+  const sri = new SriWebServiceService(null as unknown as R2StorageService);
 
   try {
     const invoices = await prisma.invoice.findMany({
