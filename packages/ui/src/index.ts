@@ -12,6 +12,7 @@ export { cn } from './lib/cn';
 export { Button, buttonVariants, type ButtonProps } from './atoms/button';
 export { Badge, badgeVariants, type BadgeProps } from './atoms/badge';
 export { Input, type InputProps } from './atoms/input';
+export { PasswordInput } from './atoms/password-input';
 export { NumberInput, type NumberInputProps } from './atoms/number-input';
 export { fieldStyles } from './atoms/field-styles';
 export { Textarea } from './atoms/textarea';
@@ -88,3 +89,20 @@ export {
   ToastClose,
   ToastAction,
 } from './molecules/toast';
+
+export {
+  Select,
+  SelectGroup,
+  SelectValue,
+  SelectTrigger,
+  SelectContent,
+  SelectLabel,
+  SelectItem,
+  SelectSeparator,
+  SelectScrollUpButton,
+  SelectScrollDownButton,
+} from './molecules/select';
+
+export { SearchableSelect, type SearchableSelectProps } from './molecules/searchable-select';
+
+export { FilterBar, FilterField, type FilterBarProps } from './molecules/filter-bar';
