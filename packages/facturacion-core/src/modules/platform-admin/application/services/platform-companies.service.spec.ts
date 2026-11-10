@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { PlatformCompaniesService } from './platform-companies.service';
 import { PlatformAuditService } from './platform-audit.service';
 import { CompanyNotifierService } from './company-notifier.service';
+import * as catalog from '../../../companies/domain/product-modules.catalog';
 
 describe('PlatformCompaniesService.goLive', () => {
   const companyId = 'company-1';
@@ -35,7 +36,9 @@ describe('PlatformCompaniesService.goLive', () => {
       platformAuditLog: { create: jest.fn() },
     };
     const prisma = {
-      user: { findUnique: jest.fn().mockResolvedValue({ id: 'admin-1', email: 'admin@siete8.com' }) },
+      user: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'admin-1', email: 'admin@siete8.com' }),
+      },
       company: { findUnique: jest.fn().mockResolvedValue(company) },
       emissionPoint: { findMany: jest.fn().mockResolvedValue(points) },
       // lastIssuedInProduction: primero facturas, luego notas de crédito.
@@ -76,7 +79,11 @@ describe('PlatformCompaniesService.goLive', () => {
     });
     expect(tx.platformAuditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ action: 'COMPANY_WENT_LIVE', actorEmail: 'admin@siete8.com', companyRuc: '1715758502001' }),
+        data: expect.objectContaining({
+          action: 'COMPANY_WENT_LIVE',
+          actorEmail: 'admin@siete8.com',
+          companyRuc: '1715758502001',
+        }),
       }),
     );
     expect(notifier.notify).toHaveBeenCalledWith(companyId, { kind: 'wentLive' });
@@ -92,7 +99,10 @@ describe('PlatformCompaniesService.goLive', () => {
   it('exige decidir el número de todos los puntos', async () => {
     const { service, tx } = setup();
     await expect(
-      service.goLive('admin-1', companyId, { ...allPoints, emissionPoints: [allPoints.emissionPoints[0]] }),
+      service.goLive('admin-1', companyId, {
+        ...allPoints,
+        emissionPoints: [allPoints.emissionPoints[0]],
+      }),
     ).rejects.toThrow('faltan: 001-020');
     expect(tx.company.update).not.toHaveBeenCalled();
   });
@@ -102,14 +112,19 @@ describe('PlatformCompaniesService.goLive', () => {
     await expect(
       service.goLive('admin-1', companyId, {
         ...allPoints,
-        emissionPoints: [...allPoints.emissionPoints, { emissionPointId: 'ajeno', nextInvoiceSequence: 1, nextCreditNoteSequence: 1 }],
+        emissionPoints: [
+          ...allPoints.emissionPoints,
+          { emissionPointId: 'ajeno', nextInvoiceSequence: 1, nextCreditNoteSequence: 1 },
+        ],
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('no deja repetir un número ya emitido en producción', async () => {
     const { service, tx } = setup({ lastInvoices: [{ emissionPointId: 'p-020', last: 5 }] });
-    await expect(service.goLive('admin-1', companyId, allPoints)).rejects.toThrow('el siguiente debe ser 6 o mayor');
+    await expect(service.goLive('admin-1', companyId, allPoints)).rejects.toThrow(
+      'el siguiente debe ser 6 o mayor',
+    );
     expect(tx.company.update).not.toHaveBeenCalled();
   });
 
@@ -123,7 +138,9 @@ describe('PlatformCompaniesService.goLive', () => {
 
   it('no repite el paso si ya está en producción', async () => {
     const { service } = setup({ company: readyCompany({ environment: 'PRODUCTION' }) });
-    await expect(service.goLive('admin-1', companyId, allPoints)).rejects.toThrow('ya está en producción');
+    await expect(service.goLive('admin-1', companyId, allPoints)).rejects.toThrow(
+      'ya está en producción',
+    );
   });
 });
 
@@ -131,8 +148,14 @@ describe('PlatformCompaniesService.updateModules', () => {
   function setup(enabledModules: string[]) {
     const tx = { company: { update: jest.fn() }, platformAuditLog: { create: jest.fn() } };
     const prisma = {
-      user: { findUnique: jest.fn().mockResolvedValue({ id: 'admin-1', email: 'admin@siete8.com' }) },
-      company: { findUnique: jest.fn().mockResolvedValue({ id: 'c-1', ruc: '1793082815001', enabledModules }) },
+      user: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'admin-1', email: 'admin@siete8.com' }),
+      },
+      company: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ id: 'c-1', ruc: '1793082815001', enabledModules }),
+      },
       $transaction: jest.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
     };
     const service = new PlatformCompaniesService(
@@ -147,20 +170,48 @@ describe('PlatformCompaniesService.updateModules', () => {
   it('habilita Cobranza y lo audita', async () => {
     const { service, tx } = setup([]);
     await service.updateModules('admin-1', 'c-1', ['cobranza']);
-    expect(tx.company.update).toHaveBeenCalledWith({ where: { id: 'c-1' }, data: { enabledModules: ['cobranza'] } });
+    expect(tx.company.update).toHaveBeenCalledWith({
+      where: { id: 'c-1' },
+      data: { enabledModules: ['cobranza'] },
+    });
     expect(tx.platformAuditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ action: 'COMPANY_MODULES_CHANGED', details: { enabled: ['cobranza'], disabled: [] } }),
+        data: expect.objectContaining({
+          action: 'COMPANY_MODULES_CHANGED',
+          details: { enabled: ['cobranza'], disabled: [] },
+        }),
       }),
     );
+  });
+
+  it('rechaza una combinación en la que un módulo queda sin el que requiere, sin guardar nada', async () => {
+    const { service, tx } = setup([]);
+    jest.spyOn(catalog, 'findMissingRequirements').mockReturnValueOnce([
+      {
+        module: { key: 'cobranza', name: 'ATS', description: '', requires: [] },
+        missing: [{ key: 'compras', name: 'Compras', description: '', requires: [] }],
+      },
+    ]);
+
+    await expect(service.updateModules('admin-1', 'c-1', ['cobranza'])).rejects.toThrow(
+      new BadRequestException('ATS requiere Compras'),
+    );
+    expect(tx.company.update).not.toHaveBeenCalled();
   });
 
   it('deshabilita y descarta claves que ya no existen en el catálogo', async () => {
     const { service, tx } = setup(['cobranza', 'viejo']);
     await service.updateModules('admin-1', 'c-1', []);
-    expect(tx.company.update).toHaveBeenCalledWith({ where: { id: 'c-1' }, data: { enabledModules: [] } });
+    expect(tx.company.update).toHaveBeenCalledWith({
+      where: { id: 'c-1' },
+      data: { enabledModules: [] },
+    });
     expect(tx.platformAuditLog.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ details: { enabled: [], disabled: ['cobranza', 'viejo'] } }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({
+          details: { enabled: [], disabled: ['cobranza', 'viejo'] },
+        }),
+      }),
     );
   });
 
@@ -175,7 +226,9 @@ describe('PlatformCompaniesService.sendCertificateReminder', () => {
   function setup(company: Record<string, unknown>, sent: number) {
     const tx = { platformAuditLog: { create: jest.fn() } };
     const prisma = {
-      user: { findUnique: jest.fn().mockResolvedValue({ id: 'admin-1', email: 'admin@siete8.com' }) },
+      user: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'admin-1', email: 'admin@siete8.com' }),
+      },
       company: { findUnique: jest.fn().mockResolvedValue(company) },
       $transaction: jest.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
     };
@@ -202,19 +255,28 @@ describe('PlatformCompaniesService.sendCertificateReminder', () => {
     expect(notifier.notify).toHaveBeenCalledWith('c-1', { kind: 'certificateExpiring' });
     expect(result.sent).toBe(2);
     expect(tx.platformAuditLog.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ action: 'CERTIFICATE_REMINDER_SENT' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ action: 'CERTIFICATE_REMINDER_SENT' }),
+      }),
     );
   });
 
   it('no envía si la empresa no tiene certificado', async () => {
-    const { service, notifier } = setup({ ...withCertificate, hasCertificate: false, certificateExpiry: null }, 0);
-    await expect(service.sendCertificateReminder('admin-1', 'c-1')).rejects.toThrow('no tiene un certificado');
+    const { service, notifier } = setup(
+      { ...withCertificate, hasCertificate: false, certificateExpiry: null },
+      0,
+    );
+    await expect(service.sendCertificateReminder('admin-1', 'c-1')).rejects.toThrow(
+      'no tiene un certificado',
+    );
     expect(notifier.notify).not.toHaveBeenCalled();
   });
 
   it('avisa si no salió ningún correo y no lo audita', async () => {
     const { service, tx } = setup(withCertificate, 0);
-    await expect(service.sendCertificateReminder('admin-1', 'c-1')).rejects.toThrow('No se pudo enviar');
+    await expect(service.sendCertificateReminder('admin-1', 'c-1')).rejects.toThrow(
+      'No se pudo enviar',
+    );
     expect(tx.platformAuditLog.create).not.toHaveBeenCalled();
   });
 });

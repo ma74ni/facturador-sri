@@ -2,20 +2,43 @@
 
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@facturador-sri/ui';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useProductModules, useUpdateCompanyModules } from '@/lib/hooks/use-platform-admin';
+import { enabledDependents, missingRequirements } from '@/lib/product-modules';
+import type { ProductModule } from '@/lib/api/platform-admin';
 
 interface ModulesCardProps {
   companyId: string;
   enabledModules: string[];
 }
 
-/** Módulos de producto de una empresa (aparecen en su menú y habilitan su API). */
+/** Lo que pide confirmar apagar un módulo del que dependen otros encendidos. */
+interface PendingDisable {
+  module: ProductModule;
+  dependents: ProductModule[];
+}
+
+/**
+ * Módulos de producto de una empresa (aparecen en su menú y habilitan su API). Los que requieren a
+ * otro se muestran debajo de él y no se pueden encender sin él; apagar uno del que dependen otros
+ * pide confirmar que se apagan también.
+ */
 export function ModulesCard({ companyId, enabledModules }: ModulesCardProps) {
   const { data: catalog = [], isLoading } = useProductModules();
   const update = useUpdateCompanyModules(companyId);
   const [selected, setSelected] = useState<string[]>(enabledModules);
+  const [pending, setPending] = useState<PendingDisable | null>(null);
 
   // Por contenido, no por referencia: un refetch del detalle no borra lo que se está editando.
   const savedKey = enabledModules.join(',');
@@ -24,37 +47,87 @@ export function ModulesCard({ companyId, enabledModules }: ModulesCardProps) {
   }, [savedKey]);
 
   const changed =
-    selected.length !== enabledModules.length || selected.some((key) => !enabledModules.includes(key));
+    selected.length !== enabledModules.length ||
+    selected.some((key) => !enabledModules.includes(key));
 
-  const toggle = (key: string) =>
-    setSelected((current) => (current.includes(key) ? current.filter((k) => k !== key) : [...current, key]));
+  const byKey = new Map(catalog.map((module) => [module.key, module]));
+  const nameOf = (key: string) => byKey.get(key)?.name ?? key;
+
+  const toggle = (module: ProductModule) => {
+    if (!selected.includes(module.key)) {
+      setSelected((current) => [...current, module.key]);
+      return;
+    }
+    const dependents = enabledDependents(module.key, selected, catalog);
+    if (dependents.length > 0) {
+      setPending({ module, dependents: dependents.map((key) => byKey.get(key)!).filter(Boolean) });
+      return;
+    }
+    setSelected((current) => current.filter((key) => key !== module.key));
+  };
+
+  const confirmDisable = () => {
+    if (!pending) return;
+    const off = new Set([pending.module.key, ...pending.dependents.map((module) => module.key)]);
+    setSelected((current) => current.filter((key) => !off.has(key)));
+    setPending(null);
+  };
+
+  // Primero los módulos base; cada uno con los que dependen de él debajo.
+  const roots = catalog.filter((module) => module.requires.length === 0);
+  const childrenOf = (key: string) =>
+    catalog.filter((module) => module.requires.length > 0 && module.requires[0] === key);
+
+  const renderModule = (module: ProductModule) => {
+    const missing = missingRequirements(module, selected);
+    const blocked = missing.length > 0 && !selected.includes(module.key);
+    return (
+      <label
+        className={`flex items-start gap-3 text-body-md ${blocked ? 'cursor-not-allowed opacity-[0.6]' : 'cursor-pointer'}`}
+      >
+        <input
+          type="checkbox"
+          className="mt-1 accent-primary"
+          checked={selected.includes(module.key)}
+          onChange={() => toggle(module)}
+          disabled={update.isPending || blocked}
+        />
+        <span>
+          <span className="text-title-sm text-on-surface">{module.name}</span>
+          <span className="block text-body-sm text-on-surface-variant">
+            {module.description}
+            {module.requires.length > 0 && (
+              <> Requiere {module.requires.map(nameOf).join(' y ')}.</>
+            )}
+          </span>
+        </span>
+      </label>
+    );
+  };
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Módulos</CardTitle>
-        <CardDescription>Funciones adicionales que aparecen en el menú de la empresa.</CardDescription>
+        <CardDescription>
+          Funciones adicionales que aparecen en el menú de la empresa.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {isLoading ? (
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          <Loader2 className="h-5 w-5 animate-spin text-on-surface-variant" />
         ) : (
           <ul className="space-y-3">
-            {catalog.map((module) => (
-              <li key={module.key}>
-                <label className="flex items-start gap-3 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={selected.includes(module.key)}
-                    onChange={() => toggle(module.key)}
-                    disabled={update.isPending}
-                  />
-                  <span>
-                    <span className="font-medium">{module.name}</span>
-                    <span className="block text-muted-foreground">{module.description}</span>
-                  </span>
-                </label>
+            {roots.map((root) => (
+              <li key={root.key} className="space-y-3">
+                {renderModule(root)}
+                {childrenOf(root.key).length > 0 && (
+                  <ul className="ml-2 space-y-3 border-l border-outline-variant pl-5">
+                    {childrenOf(root.key).map((child) => (
+                      <li key={child.key}>{renderModule(child)}</li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
           </ul>
@@ -65,12 +138,34 @@ export function ModulesCard({ companyId, enabledModules }: ModulesCardProps) {
             <Button size="sm" onClick={() => update.mutate(selected)} disabled={update.isPending}>
               {update.isPending ? 'Guardando...' : 'Guardar módulos'}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setSelected(enabledModules)} disabled={update.isPending}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setSelected(enabledModules)}
+              disabled={update.isPending}
+            >
               Cancelar
             </Button>
           </div>
         )}
       </CardContent>
+
+      <AlertDialog open={!!pending} onOpenChange={(open) => !open && setPending(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Apagar {pending?.module.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              También se apagan los módulos que lo necesitan:{' '}
+              {pending?.dependents.map((module) => module.name).join(', ')}. Los datos no se borran:
+              vuelven a aparecer si los enciendes de nuevo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDisable}>Apagar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
