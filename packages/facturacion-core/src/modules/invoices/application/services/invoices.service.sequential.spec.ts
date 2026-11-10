@@ -129,4 +129,14 @@ describe('InvoicesService.create · secuencial', () => {
     expect(second.invoice.sequential).toBe('000000008');
     expect(prisma.invoice.update).not.toHaveBeenCalled();
   });
+
+  it('guarda la forma de pago elegida; sin ella, efectivo (01)', async () => {
+    const { service, prisma } = setup();
+
+    await service.create({ ...dto, paymentMethod: '19' }, companyId, 'user_1');
+    await service.create(dto, companyId, 'user_1');
+
+    const saved = prisma.invoice.create.mock.calls.map(([args]: any) => args.data.paymentMethod);
+    expect(saved).toEqual(['19', '01']);
+  });
 });

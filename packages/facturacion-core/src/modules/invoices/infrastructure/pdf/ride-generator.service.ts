@@ -7,6 +7,7 @@ import {
   toRideIssuer,
 } from '../../../../shared/ride/ride-document';
 import { RidePublisher } from '../../../../shared/ride/ride-publisher.service';
+import { paymentMethodLabel } from '../../domain/payment-methods';
 
 type Text = string | null | undefined;
 
@@ -25,6 +26,7 @@ export interface InvoiceRideSource {
   iceValue?: RideDocument['iceValue'];
   irbpnrValue?: RideDocument['irbpnrValue'];
   tip?: RideDocument['tip'];
+  /** Código de la Tabla 24 del SRI. */
   paymentMethod?: Text;
   company?: { environment?: Text } | null;
 }
@@ -52,7 +54,7 @@ export function toInvoiceRide(
     iceValue: invoice.iceValue,
     irbpnrValue: invoice.irbpnrValue,
     tip: invoice.tip,
-    payment: { method: invoice.paymentMethod },
+    payment: { method: paymentMethodLabel(invoice.paymentMethod) },
   };
 }
 

@@ -14,6 +14,7 @@ import {
   resolutionNumber,
   rimpeLegend,
 } from '../../../companies/domain/tax-profile';
+import { paymentMethodCode } from '../../domain/payment-methods';
 
 /** La factura con sus líneas y su cliente, tal como sale de Prisma. */
 export type InvoiceForXml = Prisma.InvoiceGetPayload<{ include: { items: true; customer: true } }>;
@@ -177,7 +178,7 @@ export class XmlGeneratorService {
     // ==================== FORMA DE PAGO ====================
     const pagos = infoFactura.ele('pagos');
     const pago = pagos.ele('pago');
-    pago.ele('formaPago').txt('01'); // 01 = Sin utilización del sistema financiero
+    pago.ele('formaPago').txt(paymentMethodCode(invoice.paymentMethod));
     pago.ele('total').txt(taxes.total.toFixed(2));
     pago.ele('plazo').txt('0');
     pago.ele('unidadTiempo').txt('dias');
