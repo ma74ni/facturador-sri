@@ -263,6 +263,27 @@ export class RidePdfRenderer {
       innerW - 145,
       7,
     );
+    if (issuer.withholdingAgent) {
+      ly +=
+        6 +
+        this.labeled(
+          doc,
+          'Agente de Retención Resolución No.:',
+          this.text(issuer.withholdingAgent),
+          innerX,
+          ly + 6,
+          145,
+          innerW - 145,
+          7,
+        );
+    }
+    if (issuer.regimeLegend) {
+      ly += 6;
+      doc.fontSize(7).font(FONT_BOLD);
+      doc.text(this.text(issuer.regimeLegend), innerX, ly, { width: innerW });
+      ly += doc.heightOfString(this.text(issuer.regimeLegend), { width: innerW });
+      doc.font(FONT);
+    }
     const leftBottom = ly + PAD;
 
     // ---- Cuadro tributario ----

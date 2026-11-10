@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import apiClient from '../api/client';
 import { LoginFormData, RegisterFormData } from '../validations/schemas';
+import type { TaxRegime, VatFilingPeriod } from '../api/company';
 
 interface User {
   id: string;
@@ -31,6 +32,12 @@ interface Company {
   approvedAt?: string;
   rejectedAt?: string;
   enabledModules?: string[];
+  // Perfil tributario (ver lib/api/company.ts).
+  taxRegime?: TaxRegime;
+  keepsAccounting?: boolean;
+  vatFilingPeriod?: VatFilingPeriod;
+  withholdingAgentResolution?: string | null;
+  specialTaxpayerResolution?: string | null;
 }
 
 interface AuthContextType {
@@ -114,9 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await startSession(response.data.access_token);
       router.push('/dashboard');
     } catch (error: any) {
-      throw new Error(
-        error.response?.data?.message || 'Error al iniciar sesión'
-      );
+      throw new Error(error.response?.data?.message || 'Error al iniciar sesión');
     }
   };
 
@@ -152,9 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       router.push('/dashboard');
     } catch (error: any) {
-      throw new Error(
-        error.response?.data?.message || 'Error al registrarse'
-      );
+      throw new Error(error.response?.data?.message || 'Error al registrarse');
     }
   };
 

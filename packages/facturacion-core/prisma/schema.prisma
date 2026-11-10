@@ -34,6 +34,19 @@ enum SRIStatus {
 
 }
 
+// Régimen tributario de la empresa (perfil tributario).
+enum TaxRegime {
+  GENERAL
+  RIMPE_EMPRENDEDOR
+  RIMPE_NEGOCIO_POPULAR
+}
+
+// Cada cuánto declara el IVA (los RIMPE, semestral).
+enum VatFilingPeriod {
+  MONTHLY
+  SEMIANNUAL
+}
+
 enum CompanyStatus {
   PENDING
   APPROVED
@@ -159,6 +172,16 @@ model Company {
 
   // Módulos de producto habilitados para este tenant (ej. "cobranza") — ver RequireModuleGuard
   enabledModules String[] @default([])
+
+  // Perfil tributario: cómo ve el SRI a la empresa. Va en el XML y el RIDE
+  // (obligadoContabilidad, contribuyenteRimpe, agenteRetencion) y decide el
+  // período de sus reportes. Los valores por defecto son lo que se emitía antes.
+  taxRegime                     TaxRegime   @default(GENERAL)
+  keepsAccounting               Boolean     @default(true)
+  vatFilingPeriod               VatFilingPeriod @default(MONTHLY)
+  // Número de resolución del SRI; vacío si no lo es.
+  withholdingAgentResolution    String?
+  specialTaxpayerResolution     String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

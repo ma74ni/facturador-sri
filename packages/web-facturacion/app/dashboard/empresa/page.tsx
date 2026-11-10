@@ -26,6 +26,7 @@ import {
 import { companyApi, UpdateCompanyDto } from '@/lib/api/company';
 import { useToast } from '@/hooks/use-toast';
 import { LogoManager } from '@/components/company/logo-manager';
+import { TaxProfileCard } from '@/components/company/tax-profile-card';
 
 export default function EmpresaPage() {
   const { company, checkAuth } = useAuth();
@@ -312,6 +313,8 @@ export default function EmpresaPage() {
           </div>
         </CardContent>
       </Card>
+
+      <TaxProfileCard />
 
       <LogoManager />
 
