@@ -27,21 +27,17 @@ export function enabledDependents(
   const pending = [key];
   while (pending.length > 0) {
     const current = pending.pop()!;
-    for (const module of catalog) {
-      if (
-        selected.includes(module.key) &&
-        module.requires?.includes(current) &&
-        !found.has(module.key)
-      ) {
-        found.add(module.key);
-        pending.push(module.key);
+    for (const item of catalog) {
+      if (selected.includes(item.key) && item.requires?.includes(current) && !found.has(item.key)) {
+        found.add(item.key);
+        pending.push(item.key);
       }
     }
   }
-  return catalog.map((module) => module.key).filter((moduleKey) => found.has(moduleKey));
+  return catalog.map((item) => item.key).filter((moduleKey) => found.has(moduleKey));
 }
 
-/** Los módulos que requiere `module` y no están encendidos. */
-export function missingRequirements(module: ModuleRequirements, selected: string[]): string[] {
-  return (module.requires ?? []).filter((required) => !selected.includes(required));
+/** Los módulos que requiere `item` y no están encendidos. */
+export function missingRequirements(item: ModuleRequirements, selected: string[]): string[] {
+  return (item.requires ?? []).filter((required) => !selected.includes(required));
 }

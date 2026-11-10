@@ -25,7 +25,7 @@ interface ModulesCardProps {
 
 /** Lo que pide confirmar apagar un módulo del que dependen otros encendidos. */
 interface PendingDisable {
-  module: ProductModule;
+  item: ProductModule;
   dependents: ProductModule[];
 }
 
@@ -50,37 +50,37 @@ export function ModulesCard({ companyId, enabledModules }: ModulesCardProps) {
     selected.length !== enabledModules.length ||
     selected.some((key) => !enabledModules.includes(key));
 
-  const byKey = new Map(catalog.map((module) => [module.key, module]));
+  const byKey = new Map(catalog.map((item) => [item.key, item]));
   const nameOf = (key: string) => byKey.get(key)?.name ?? key;
 
-  const toggle = (module: ProductModule) => {
-    if (!selected.includes(module.key)) {
-      setSelected((current) => [...current, module.key]);
+  const toggle = (item: ProductModule) => {
+    if (!selected.includes(item.key)) {
+      setSelected((current) => [...current, item.key]);
       return;
     }
-    const dependents = enabledDependents(module.key, selected, catalog);
+    const dependents = enabledDependents(item.key, selected, catalog);
     if (dependents.length > 0) {
-      setPending({ module, dependents: dependents.map((key) => byKey.get(key)!).filter(Boolean) });
+      setPending({ item, dependents: dependents.map((key) => byKey.get(key)!).filter(Boolean) });
       return;
     }
-    setSelected((current) => current.filter((key) => key !== module.key));
+    setSelected((current) => current.filter((key) => key !== item.key));
   };
 
   const confirmDisable = () => {
     if (!pending) return;
-    const off = new Set([pending.module.key, ...pending.dependents.map((module) => module.key)]);
+    const off = new Set([pending.item.key, ...pending.dependents.map((item) => item.key)]);
     setSelected((current) => current.filter((key) => !off.has(key)));
     setPending(null);
   };
 
   // Primero los módulos base; cada uno con los que dependen de él debajo.
-  const roots = catalog.filter((module) => module.requires.length === 0);
+  const roots = catalog.filter((item) => item.requires.length === 0);
   const childrenOf = (key: string) =>
-    catalog.filter((module) => module.requires.length > 0 && module.requires[0] === key);
+    catalog.filter((item) => item.requires.length > 0 && item.requires[0] === key);
 
-  const renderModule = (module: ProductModule) => {
-    const missing = missingRequirements(module, selected);
-    const blocked = missing.length > 0 && !selected.includes(module.key);
+  const renderModule = (item: ProductModule) => {
+    const missing = missingRequirements(item, selected);
+    const blocked = missing.length > 0 && !selected.includes(item.key);
     return (
       <label
         className={`flex items-start gap-3 text-body-md ${blocked ? 'cursor-not-allowed opacity-[0.6]' : 'cursor-pointer'}`}
@@ -88,17 +88,15 @@ export function ModulesCard({ companyId, enabledModules }: ModulesCardProps) {
         <input
           type="checkbox"
           className="mt-1 accent-primary"
-          checked={selected.includes(module.key)}
-          onChange={() => toggle(module)}
+          checked={selected.includes(item.key)}
+          onChange={() => toggle(item)}
           disabled={update.isPending || blocked}
         />
         <span>
-          <span className="text-title-sm text-on-surface">{module.name}</span>
+          <span className="text-title-sm text-on-surface">{item.name}</span>
           <span className="block text-body-sm text-on-surface-variant">
-            {module.description}
-            {module.requires.length > 0 && (
-              <> Requiere {module.requires.map(nameOf).join(' y ')}.</>
-            )}
+            {item.description}
+            {item.requires.length > 0 && <> Requiere {item.requires.map(nameOf).join(' y ')}.</>}
           </span>
         </span>
       </label>
@@ -153,10 +151,10 @@ export function ModulesCard({ companyId, enabledModules }: ModulesCardProps) {
       <AlertDialog open={!!pending} onOpenChange={(open) => !open && setPending(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Apagar {pending?.module.name}?</AlertDialogTitle>
+            <AlertDialogTitle>¿Apagar {pending?.item.name}?</AlertDialogTitle>
             <AlertDialogDescription>
               También se apagan los módulos que lo necesitan:{' '}
-              {pending?.dependents.map((module) => module.name).join(', ')}. Los datos no se borran:
+              {pending?.dependents.map((item) => item.name).join(', ')}. Los datos no se borran:
               vuelven a aparecer si los enciendes de nuevo.
             </AlertDialogDescription>
           </AlertDialogHeader>
