@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import { useAuth } from "@/lib/context/auth-context";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useAuth } from '@/lib/context/auth-context';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   LayoutDashboard,
   FileText,
@@ -23,17 +23,14 @@ import {
   X,
   Wallet,
   ShieldCheck,
-} from "lucide-react";
-import { usePathname } from "next/navigation";
-import { EmailVerificationBanner } from "@/components/shared/email-verification-banner";
-import { CompanyStatusBanners } from "@/components/shared/company-status-banners";
-import { COBRANZA_MODULE, hasModule } from "@/lib/product-modules";
+  ShoppingCart,
+} from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { EmailVerificationBanner } from '@/components/shared/email-verification-banner';
+import { CompanyStatusBanners } from '@/components/shared/company-status-banners';
+import { COBRANZA_MODULE, COMPRAS_MODULE, hasModule } from '@/lib/product-modules';
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, company, isLoading, isAuthenticated, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -41,7 +38,7 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push("/login");
+      router.push('/login');
     }
   }, [isLoading, isAuthenticated, router]);
 
@@ -66,19 +63,22 @@ export default function DashboardLayout({
   }
 
   const navigation = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Facturas", href: "/dashboard/facturas", icon: FileText },
-    { name: "Notas de crédito", href: "/dashboard/notas-credito", icon: FileMinus },
-    { name: "Clientes", href: "/dashboard/clientes", icon: Users },
-    { name: "Productos", href: "/dashboard/productos", icon: Package },
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Facturas', href: '/dashboard/facturas', icon: FileText },
+    { name: 'Notas de crédito', href: '/dashboard/notas-credito', icon: FileMinus },
+    { name: 'Clientes', href: '/dashboard/clientes', icon: Users },
+    { name: 'Productos', href: '/dashboard/productos', icon: Package },
     ...(hasModule(company?.enabledModules, COBRANZA_MODULE)
-      ? [{ name: "Cobranza", href: "/dashboard/cobranza", icon: Wallet }]
+      ? [{ name: 'Cobranza', href: '/dashboard/cobranza', icon: Wallet }]
       : []),
-    { name: "Reportes", href: "/dashboard/reportes", icon: BarChart3 },
-    { name: "Empresa", href: "/dashboard/empresa", icon: Building2 },
-    { name: "Configuración", href: "/dashboard/configuracion", icon: Settings },
+    ...(hasModule(company?.enabledModules, COMPRAS_MODULE)
+      ? [{ name: 'Compras', href: '/dashboard/compras/proveedores', icon: ShoppingCart }]
+      : []),
+    { name: 'Reportes', href: '/dashboard/reportes', icon: BarChart3 },
+    { name: 'Empresa', href: '/dashboard/empresa', icon: Building2 },
+    { name: 'Configuración', href: '/dashboard/configuracion', icon: Settings },
     ...(user?.isPlatformAdmin
-      ? [{ name: "Administración", href: "/dashboard/admin", icon: ShieldCheck }]
+      ? [{ name: 'Administración', href: '/dashboard/admin', icon: ShieldCheck }]
       : []),
   ];
 
@@ -95,7 +95,7 @@ export default function DashboardLayout({
       {/* Sidebar */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 w-64 bg-surface-container-lowest border-r border-outline-variant transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="flex flex-col h-full">
@@ -120,7 +120,7 @@ export default function DashboardLayout({
               const Icon = item.icon;
               // Las subpáginas (p. ej. /dashboard/admin/empresas/:id) marcan su sección.
               const isActive =
-                item.href === "/dashboard"
+                item.href === '/dashboard'
                   ? pathname === item.href
                   : pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
@@ -129,8 +129,8 @@ export default function DashboardLayout({
                   href={item.href}
                   className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                     isActive
-                      ? "bg-primary/10 text-primary"
-                      : "text-on-surface hover:bg-surface-container-high hover:text-on-surface"
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-on-surface hover:bg-surface-container-high hover:text-on-surface'
                   }`}
                 >
                   <Icon className="mr-3 h-5 w-5 flex-shrink-0" />
@@ -146,16 +146,9 @@ export default function DashboardLayout({
               <p className="text-sm font-medium text-on-surface truncate">
                 {user?.firstName} {user?.lastName}
               </p>
-              <p className="text-xs text-on-surface-variant truncate">
-                {company?.businessName}
-              </p>
+              <p className="text-xs text-on-surface-variant truncate">{company?.businessName}</p>
             </div>
-            <Button
-              onClick={logout}
-              variant="outline"
-              size="sm"
-              className="w-full"
-            >
+            <Button onClick={logout} variant="outline" size="sm" className="w-full">
               <LogOut className="mr-2 h-4 w-4" />
               Cerrar Sesión
             </Button>
