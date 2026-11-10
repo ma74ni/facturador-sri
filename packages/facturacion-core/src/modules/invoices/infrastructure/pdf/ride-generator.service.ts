@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { RideCustomer, RideDocument, RideIssuer, RideItem } from '../../../../shared/ride/ride-document';
+import {
+  CompanyIssuerSource,
+  RideCustomer,
+  RideDocument,
+  RideItem,
+  toRideIssuer,
+} from '../../../../shared/ride/ride-document';
 import { RidePublisher } from '../../../../shared/ride/ride-publisher.service';
 
 type Text = string | null | undefined;
@@ -23,9 +29,12 @@ export interface InvoiceRideSource {
   company?: { environment?: Text } | null;
 }
 
-export type CompanyRideSource = RideIssuer & { environment?: Text };
+export type CompanyRideSource = CompanyIssuerSource & { environment?: Text };
 
-export function toInvoiceRide(invoice: InvoiceRideSource, company: CompanyRideSource): RideDocument {
+export function toInvoiceRide(
+  invoice: InvoiceRideSource,
+  company: CompanyRideSource,
+): RideDocument {
   return {
     title: 'FACTURA',
     establishmentCode: invoice.establishmentCode,
@@ -36,7 +45,7 @@ export function toInvoiceRide(invoice: InvoiceRideSource, company: CompanyRideSo
     authorizationDate: invoice.authorizationDate,
     environment: invoice.company?.environment || company.environment,
     issueDate: invoice.issueDate,
-    issuer: company,
+    issuer: toRideIssuer(company),
     customer: invoice.customer,
     items: invoice.items || [],
     total: invoice.total,

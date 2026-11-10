@@ -10,7 +10,11 @@ import {
   TaxCalculatorService,
 } from '../../../tax-codes/domain/services/tax-calculator.service';
 import { Prisma } from '@prisma/client';
-import { CompanyForXml } from '../../../invoices/infrastructure/xml/xml-generator.service';
+import {
+  appendTaxProfileToInfoTributaria,
+  CompanyForXml,
+} from '../../../invoices/infrastructure/xml/xml-generator.service';
+import { accountingFlag, resolutionNumber } from '../../../companies/domain/tax-profile';
 
 /** La nota de crédito con sus líneas, su cliente y la fecha de la factura que modifica. */
 export type CreditNoteForXml = Prisma.CreditNoteGetPayload<{
@@ -58,6 +62,7 @@ export class CreditNoteXmlGeneratorService {
     infoTributaria.ele('ptoEmi').txt(creditNote.emissionPointCode);
     infoTributaria.ele('secuencial').txt(creditNote.sequential);
     infoTributaria.ele('dirMatriz').txt(company.address);
+    appendTaxProfileToInfoTributaria(infoTributaria, company);
 
     // ==================== INFO NOTA DE CREDITO ====================
     const infoNotaCredito = root.ele('infoNotaCredito');
@@ -85,8 +90,10 @@ export class CreditNoteXmlGeneratorService {
       );
     infoNotaCredito.ele('identificacionComprador').txt(creditNote.customer.identification);
 
-    // Obligado a llevar contabilidad
-    infoNotaCredito.ele('obligadoContabilidad').txt('SI');
+    // Perfil tributario: contribuyenteEspecial (si lo es) va antes de obligadoContabilidad.
+    const specialTaxpayer = resolutionNumber(company.specialTaxpayerResolution);
+    if (specialTaxpayer) infoNotaCredito.ele('contribuyenteEspecial').txt(specialTaxpayer);
+    infoNotaCredito.ele('obligadoContabilidad').txt(accountingFlag(company.keepsAccounting));
 
     // ==================== DOCUMENTO MODIFICADO ====================
     infoNotaCredito.ele('codDocModificado').txt(creditNote.modifiedDocType); // "01" = Factura
@@ -97,9 +104,7 @@ export class CreditNoteXmlGeneratorService {
     const fechaSustento = creditNote.modifiedInvoice?.issueDate
       ? creditNote.modifiedInvoice.issueDate
       : creditNote.issueDate;
-    infoNotaCredito
-      .ele('fechaEmisionDocSustento')
-      .txt(this.formatDateUtc(fechaSustento));
+    infoNotaCredito.ele('fechaEmisionDocSustento').txt(this.formatDateUtc(fechaSustento));
 
     // ==================== TOTALES ====================
     // ORDEN CORRECTO SEGÚN ESQUEMA SRI:

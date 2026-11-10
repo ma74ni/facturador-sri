@@ -1,4 +1,6 @@
+import { TaxRegime } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { resolutionNumber, rimpeLegend } from '../../modules/companies/domain/tax-profile';
 import { StoredLineTax } from '../../modules/tax-codes/domain/services/tax-calculator.service';
 
 type Amount = Decimal.Value;
@@ -14,7 +16,40 @@ export interface RideIssuer {
   branchAddress?: Text;
   specialTaxpayer?: Text;
   accountingRequired?: boolean | null;
+  /** Número de resolución de agente de retención. */
+  withholdingAgent?: Text;
+  /** Leyenda del régimen RIMPE ("CONTRIBUYENTE RÉGIMEN RIMPE"…); vacía en régimen general. */
+  regimeLegend?: Text;
   logoPath?: Text;
+}
+
+/** La empresa tal como la guarda la base, con su perfil tributario. */
+export type CompanyIssuerSource = Omit<
+  RideIssuer,
+  'specialTaxpayer' | 'accountingRequired' | 'withholdingAgent' | 'regimeLegend'
+> & {
+  taxRegime?: TaxRegime | null;
+  keepsAccounting?: boolean | null;
+  withholdingAgentResolution?: Text;
+  specialTaxpayerResolution?: Text;
+};
+
+/** Traduce el perfil tributario de la empresa a lo que imprime el RIDE. */
+export function toRideIssuer(company: CompanyIssuerSource): RideIssuer {
+  const {
+    taxRegime,
+    keepsAccounting,
+    withholdingAgentResolution,
+    specialTaxpayerResolution,
+    ...issuer
+  } = company;
+  return {
+    ...issuer,
+    specialTaxpayer: resolutionNumber(specialTaxpayerResolution),
+    accountingRequired: keepsAccounting !== false,
+    withholdingAgent: resolutionNumber(withholdingAgentResolution),
+    regimeLegend: rimpeLegend(taxRegime),
+  };
 }
 
 /** Lo que el RIDE necesita del comprador. */

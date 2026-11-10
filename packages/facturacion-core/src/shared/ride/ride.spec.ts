@@ -15,7 +15,7 @@ const company: CompanyRideSource = {
   ruc: '1709314163001',
   businessName: 'PAEZ PACHECO LUCIA DE LOURDES',
   address: 'Calle Adrián Navarro S11-267',
-  accountingRequired: false,
+  keepsAccounting: false,
   environment: 'TEST',
   logoPath: 'logos/c1/logo.png',
 };
@@ -78,7 +78,32 @@ describe('RIDE', () => {
       expect(ride.environment).toBe('PRODUCTION');
       expect(ride.payment).toEqual({ method: invoice.paymentMethod });
       expect(ride.modifiedDocument).toBeUndefined();
-      expect(ride.issuer).toBe(company);
+      expect(ride.issuer).toMatchObject({ ruc: company.ruc, accountingRequired: false });
+    });
+
+    it('traduce el perfil tributario de la empresa a los datos del emisor', () => {
+      const issuer = toInvoiceRide(invoice, {
+        ...company,
+        taxRegime: 'RIMPE_EMPRENDEDOR',
+        withholdingAgentResolution: ' 1 ',
+        specialTaxpayerResolution: '',
+      }).issuer;
+
+      expect(issuer).toMatchObject({
+        accountingRequired: false,
+        regimeLegend: 'CONTRIBUYENTE RÉGIMEN RIMPE',
+        withholdingAgent: '1',
+        specialTaxpayer: null,
+      });
+      expect(issuer).not.toHaveProperty('taxRegime');
+    });
+
+    it('sin perfil cargado, el emisor queda como antes: obligado a llevar contabilidad', () => {
+      const { keepsAccounting: _omit, ...withoutProfile } = company;
+      expect(toInvoiceRide(invoice, withoutProfile).issuer).toMatchObject({
+        accountingRequired: true,
+        regimeLegend: null,
+      });
     });
 
     it('sin ambiente en la factura usa el de la empresa', () => {
@@ -98,6 +123,19 @@ describe('RIDE', () => {
         reason: 'Devolución',
       });
       expect(ride.payment).toBeUndefined();
+    });
+
+    it('una nota de crédito lleva el mismo perfil tributario del emisor que la factura', () => {
+      const ride = toCreditNoteRide(
+        { ...invoice, modifiedNumber: '001-001-000000150', reason: 'Devolución' },
+        { ...company, taxRegime: 'RIMPE_NEGOCIO_POPULAR', withholdingAgentResolution: '7' },
+      );
+
+      expect(ride.issuer).toMatchObject({
+        accountingRequired: false,
+        regimeLegend: 'CONTRIBUYENTE NEGOCIO POPULAR - RÉGIMEN RIMPE',
+        withholdingAgent: '7',
+      });
     });
   });
 
@@ -122,6 +160,26 @@ describe('RIDE', () => {
       const pdf = await renderer.render(ride, Buffer.from('no soy un png'));
 
       expect(pdfText(pdf)).toContain('NO TIENE LOGO');
+    });
+
+    it('imprime la leyenda RIMPE, el agente de retención y si lleva contabilidad', async () => {
+      const text = pdfText(
+        await renderer.render(
+          {
+            ...ride,
+            issuer: {
+              ...ride.issuer,
+              regimeLegend: 'CONTRIBUYENTE RÉGIMEN RIMPE',
+              withholdingAgent: '1',
+            },
+          },
+          null,
+        ),
+      );
+
+      expect(text).toContain('CONTRIBUYENTE RÉGIMEN RIMPE');
+      expect(text).toContain('Agente de Retención Resolución No.:');
+      expect(text).toMatch(/OBLIGADO A LLEVAR CONTABILIDAD:[\s\S]*NO/);
     });
 
     it('sin logo avisa "NO TIENE LOGO"', async () => {
