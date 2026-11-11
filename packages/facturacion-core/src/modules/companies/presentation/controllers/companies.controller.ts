@@ -12,10 +12,18 @@ import {
   Res,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiBody,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { CompaniesService } from '../../application/services/companies.service';
 import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
 import { EmailVerifiedGuard } from '../../../auth/infrastructure/guards/email-verified.guard';
+import { AdminGuard } from '../../../auth/infrastructure/guards/admin.guard';
 import { PrismaService } from '../../../../shared/database/prisma.service';
 import { Response } from 'express';
 import { EmailService } from '@/shared/email/email.service';
@@ -27,6 +35,7 @@ import {
   CurrentUser,
 } from '../../../auth/infrastructure/decorators/current-user.decorator';
 import { UpdateMailjetConfigDto } from '../../application/dto/update-mailjet-config.dto';
+import { UpdateCompanyDto } from '../../application/dto/update-company.dto';
 
 @ApiTags('companies')
 @Controller('companies')
@@ -101,6 +110,27 @@ export class CompaniesController {
   async getCompanyInfo(@CurrentUser() user: AuthenticatedUser) {
     const { companyId } = user;
     return this.companiesService.getCompanyInfo(companyId);
+  }
+
+  @Get('me')
+  @ApiOperation({ summary: 'Información general y perfil tributario de la empresa' })
+  async getMyCompany(@CurrentUser() user: AuthenticatedUser) {
+    const { company } = await this.companiesService.getCompanyInfo(user.companyId);
+    return company;
+  }
+
+  @Put('me')
+  @UseGuards(AdminGuard)
+  @ApiOperation({
+    summary: 'Editar la información general y el perfil tributario de la empresa',
+    description:
+      'Solo un administrador de la empresa. El perfil tributario (régimen, contabilidad, agente ' +
+      'de retención, contribuyente especial) sale en el XML y el RIDE de lo que se emita desde ahora.',
+  })
+  @ApiResponse({ status: 200, description: 'Empresa actualizada' })
+  @ApiResponse({ status: 403, description: 'El usuario no es administrador de la empresa' })
+  async updateMyCompany(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateCompanyDto) {
+    return this.companiesService.updateCompany(user.companyId, dto);
   }
 
   // El ambiente (TEST/PRODUCTION) lo cambia solo un administrador de la

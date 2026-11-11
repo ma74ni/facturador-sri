@@ -17,7 +17,33 @@ export interface Company {
   updatedAt: string;
 }
 
-export interface UpdateCompanyDto {
+/** Régimen tributario de la empresa (perfil tributario). */
+export type TaxRegime = 'GENERAL' | 'RIMPE_EMPRENDEDOR' | 'RIMPE_NEGOCIO_POPULAR';
+/** Cada cuánto declara el IVA. */
+export type VatFilingPeriod = 'MONTHLY' | 'SEMIANNUAL';
+
+export const TAX_REGIME_LABELS: Record<TaxRegime, string> = {
+  GENERAL: 'General',
+  RIMPE_EMPRENDEDOR: 'RIMPE emprendedor',
+  RIMPE_NEGOCIO_POPULAR: 'RIMPE negocio popular',
+};
+
+export const VAT_FILING_PERIOD_LABELS: Record<VatFilingPeriod, string> = {
+  MONTHLY: 'Mensual',
+  SEMIANNUAL: 'Semestral',
+};
+
+/** Cómo ve el SRI a la empresa: sale en sus comprobantes y define el período de sus reportes. */
+export interface CompanyTaxProfile {
+  taxRegime: TaxRegime;
+  keepsAccounting: boolean;
+  vatFilingPeriod: VatFilingPeriod;
+  /** Solo el número de la resolución; vacío si no lo es. */
+  withholdingAgentResolution: string | null;
+  specialTaxpayerResolution: string | null;
+}
+
+export interface UpdateCompanyDto extends Partial<CompanyTaxProfile> {
   businessName?: string;
   tradeName?: string;
   address?: string;

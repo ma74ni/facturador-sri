@@ -47,6 +47,8 @@ export interface ProductModule {
   key: string;
   name: string;
   description: string;
+  /** Módulos que tienen que estar encendidos para encender este. */
+  requires: string[];
 }
 
 export interface AdminEmissionPoint {

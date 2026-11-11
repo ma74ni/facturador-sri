@@ -15,6 +15,7 @@ import { R2StorageService } from '../../../../shared/storage/r2-storage.service'
 import { TaxCalculatorService } from '../../../tax-codes/domain/services/tax-calculator.service';
 import { availableForCreditNote } from '../../../credit-notes/domain/credit-note-limit';
 import { SignatureStatus, signatureWarning, unusableCertificateReason } from '../../domain/signing-status';
+import { DEFAULT_PAYMENT_METHOD } from '../../domain/payment-methods';
 import {
   LineIvaResolverService,
   toBadRequest,
@@ -147,6 +148,7 @@ export class InvoicesService {
           totalDiscount: taxes.totalDiscount,
           ivaValue: taxes.ivaTotal,
           total: taxes.total,
+          paymentMethod: dto.paymentMethod ?? DEFAULT_PAYMENT_METHOD,
           companyId,
           createdById: userId,
           sriStatus: 'DRAFT', // 👈 Estado DRAFT hasta que se firme exitosamente

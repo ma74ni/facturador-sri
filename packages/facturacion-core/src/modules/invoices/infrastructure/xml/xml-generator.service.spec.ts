@@ -85,8 +85,16 @@ describe('XmlGeneratorService', () => {
     const taxOf = (code: string) =>
       details.find((detail) => detail.codigoPrincipal === code).impuestos.impuesto;
 
-    expect(taxOf('AGUA-GAS')).toMatchObject({ codigoPorcentaje: '4', tarifa: '15.00', valor: '0.11' });
-    expect(taxOf('AGUA-SIN-GAS')).toMatchObject({ codigoPorcentaje: '0', tarifa: '0.00', valor: '0.00' });
+    expect(taxOf('AGUA-GAS')).toMatchObject({
+      codigoPorcentaje: '4',
+      tarifa: '15.00',
+      valor: '0.11',
+    });
+    expect(taxOf('AGUA-SIN-GAS')).toMatchObject({
+      codigoPorcentaje: '0',
+      tarifa: '0.00',
+      valor: '0.00',
+    });
   });
 
   it('suma de detalles = totales del comprobante (como valida el SRI)', () => {
@@ -96,6 +104,23 @@ describe('XmlGeneratorService', () => {
 
     expect(sumBase.toFixed(2)).toBe(info.totalSinImpuestos);
     expect(sumIva.toFixed(2)).toBe(totalIva.toFixed(2));
+  });
+
+  describe('forma de pago', () => {
+    const formaPago = (paymentMethod?: string | null) =>
+      new XMLParser({ parseTagValue: false }).parse(
+        generator.generateInvoiceXml({ ...invoice, paymentMethod } as never, company as never),
+      ).factura.infoFactura.pagos.pago.formaPago;
+
+    it('usa la forma de pago elegida al emitir', () => {
+      expect(formaPago('19')).toBe('19');
+      expect(formaPago('20')).toBe('20');
+    });
+
+    it('las facturas anteriores al campo salen como efectivo (01), como antes', () => {
+      expect(formaPago(null)).toBe('01');
+      expect(formaPago(undefined)).toBe('01');
+    });
   });
 
   describe('cantidad con decimales (venta por peso)', () => {

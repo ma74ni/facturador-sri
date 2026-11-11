@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../../shared/database/prisma.service';
+import { UpdateCompanyDto } from '../dto/update-company.dto';
 import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
 import { sealCertificatePassword } from '../../../../shared/crypto/secret-cipher';
 import {
@@ -22,6 +23,28 @@ const certificateStatusSelect = {
   certificateIssuer: true,
 } as const;
 
+/** La empresa tal como la ve y la edita ella misma: información general y perfil tributario. */
+const COMPANY_PROFILE_SELECT = {
+  id: true,
+  ruc: true,
+  businessName: true,
+  tradeName: true,
+  address: true,
+  phone: true,
+  email: true,
+  environment: true,
+  status: true,
+  enabledModules: true,
+  hasCertificate: true,
+  certificateExpiry: true,
+  isActive: true,
+  taxRegime: true,
+  keepsAccounting: true,
+  vatFilingPeriod: true,
+  withholdingAgentResolution: true,
+  specialTaxpayerResolution: true,
+} as const;
+
 /** Estado del certificado tal como lo muestra la web. */
 function describeCertificate(company: {
   hasCertificate: boolean;
@@ -40,7 +63,8 @@ function describeCertificate(company: {
     holder: company.certificateHolder,
     issuer: company.certificateIssuer,
     isExpired,
-    isExpiringSoon: !isExpired && daysUntilExpiry !== null && daysUntilExpiry <= CERTIFICATE_WARNING_DAYS,
+    isExpiringSoon:
+      !isExpired && daysUntilExpiry !== null && daysUntilExpiry <= CERTIFICATE_WARNING_DAYS,
     daysUntilExpiry,
   };
 }
@@ -52,11 +76,7 @@ export class CompaniesService {
     private r2Storage: R2StorageService,
   ) {}
 
-  async uploadCertificate(
-    companyId: string,
-    file: Express.Multer.File,
-    password: string,
-  ) {
+  async uploadCertificate(companyId: string, file: Express.Multer.File, password: string) {
     // 1. Verificar que la empresa existe
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
@@ -86,7 +106,7 @@ export class CompaniesService {
     if (info.ruc && info.ruc !== company.ruc) {
       throw new BadRequestException(
         `El RUC del certificado (${info.ruc}) no coincide con el RUC de la empresa (${company.ruc}). ` +
-        'Sube el certificado correcto para esta empresa.',
+          'Sube el certificado correcto para esta empresa.',
       );
     }
 
@@ -180,37 +200,57 @@ export class CompaniesService {
     };
   }
 
-async getCompanyInfo(companyId: string) {
-  const company = await this.prisma.company.findUnique({
-    where: { id: companyId },
-    select: {
-      id: true,
-      ruc: true,
-      businessName: true,
-      tradeName: true,
-      address: true,
-      phone: true,
-      email: true,
-      environment: true,
-      hasCertificate: true,
-      certificateExpiry: true,
-      isActive: true,
-    },
-  });
+  async getCompanyInfo(companyId: string) {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: COMPANY_PROFILE_SELECT,
+    });
 
-  if (!company) {
-    throw new NotFoundException('Empresa no encontrada');
+    if (!company) {
+      throw new NotFoundException('Empresa no encontrada');
+    }
+
+    return {
+      message: 'Información de la empresa',
+      company,
+    };
   }
 
-  return {
-    message: 'Información de la empresa',
-    company,
-  };
-}
-async uploadLogo(
-    companyId: string,
-    file: Express.Multer.File,
-  ) {
+  /**
+   * La empresa edita su información general y su perfil tributario. Lo que cambie sale en los
+   * comprobantes que emita desde ahora: el XML ya firmado no cambia. Un RIDE que se regenere
+   * después usa los datos actuales de la empresa (igual que la razón social o la dirección).
+   */
+  async updateCompany(companyId: string, dto: UpdateCompanyDto) {
+    const exists = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true },
+    });
+    if (!exists) {
+      throw new NotFoundException('Empresa no encontrada');
+    }
+
+    const company = await this.prisma.company.update({
+      where: { id: companyId },
+      data: {
+        businessName: dto.businessName,
+        tradeName: dto.tradeName,
+        address: dto.address,
+        email: dto.email,
+        phone: dto.phone,
+        taxRegime: dto.taxRegime,
+        keepsAccounting: dto.keepsAccounting,
+        vatFilingPeriod: dto.vatFilingPeriod,
+        withholdingAgentResolution: dto.withholdingAgentResolution,
+        specialTaxpayerResolution: dto.specialTaxpayerResolution,
+      },
+      select: COMPANY_PROFILE_SELECT,
+    });
+
+    return company;
+  }
+
+  async uploadLogo(companyId: string, file: Express.Multer.File) {
     // 1. Verificar que la empresa existe
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
@@ -240,9 +280,7 @@ async uploadLogo(
     // 3. Validar tamaño (máximo 2MB)
     const maxSize = 2 * 1024 * 1024; // 2MB
     if (file.size > maxSize) {
-      throw new BadRequestException(
-        'El archivo es demasiado grande. Tamaño máximo: 2MB',
-      );
+      throw new BadRequestException('El archivo es demasiado grande. Tamaño máximo: 2MB');
     }
 
     // 4. Eliminar logo anterior si existe en R2
@@ -307,5 +345,4 @@ async uploadLogo(
       message: 'Logo eliminado exitosamente',
     };
   }
-
 }

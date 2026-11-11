@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { create } from 'xmlbuilder2';
+import type { XMLBuilder } from 'xmlbuilder2/lib/interfaces';
 
 import { SRI_IVA_TAX_CODE } from '../../../tax-codes/domain/iva-rate.catalog';
 import { TaxCalculatorService } from '../../../tax-codes/domain/services/tax-calculator.service';
@@ -8,6 +9,12 @@ import {
   IDENTIFICATION_TYPE,
 } from '../../../customers/domain/identification-type';
 import { Company, Prisma } from '@prisma/client';
+import {
+  accountingFlag,
+  resolutionNumber,
+  rimpeLegend,
+} from '../../../companies/domain/tax-profile';
+import { paymentMethodCode } from '../../domain/payment-methods';
 
 /** La factura con sus líneas y su cliente, tal como sale de Prisma. */
 export type InvoiceForXml = Prisma.InvoiceGetPayload<{ include: { items: true; customer: true } }>;
@@ -15,8 +22,30 @@ export type InvoiceForXml = Prisma.InvoiceGetPayload<{ include: { items: true; c
 /** Lo que el XML lee del emisor. */
 export type CompanyForXml = Pick<
   Company,
-  'environment' | 'businessName' | 'tradeName' | 'ruc' | 'address'
+  | 'environment'
+  | 'businessName'
+  | 'tradeName'
+  | 'ruc'
+  | 'address'
+  | 'taxRegime'
+  | 'keepsAccounting'
+  | 'withholdingAgentResolution'
+  | 'specialTaxpayerResolution'
 >;
+
+/**
+ * Cierre de `infoTributaria` con el perfil tributario: `agenteRetencion` y `contribuyenteRimpe` van
+ * después de `dirMatriz`, en ese orden, y solo si aplican. Lo usan la factura y la nota de crédito.
+ */
+export function appendTaxProfileToInfoTributaria(
+  infoTributaria: XMLBuilder,
+  company: CompanyForXml,
+): void {
+  const withholdingAgent = resolutionNumber(company.withholdingAgentResolution);
+  if (withholdingAgent) infoTributaria.ele('agenteRetencion').txt(withholdingAgent);
+  const legend = rimpeLegend(company.taxRegime);
+  if (legend) infoTributaria.ele('contribuyenteRimpe').txt(legend);
+}
 
 @Injectable()
 export class XmlGeneratorService {
@@ -53,15 +82,14 @@ export class XmlGeneratorService {
    * Estructura basada en ANEXO 1 - Ficha Técnica SRI
    */
   generateInvoiceXml(invoice: InvoiceForXml, company: CompanyForXml): string {
-    const root = create({ version: '1.0', encoding: 'UTF-8' })
-      .ele('factura', {
-        id: 'comprobante',
-        version: '2.1.0',
-      });
+    const root = create({ version: '1.0', encoding: 'UTF-8' }).ele('factura', {
+      id: 'comprobante',
+      version: '2.1.0',
+    });
 
     // ==================== INFO TRIBUTARIA ====================
     const infoTributaria = root.ele('infoTributaria');
-    
+
     infoTributaria.ele('ambiente').txt(company.environment === 'PRODUCTION' ? '2' : '1');
     infoTributaria.ele('tipoEmision').txt('1'); // 1 = Normal
     infoTributaria.ele('razonSocial').txt(company.businessName);
@@ -73,6 +101,7 @@ export class XmlGeneratorService {
     infoTributaria.ele('ptoEmi').txt(invoice.emissionPointCode);
     infoTributaria.ele('secuencial').txt(invoice.sequential);
     infoTributaria.ele('dirMatriz').txt(company.address);
+    appendTaxProfileToInfoTributaria(infoTributaria, company);
 
     // ==================== INFO FACTURA ====================
     const infoFactura = root.ele('infoFactura');
@@ -84,32 +113,42 @@ export class XmlGeneratorService {
     infoFactura.ele('fechaEmision').txt(this.formatDateUtc(invoice.issueDate));
     infoFactura.ele('dirEstablecimiento').txt(company.address);
 
-    // Obligado a llevar contabilidad
-    infoFactura.ele('obligadoContabilidad').txt('SI');
+    // Perfil tributario: contribuyenteEspecial (si lo es) va antes de obligadoContabilidad.
+    const specialTaxpayer = resolutionNumber(company.specialTaxpayerResolution);
+    if (specialTaxpayer) infoFactura.ele('contribuyenteEspecial').txt(specialTaxpayer);
+    infoFactura.ele('obligadoContabilidad').txt(accountingFlag(company.keepsAccounting));
 
     // Tipo identificación comprador - Usar código del SRI
-    const tipoIdentificacionCodigo = buyerIdentificationTypeForSri(invoice.customer.identificationType);
+    const tipoIdentificacionCodigo = buyerIdentificationTypeForSri(
+      invoice.customer.identificationType,
+    );
     const identificacionNormalizada = this.normalizeIdentification(
       invoice.customer.identification,
-      invoice.customer.identificationType
+      invoice.customer.identificationType,
     );
 
-    this.logger.log(`📝 Mapeo tipo identificación: "${invoice.customer.identificationType}" → "${tipoIdentificacionCodigo}"`);
-    this.logger.log(`📝 Identificación normalizada: "${invoice.customer.identification}" → "${identificacionNormalizada}"`);
+    this.logger.log(
+      `📝 Mapeo tipo identificación: "${invoice.customer.identificationType}" → "${tipoIdentificacionCodigo}"`,
+    );
+    this.logger.log(
+      `📝 Identificación normalizada: "${invoice.customer.identification}" → "${identificacionNormalizada}"`,
+    );
 
     infoFactura.ele('tipoIdentificacionComprador').txt(tipoIdentificacionCodigo);
-    infoFactura.ele('razonSocialComprador').txt(
-      invoice.customer.businessName ||
-      `${invoice.customer.firstName || ''} ${invoice.customer.lastName || ''}`.trim() ||
-      'CONSUMIDOR FINAL'
-    );
+    infoFactura
+      .ele('razonSocialComprador')
+      .txt(
+        invoice.customer.businessName ||
+          `${invoice.customer.firstName || ''} ${invoice.customer.lastName || ''}`.trim() ||
+          'CONSUMIDOR FINAL',
+      );
     infoFactura.ele('identificacionComprador').txt(identificacionNormalizada);
 
     // Dirección comprador (opcional)
     if (invoice.customer.address) {
       infoFactura.ele('direccionComprador').txt(invoice.customer.address);
     }
-    
+
     // Totales, agrupados por tarifa desde el IVA guardado en cada línea.
     // invoice.subtotal ya es la base neta de descuentos (totalSinImpuestos).
     const taxes = this.taxCalculator.summarize(invoice.items);
@@ -132,14 +171,14 @@ export class XmlGeneratorService {
 
     // Importe total = totalSinImpuestos + IVA + propina
     infoFactura.ele('importeTotal').txt(taxes.total.toFixed(2));
-    
+
     // Moneda
     infoFactura.ele('moneda').txt('DOLAR');
 
     // ==================== FORMA DE PAGO ====================
     const pagos = infoFactura.ele('pagos');
     const pago = pagos.ele('pago');
-    pago.ele('formaPago').txt('01'); // 01 = Sin utilización del sistema financiero
+    pago.ele('formaPago').txt(paymentMethodCode(invoice.paymentMethod));
     pago.ele('total').txt(taxes.total.toFixed(2));
     pago.ele('plazo').txt('0');
     pago.ele('unidadTiempo').txt('dias');
@@ -180,7 +219,7 @@ export class XmlGeneratorService {
 
     // Generar XML como string
     const xml = root.end({ prettyPrint: true });
-    
+
     return xml;
   }
 

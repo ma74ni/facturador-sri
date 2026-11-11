@@ -57,9 +57,10 @@ export interface CreateInvoiceDto {
   establishmentId: string;
   emissionPointId: string;
   items: InvoiceItemDto[];
+  /** Forma de pago (Tabla 24 del SRI); sin ella, la API usa 01 (efectivo). */
+  paymentMethod?: string;
+  /** Solo para la web: la API no guarda estos datos. */
   metadata?: {
-    paymentMethod?: string;
-    isRimpe?: boolean;
     source?: string;
     sendToSri?: boolean;
   };

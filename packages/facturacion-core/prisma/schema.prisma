@@ -34,6 +34,19 @@ enum SRIStatus {
 
 }
 
+// Régimen tributario de la empresa (perfil tributario).
+enum TaxRegime {
+  GENERAL
+  RIMPE_EMPRENDEDOR
+  RIMPE_NEGOCIO_POPULAR
+}
+
+// Cada cuánto declara el IVA (los RIMPE, semestral).
+enum VatFilingPeriod {
+  MONTHLY
+  SEMIANNUAL
+}
+
 enum CompanyStatus {
   PENDING
   APPROVED
@@ -160,6 +173,16 @@ model Company {
   // Módulos de producto habilitados para este tenant (ej. "cobranza") — ver RequireModuleGuard
   enabledModules String[] @default([])
 
+  // Perfil tributario: cómo ve el SRI a la empresa. Va en el XML y el RIDE
+  // (obligadoContabilidad, contribuyenteRimpe, agenteRetencion) y decide el
+  // período de sus reportes. Los valores por defecto son lo que se emitía antes.
+  taxRegime                     TaxRegime   @default(GENERAL)
+  keepsAccounting               Boolean     @default(true)
+  vatFilingPeriod               VatFilingPeriod @default(MONTHLY)
+  // Número de resolución del SRI; vacío si no lo es.
+  withholdingAgentResolution    String?
+  specialTaxpayerResolution     String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -170,6 +193,7 @@ model Company {
   invoices       Invoice[]
   creditNotes    CreditNote[]
   payments       Payment[]
+  suppliers      Supplier[]
 
   platformAuditLogs PlatformAuditLog[]
 
@@ -354,6 +378,10 @@ model Invoice {
   totalDiscount Decimal @default(0) @db.Decimal(12, 2)
   ivaValue      Decimal @db.Decimal(12, 2)
   total         Decimal @db.Decimal(12, 2)
+
+  // Forma de pago (Tabla 24 del SRI) que va en el XML y el RIDE. Null en las anteriores a este
+  // campo y en las importadas: se emitieron como 01 (sin utilización del sistema financiero).
+  paymentMethod String? @db.VarChar(2)
 
   sriStatus           SRIStatus @default(DRAFT)
   authorizationNumber String?
@@ -592,4 +620,38 @@ model CreditNoteEmailLog {
   @@index([creditNoteId])
   @@index([status])
   @@map("credit_note_email_logs")
+}
+
+// ==================== COMPRAS ====================
+// Módulo "compras" (Company.enabledModules). Solo lo tributario: lo operativo
+// (insumos, reparto) vive en cada app que consume la API.
+
+// Proveedor: a quién le compra la empresa. Tabla propia, no Customer: son roles
+// tributarios distintos y una misma persona puede ser cliente y proveedor.
+model Supplier {
+  id                 String  @id @default(cuid())
+  // Tabla 6 del SRI: 04 RUC, 05 cédula, 06 pasaporte, 08 identificación del exterior.
+  identificationType String
+  identification     String
+  // Razón social, o nombres y apellidos de una persona.
+  businessName       String
+  tradeName          String?
+  email              String?
+  phone              String?
+  address            String?
+  // Negocio popular del RIMPE: sus compras van en su casilla del 104 y sus notas de venta
+  // preimpresas no llevan retención.
+  isPopularBusiness  Boolean @default(false)
+  // Parte relacionada (dato del ATS).
+  isRelatedParty     Boolean @default(false)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, identification])
+  @@index([companyId])
+  @@map("suppliers")
 }

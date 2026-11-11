@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { RideDocument } from '../../../../shared/ride/ride-document';
+import { RideDocument, toRideIssuer } from '../../../../shared/ride/ride-document';
 import { RidePublisher } from '../../../../shared/ride/ride-publisher.service';
 import {
   CompanyRideSource,
@@ -28,7 +28,7 @@ export function toCreditNoteRide(
     authorizationDate: creditNote.authorizationDate,
     environment: creditNote.company?.environment || company.environment,
     issueDate: creditNote.issueDate,
-    issuer: company,
+    issuer: toRideIssuer(company),
     customer: creditNote.customer,
     items: creditNote.items || [],
     total: creditNote.total,
@@ -36,7 +36,11 @@ export function toCreditNoteRide(
     irbpnrValue: creditNote.irbpnrValue,
     tip: creditNote.tip,
     // Las notas de crédito de este sistema siempre modifican una factura.
-    modifiedDocument: { type: 'FACTURA', number: creditNote.modifiedNumber, reason: creditNote.reason },
+    modifiedDocument: {
+      type: 'FACTURA',
+      number: creditNote.modifiedNumber,
+      reason: creditNote.reason,
+    },
   };
 }
 

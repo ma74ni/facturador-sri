@@ -17,7 +17,12 @@ import { CompanyNotifierService } from './company-notifier.service';
 import { CompanyListFilter } from '../dto/company-list-query.dto';
 import { GoLiveDto } from '../dto/go-live.dto';
 import { UpdateEmissionSequenceDto } from '../dto/update-emission-sequence.dto';
-import { PRODUCT_MODULE_KEYS, ProductModuleKey } from '../../../companies/domain/product-modules.catalog';
+import {
+  describeMissingRequirements,
+  findMissingRequirements,
+  PRODUCT_MODULE_KEYS,
+  ProductModuleKey,
+} from '../../../companies/domain/product-modules.catalog';
 
 const TEST_DOCUMENT_REASON = 'Emitida en el ambiente de pruebas del SRI, antes de producción';
 
@@ -130,7 +135,15 @@ export class PlatformCompaniesService {
       this.prisma.user.findMany({
         where: { companyId },
         orderBy: { createdAt: 'asc' },
-        select: { id: true, email: true, firstName: true, lastName: true, role: true, emailVerified: true, isActive: true },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          emailVerified: true,
+          isActive: true,
+        },
       }),
       this.prisma.establishment.findMany({
         where: { companyId },
@@ -141,7 +154,13 @@ export class PlatformCompaniesService {
           name: true,
           emissionPoints: {
             orderBy: { code: 'asc' },
-            select: { id: true, code: true, description: true, invoiceSequence: true, creditNoteSequence: true },
+            select: {
+              id: true,
+              code: true,
+              description: true,
+              invoiceSequence: true,
+              creditNoteSequence: true,
+            },
           },
         },
       }),
@@ -183,7 +202,12 @@ export class PlatformCompaniesService {
     await this.prisma.$transaction(async (tx) => {
       await tx.company.update({
         where: { id: companyId },
-        data: { status: 'APPROVED', approvedAt: new Date(), rejectedAt: null, rejectionReason: null },
+        data: {
+          status: 'APPROVED',
+          approvedAt: new Date(),
+          rejectedAt: null,
+          rejectionReason: null,
+        },
       });
       await this.audit.record(tx, actor, {
         action: 'COMPANY_APPROVED',
@@ -206,7 +230,12 @@ export class PlatformCompaniesService {
     await this.prisma.$transaction(async (tx) => {
       await tx.company.update({
         where: { id: companyId },
-        data: { status: 'REJECTED', rejectedAt: new Date(), rejectionReason: reason, approvedAt: null },
+        data: {
+          status: 'REJECTED',
+          rejectedAt: new Date(),
+          rejectionReason: reason,
+          approvedAt: null,
+        },
       });
       await this.audit.record(tx, actor, {
         action: 'COMPANY_REJECTED',
@@ -274,7 +303,10 @@ export class PlatformCompaniesService {
         const next = requested.get(point.id)!;
         await tx.emissionPoint.update({
           where: { id: point.id },
-          data: { invoiceSequence: next.nextInvoiceSequence, creditNoteSequence: next.nextCreditNoteSequence },
+          data: {
+            invoiceSequence: next.nextInvoiceSequence,
+            creditNoteSequence: next.nextCreditNoteSequence,
+          },
         });
       }
 
@@ -323,7 +355,13 @@ export class PlatformCompaniesService {
     const company = await this.findCompany(companyId);
     const point = await this.prisma.emissionPoint.findFirst({
       where: { id: emissionPointId, establishment: { companyId } },
-      select: { id: true, code: true, invoiceSequence: true, creditNoteSequence: true, establishment: { select: { code: true } } },
+      select: {
+        id: true,
+        code: true,
+        invoiceSequence: true,
+        creditNoteSequence: true,
+        establishment: { select: { code: true } },
+      },
     });
     if (!point) {
       throw new NotFoundException('Punto de emisión no encontrado en esta empresa');
@@ -350,7 +388,10 @@ export class PlatformCompaniesService {
         company,
         details: {
           point: `${point.establishment.code}-${point.code}`,
-          invoiceSequence: { from: point.invoiceSequence, to: dto.nextInvoiceSequence ?? point.invoiceSequence },
+          invoiceSequence: {
+            from: point.invoiceSequence,
+            to: dto.nextInvoiceSequence ?? point.invoiceSequence,
+          },
           creditNoteSequence: {
             from: point.creditNoteSequence,
             to: dto.nextCreditNoteSequence ?? point.creditNoteSequence,
@@ -373,12 +414,16 @@ export class PlatformCompaniesService {
       throw new NotFoundException('Empresa no encontrada');
     }
     if (!company.hasCertificate || !company.certificateExpiry) {
-      throw new BadRequestException('La empresa no tiene un certificado cargado con fecha de vencimiento');
+      throw new BadRequestException(
+        'La empresa no tiene un certificado cargado con fecha de vencimiento',
+      );
     }
 
     const result = await this.notifier.notify(companyId, { kind: 'certificateExpiring' });
     if (result.sent === 0) {
-      throw new BadRequestException('No se pudo enviar el correo a la empresa: revisa sus correos de contacto');
+      throw new BadRequestException(
+        'No se pudo enviar el correo a la empresa: revisa sus correos de contacto',
+      );
     }
 
     await this.prisma.$transaction((tx) =>
@@ -405,6 +450,12 @@ export class PlatformCompaniesService {
 
     // Orden del catálogo: la lista guardada no depende del orden de los clics.
     const next = PRODUCT_MODULE_KEYS.filter((key) => modules.includes(key));
+    // Nunca se apaga ni se enciende nada por su cuenta: una combinación inválida se rechaza y el
+    // panel le pide a quien guarda que confirme también los módulos que dependen.
+    const missing = findMissingRequirements(next);
+    if (missing.length > 0) {
+      throw new BadRequestException(describeMissingRequirements(missing));
+    }
     const enabled = next.filter((key) => !company.enabledModules.includes(key));
     const disabled = company.enabledModules.filter((key) => !(next as string[]).includes(key));
     if (enabled.length === 0 && disabled.length === 0) {
