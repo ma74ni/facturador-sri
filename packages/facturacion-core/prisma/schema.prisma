@@ -194,6 +194,7 @@ model Company {
   creditNotes    CreditNote[]
   payments       Payment[]
   suppliers      Supplier[]
+  expenseAccounts ExpenseAccount[]
 
   platformAuditLogs PlatformAuditLog[]
 
@@ -654,4 +655,27 @@ model Supplier {
   @@unique([companyId, identification])
   @@index([companyId])
   @@map("suppliers")
+}
+
+// Catálogo de cuentas de gasto de la empresa (módulo Compras): a qué cuenta del contador va
+// cada compra. El código es opcional: no todas las empresas tienen plan de cuentas.
+model ExpenseAccount {
+  id       String  @id @default(cuid())
+  code     String?
+  name     String
+  // El nombre en minúsculas: "Arriendo" y "arriendo" son la misma cuenta, también para el índice.
+  nameKey  String
+  // Inactiva: ya no se ofrece al registrar compras, pero las que la usan la conservan.
+  isActive Boolean @default(true)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, nameKey])
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@map("expense_accounts")
 }
