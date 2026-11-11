@@ -19,6 +19,7 @@ function setup(found: unknown = supplier) {
       update: jest.fn((args) => Promise.resolve({ ...supplier, ...args.data })),
       delete: jest.fn().mockResolvedValue(supplier),
     },
+    receivedDocument: { count: jest.fn().mockResolvedValue(0) },
   };
   return { service: new SuppliersService(prisma as never), prisma };
 }
@@ -151,5 +152,21 @@ describe('SuppliersService', () => {
 
     expect(prisma.supplier.findMany.mock.calls[0][0].where).toEqual({ companyId: 'c-1' });
     expect(prisma.supplier.findMany.mock.calls[0][0].take).toBe(500);
+  });
+
+  it('un proveedor con compras registradas no se elimina', async () => {
+    const { service, prisma } = setup();
+    prisma.receivedDocument.count.mockResolvedValueOnce(3);
+
+    await expect(service.remove('s-1', 'c-1')).rejects.toThrow(
+      'Este proveedor tiene 3 compras registradas: no se puede eliminar',
+    );
+    expect(prisma.receivedDocument.count).toHaveBeenCalledWith({
+      where: { supplierId: 's-1', companyId: 'c-1' },
+    });
+    expect(prisma.supplier.delete).not.toHaveBeenCalled();
+
+    await service.remove('s-1', 'c-1');
+    expect(prisma.supplier.delete).toHaveBeenCalledWith({ where: { id: 's-1' } });
   });
 });

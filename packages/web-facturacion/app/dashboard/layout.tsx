@@ -72,7 +72,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       ? [{ name: 'Cobranza', href: '/dashboard/cobranza', icon: Wallet }]
       : []),
     ...(hasModule(company?.enabledModules, COMPRAS_MODULE)
-      ? [{ name: 'Compras', href: '/dashboard/compras/proveedores', icon: ShoppingCart }]
+      ? [{ name: 'Compras', href: '/dashboard/compras', icon: ShoppingCart }]
       : []),
     { name: 'Reportes', href: '/dashboard/reportes', icon: BarChart3 },
     { name: 'Empresa', href: '/dashboard/empresa', icon: Building2 },
