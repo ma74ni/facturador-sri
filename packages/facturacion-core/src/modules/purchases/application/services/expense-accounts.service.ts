@@ -89,13 +89,28 @@ export class ExpenseAccountsService {
     }
   }
 
-  /**
-   * Elimina una cuenta de la empresa. Cuando existan compras registradas (siguiente PR de C1),
-   * una cuenta con compras no se podrá eliminar: se desactiva.
-   */
+  /** Elimina una cuenta de la empresa; una con compras no se elimina: se desactiva. */
   async remove(id: string, companyId: string) {
     const account = await this.findOne(id, companyId);
-    await this.prisma.expenseAccount.delete({ where: { id: account.id } });
+    const inUse = (count: number) =>
+      new ConflictException(
+        `Esta cuenta tiene ${count === 1 ? '1 compra' : `${count} compras`}: desactívala en vez de eliminarla`,
+      );
+    const purchases = await this.prisma.receivedDocument.count({
+      where: { expenseAccountId: account.id, companyId },
+    });
+    if (purchases > 0) {
+      throw inUse(purchases);
+    }
+    try {
+      await this.prisma.expenseAccount.delete({ where: { id: account.id } });
+    } catch (error) {
+      // Alguien le asignó una compra justo ahora: la clave foránea frena el borrado.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+        throw inUse(1);
+      }
+      throw error;
+    }
     return { message: 'Cuenta de gasto eliminada' };
   }
 

@@ -31,6 +31,7 @@ function setup({
       update: jest.fn((args) => Promise.resolve({ ...account, ...args.data })),
       delete: jest.fn().mockResolvedValue(account),
     },
+    receivedDocument: { count: jest.fn().mockResolvedValue(0) },
   };
   return { service: new ExpenseAccountsService(prisma as never), prisma };
 }
@@ -137,6 +138,19 @@ describe('ExpenseAccountsService', () => {
     await expect(service.create({ code: '9', name: 'Nueva' }, 'c-1')).rejects.toThrow(
       new ConflictException('Ya tienes una cuenta con ese código'),
     );
+  });
+
+  it('una cuenta con compras no se elimina: se pide desactivarla', async () => {
+    const { service, prisma } = setup();
+    prisma.receivedDocument.count.mockResolvedValueOnce(1);
+
+    await expect(service.remove('a-1', 'c-1')).rejects.toThrow(
+      'Esta cuenta tiene 1 compra: desactívala en vez de eliminarla',
+    );
+    expect(prisma.expenseAccount.delete).not.toHaveBeenCalled();
+
+    await service.remove('a-1', 'c-1');
+    expect(prisma.expenseAccount.delete).toHaveBeenCalledWith({ where: { id: 'a-1' } });
   });
 
   describe('lista pegada del contador', () => {
