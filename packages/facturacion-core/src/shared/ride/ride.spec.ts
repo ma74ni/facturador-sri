@@ -41,7 +41,7 @@ const invoice: InvoiceRideSource = {
   customer: { businessName: 'PINTO RUALES NARCIZA ELENA', identificationType: '05' },
   items: [item(1)],
   total: '11.50',
-  paymentMethod: '20 - OTROS CON UTILIZACION DEL SISTEMA FINANCIERO',
+  paymentMethod: '20',
   company: { environment: 'PRODUCTION' },
 };
 
@@ -76,7 +76,9 @@ describe('RIDE', () => {
 
       expect(ride.title).toBe('FACTURA');
       expect(ride.environment).toBe('PRODUCTION');
-      expect(ride.payment).toEqual({ method: invoice.paymentMethod });
+      expect(ride.payment).toEqual({
+        method: '20 - OTROS CON UTILIZACION DEL SISTEMA FINANCIERO',
+      });
       expect(ride.modifiedDocument).toBeUndefined();
       expect(ride.issuer).toMatchObject({ ruc: company.ruc, accountingRequired: false });
     });
@@ -103,6 +105,12 @@ describe('RIDE', () => {
       expect(toInvoiceRide(invoice, withoutProfile).issuer).toMatchObject({
         accountingRequired: true,
         regimeLegend: null,
+      });
+    });
+
+    it('una factura sin forma de pago guardada (anterior o importada) usa el texto por defecto del RIDE', () => {
+      expect(toInvoiceRide({ ...invoice, paymentMethod: null }, company).payment).toEqual({
+        method: undefined,
       });
     });
 

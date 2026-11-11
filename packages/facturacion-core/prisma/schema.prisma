@@ -379,6 +379,10 @@ model Invoice {
   ivaValue      Decimal @db.Decimal(12, 2)
   total         Decimal @db.Decimal(12, 2)
 
+  // Forma de pago (Tabla 24 del SRI) que va en el XML y el RIDE. Null en las anteriores a este
+  // campo y en las importadas: se emitieron como 01 (sin utilización del sistema financiero).
+  paymentMethod String? @db.VarChar(2)
+
   sriStatus           SRIStatus @default(DRAFT)
   authorizationNumber String?
   authorizationDate   DateTime?

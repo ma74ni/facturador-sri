@@ -86,7 +86,7 @@ interface InvoiceItemWithCalc extends InvoiceItemDto {
   total: number;
 }
 
-// Formas de pago del SRI
+// Formas de pago del SRI (Tabla 24). La API valida los mismos códigos.
 const PAYMENT_METHODS = [
   {
     code: '01',
@@ -100,15 +100,11 @@ const PAYMENT_METHODS = [
   },
   { code: '16', label: 'Tarjeta de Débito', description: 'Débito bancario' },
   {
-    code: '17',
-    label: 'Transferencia / Dinero Electrónico',
-    description: 'Transferencias bancarias',
-  },
-  {
     code: '20',
-    label: 'Otros con Sistema Financiero',
-    description: 'Otros métodos bancarios',
+    label: 'Transferencia u otro medio bancario',
+    description: 'Transferencias, depósitos, cheques',
   },
+  { code: '17', label: 'Dinero Electrónico', description: 'Billetera de dinero electrónico' },
   { code: '15', label: 'Compensación de Deudas', description: 'Compensación' },
   { code: '18', label: 'Tarjeta Prepago', description: 'Tarjetas prepagadas' },
   { code: '21', label: 'Endoso de Títulos', description: 'Endoso' },
@@ -164,7 +160,6 @@ export function InvoiceDialog({
   const [issueDate, setIssueDate] = useState<string>(getTodayLocalDateString);
   const [items, setItems] = useState<InvoiceItemWithCalc[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<string>('01');
-  const [isRimpe, setIsRimpe] = useState<boolean>(false);
 
   // Item being added
   const [selectedProduct, setSelectedProduct] = useState<string>('');
@@ -192,7 +187,6 @@ export function InvoiceDialog({
       setIssueDate(getTodayLocalDateString());
       setItems([]);
       setPaymentMethod('01');
-      setIsRimpe(false);
       setSelectedProduct('');
       setQuantity(1);
       setDiscount(0);
@@ -338,9 +332,8 @@ export function InvoiceDialog({
           // La tarifa de cada línea viaja al backend; los totales los recalcula él.
           ({ subtotal, taxValue, total, ...item }) => item,
         ),
+        paymentMethod,
         metadata: {
-          paymentMethod,
-          isRimpe,
           source: 'WEB_FACTURACION',
           sendToSri, // Indicar si debe enviar al SRI
         },
@@ -770,7 +763,7 @@ export function InvoiceDialog({
           {/* SECCIÓN 3: Forma de Pago */}
           <div>
             <h3 className="text-lg font-semibold text-on-surface mb-4">
-              3. Forma de Pago y Opciones
+              3. Forma de Pago
             </h3>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
@@ -798,36 +791,10 @@ export function InvoiceDialog({
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-on-surface-variant mt-1">
-                  Método de pago que utilizará el cliente
+                  Cómo te paga el cliente. Sale en la factura electrónica y en el RIDE.
                 </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-base font-semibold">Opciones Tributarias</Label>
-                <div className="flex items-center space-x-3 p-3 bg-surface-container-low border border-outline-variant rounded-lg h-12">
-                  <input
-                    type="checkbox"
-                    id="rimpe-checkbox"
-                    checked={isRimpe}
-                    onChange={(e) => setIsRimpe(e.target.checked)}
-                    className="w-5 h-5 text-primary border-outline-variant rounded focus:ring-primary cursor-pointer"
-                  />
-                  <label htmlFor="rimpe-checkbox" className="cursor-pointer flex-1">
-                    <span className="text-sm font-semibold text-on-surface">Régimen RIMPE</span>
-                  </label>
-                </div>
               </div>
             </div>
-
-            {isRimpe && (
-              <div className="rounded-lg bg-primary-container border border-primary-container p-4 mt-4">
-                <p className="text-sm text-on-primary-container">
-                  <strong>Nota RIMPE:</strong> Esta factura incluirá la leyenda &ldquo;CONTRIBUYENTE
-                  NEGOCIO POPULAR - RÉGIMEN RIMPE&rdquo; en la información adicional del XML. No se
-                  aplicará retención de IVA ni renta.
-                </p>
-              </div>
-            )}
           </div>
         </DialogBody>
 
