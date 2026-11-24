@@ -113,6 +113,7 @@ model User {
 
   platformAuditActions PlatformAuditLog[] @relation("PlatformAuditActor")
   platformAuditTargets PlatformAuditLog[] @relation("PlatformAuditTarget")
+  refreshTokens        RefreshToken[]
 
   @@index([email])
   @@index([companyId])
@@ -776,4 +777,29 @@ model ReceivedDocumentTax {
 
   @@unique([receivedDocumentId, ivaCode])
   @@map("received_document_taxes")
+}
+
+// Sesión de la web que se renueva sola ("mantener la sesión iniciada"). Se guarda el
+// SHA-256 del token, nunca el token: viaja solo en una cookie httpOnly. Cada uso lo
+// cambia por uno nuevo de la misma sesión (familyId); usar uno ya cambiado revoca
+// la sesión entera (alguien lo copió).
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  familyId  String
+  // Inicio de la sesión (se copia en cada renovación): un cambio de contraseña posterior la corta.
+  sessionStartedAt DateTime
+  tokenHash String    @unique
+  expiresAt DateTime
+  // Cuándo se cambió por el siguiente de la sesión.
+  rotatedAt DateTime?
+  // Cerrar sesión, cambio de contraseña o reuso detectado.
+  revokedAt DateTime?
+  userAgent String?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
 }

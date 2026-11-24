@@ -10,6 +10,8 @@ export const loginSchema = z.object({
   password: z
     .string()
     .min(6, 'La contraseña debe tener al menos 6 caracteres'),
+  // Sesión que se renueva sola en este navegador (cookie httpOnly en la API).
+  keepSession: z.boolean().default(true),
 });
 
 export type LoginFormData = z.infer<typeof loginSchema>;

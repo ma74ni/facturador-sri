@@ -126,6 +126,12 @@ services:
         sync: false # URL de la rama dev del frontend en Netlify
       - key: CORS_ORIGIN
         value: https://dev--facturador-siete8.netlify.app,https://deploy-preview-*--facturador-siete8.netlify.app,http://localhost:3002
+      # La web de staging (netlify.app) y la API (onrender.com) son sitios distintos: la cookie
+      # de renovación de sesión necesita SameSite=None. Solo el origen exacto con https la recibe
+      # (nunca las vistas previas con comodín). Safari y los bloqueos de cookies de terceros la
+      # descartan igual: en staging la sesión que se renueva sola es "mejor esfuerzo".
+      - key: REFRESH_COOKIE_SAMESITE
+        value: none
       - key: SENTRY_DSN
         value: https://ed01e9e8ee6d38c398e683a8812497f4@o4512205677395968.ingest.us.sentry.io/4512246525263872
       - key: SENTRY_ENVIRONMENT

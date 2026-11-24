@@ -6,7 +6,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { isAllowedOrigin, parseCorsOrigins } from './shared/http/cors-origins';
+import { allowsCredentials, isAllowedOrigin, parseCorsOrigins } from './shared/http/cors-origins';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -28,14 +28,18 @@ async function bootstrap() {
       throw new Error('Falta CORS_ORIGIN: en producción la API no acepta cualquier origen');
     }
     Logger.warn('CORS_ORIGIN vacío: la API acepta llamadas desde cualquier origen', 'CORS');
-    app.enableCors();
-  } else {
-    app.enableCors({
-      // Un origen no permitido recibe la respuesta sin cabeceras CORS y el navegador la bloquea.
-      origin: (origin, callback) =>
-        callback(null, !origin || isAllowedOrigin(origin, corsOrigins)),
-    });
   }
+  // Por petición: la cookie de renovación de sesión (credenciales) solo para los orígenes
+  // exactos con https (ver allowsCredentials); el resto de la lista, sin credenciales.
+  app.enableCors((req: { headers: { origin?: string } }, callback) => {
+    const origin = req.headers.origin;
+    const allowed = !origin || corsOrigins.length === 0 || isAllowedOrigin(origin, corsOrigins);
+    callback(null, {
+      // Un origen no permitido recibe la respuesta sin cabeceras CORS y el navegador la bloquea.
+      origin: allowed,
+      credentials: !!origin && allowed && allowsCredentials(origin, corsOrigins),
+    });
+  });
 
   // Global prefix
   app.setGlobalPrefix('api/v1');

@@ -25,3 +25,15 @@ export function parseCorsOrigins(raw: string | undefined): CorsOrigin[] {
 export function isAllowedOrigin(origin: string, allowed: CorsOrigin[]): boolean {
   return allowed.some((rule) => (typeof rule === 'string' ? rule === origin : rule.test(origin)));
 }
+
+/**
+ * Si un origen puede llamar con credenciales (la cookie de renovación de sesión). Solo los
+ * orígenes exactos con https de la lista: nunca un comodín (una vista previa de Netlify la
+ * puede publicar cualquiera desde un PR) ni http. Sin lista (desarrollo), solo localhost.
+ */
+export function allowsCredentials(origin: string, allowed: CorsOrigin[]): boolean {
+  if (allowed.length === 0) return /^http:\/\/localhost(:\d+)?$/.test(origin);
+  return allowed.some(
+    (rule) => typeof rule === 'string' && rule === origin && rule.startsWith('https://'),
+  );
+}
