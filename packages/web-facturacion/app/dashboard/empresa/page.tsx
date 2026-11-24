@@ -28,19 +28,33 @@ import { useToast } from '@/hooks/use-toast';
 import { LogoManager } from '@/components/company/logo-manager';
 import { TaxProfileCard } from '@/components/company/tax-profile-card';
 
+type CompanyForm = {
+  businessName: string;
+  tradeName: string;
+  ruc: string;
+  address: string;
+  email: string;
+  phone: string;
+};
+
+const fromCompany = (company: Partial<CompanyForm> | null | undefined): CompanyForm => ({
+  businessName: company?.businessName || '',
+  tradeName: company?.tradeName || '',
+  ruc: company?.ruc || '',
+  address: company?.address || '',
+  email: company?.email || '',
+  phone: company?.phone || '',
+});
+
 export default function EmpresaPage() {
-  const { company, checkAuth } = useAuth();
+  const { user, company, checkAuth } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    businessName: company?.businessName || '',
-    tradeName: company?.tradeName || '',
-    ruc: company?.ruc || '',
-    address: company?.address || '',
-    email: company?.email || '',
-    phone: company?.phone || '',
-  });
+  const [formData, setFormData] = useState(() => fromCompany(company));
+  // Fuera de edición se muestra lo guardado, no un borrador.
+  const shown = isEditing ? formData : fromCompany(company);
 
   const handleSave = async () => {
     try {
@@ -77,15 +91,14 @@ export default function EmpresaPage() {
     }
   };
 
+  // Parte de lo guardado: al abrir la página la empresa puede no haber cargado todavía.
+  const startEditing = () => {
+    setFormData(fromCompany(company));
+    setIsEditing(true);
+  };
+
   const handleCancel = () => {
-    setFormData({
-      businessName: company?.businessName || '',
-      tradeName: company?.tradeName || '',
-      ruc: company?.ruc || '',
-      address: company?.address || '',
-      email: company?.email || '',
-      phone: company?.phone || '',
-    });
+    setFormData(fromCompany(company));
     setIsEditing(false);
   };
 
@@ -133,28 +146,6 @@ export default function EmpresaPage() {
             Información y configuración de tu empresa
           </p>
         </div>
-        {!isEditing ? (
-          <Button onClick={() => setIsEditing(true)} className="w-full sm:w-auto">
-            <Edit className="mr-2 h-4 w-4" />
-            Editar Información
-          </Button>
-        ) : (
-          <div className="flex md:flex-row flex-col gap-2">
-            <Button
-              variant="outline"
-              onClick={handleCancel}
-              disabled={loading}
-              className="flex-1 sm:flex-initial"
-            >
-              <X className="mr-2 h-4 w-4" />
-              Cancelar
-            </Button>
-            <Button onClick={handleSave} disabled={loading}>
-              <Save className="mr-2 h-4 w-4" />
-              {loading ? 'Guardando...' : 'Guardar Cambios'}
-            </Button>
-          </div>
-        )}
       </div>
 
       {/* Status Alert */}
@@ -223,9 +214,18 @@ export default function EmpresaPage() {
 
       {/* Company Information */}
       <Card>
-        <CardHeader>
-          <CardTitle>Información General</CardTitle>
-          <CardDescription>Datos fiscales y de contacto de tu empresa</CardDescription>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1">
+            <CardTitle>Información General</CardTitle>
+            <CardDescription>Datos fiscales y de contacto de tu empresa</CardDescription>
+          </div>
+          {/* Cada tarjeta edita y guarda lo suyo: el botón va en la tarjeta, no en la página. */}
+          {isAdmin && !isEditing && (
+            <Button variant="outlined" size="sm" onClick={startEditing}>
+              <Edit />
+              Editar
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
@@ -233,13 +233,7 @@ export default function EmpresaPage() {
               <Label htmlFor="ruc">RUC</Label>
               <div className="flex items-center">
                 <FileText className="mr-2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="ruc"
-                  value={formData.ruc}
-                  onChange={(e) => setFormData({ ...formData, ruc: e.target.value })}
-                  disabled={!isEditing}
-                  className="font-mono"
-                />
+                <Input id="ruc" value={shown.ruc} readOnly disabled className="font-mono" />
               </div>
             </div>
 
@@ -249,7 +243,7 @@ export default function EmpresaPage() {
                 <Building2 className="mr-2 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="businessName"
-                  value={formData.businessName}
+                  value={shown.businessName}
                   onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
                   disabled={!isEditing}
                 />
@@ -262,7 +256,7 @@ export default function EmpresaPage() {
                 <Building2 className="mr-2 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="tradeName"
-                  value={formData.tradeName}
+                  value={shown.tradeName}
                   onChange={(e) => setFormData({ ...formData, tradeName: e.target.value })}
                   disabled={!isEditing}
                   placeholder="Opcional"
@@ -277,7 +271,7 @@ export default function EmpresaPage() {
                 <Input
                   id="email"
                   type="email"
-                  value={formData.email}
+                  value={shown.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   disabled={!isEditing}
                 />
@@ -290,7 +284,7 @@ export default function EmpresaPage() {
                 <Phone className="mr-2 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="phone"
-                  value={formData.phone}
+                  value={shown.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   disabled={!isEditing}
                   placeholder="Opcional"
@@ -304,13 +298,26 @@ export default function EmpresaPage() {
                 <MapPin className="mr-2 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="address"
-                  value={formData.address}
+                  value={shown.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   disabled={!isEditing}
                 />
               </div>
             </div>
           </div>
+
+          {isEditing && (
+            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outlined" onClick={handleCancel} disabled={loading}>
+                <X />
+                Cancelar
+              </Button>
+              <Button onClick={handleSave} disabled={loading}>
+                <Save />
+                {loading ? 'Guardando…' : 'Guardar'}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
