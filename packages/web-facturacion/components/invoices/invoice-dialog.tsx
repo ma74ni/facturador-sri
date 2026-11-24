@@ -49,7 +49,7 @@ import { Product, CreateProductDto } from '@/lib/api/products';
 
 import { Establishment } from '@/lib/api/establishments';
 
-import { Info, Plus, Trash2 } from 'lucide-react';
+import { Info, Trash2 } from 'lucide-react';
 import { CustomerDialog } from '@/components/customers/customer-dialog';
 
 import { CustomerInfoCard } from '@/components/customers/customer-info-card';
@@ -68,7 +68,7 @@ import { useCertificateStatus } from '@/lib/hooks/use-certificate';
 
 import { CertificateRequiredDialog } from '@/components/shared/certificate-required-dialog';
 
-import { formatCurrency, formatQuantity } from '@/lib/utils/formatters';
+import { formatCurrency } from '@/lib/utils/formatters';
 
 import { useAuth } from '@/lib/context/auth-context';
 
@@ -171,8 +171,6 @@ export function InvoiceDialog({
 
   // Item being added
   const [selectedProduct, setSelectedProduct] = useState<string>('');
-  const [quantity, setQuantity] = useState<number>(1);
-  const [discount, setDiscount] = useState<number>(0);
 
   // Nested dialogs
   const [showCustomerDialog, setShowCustomerDialog] = useState(false);
@@ -196,8 +194,6 @@ export function InvoiceDialog({
       setItems([]);
       setPaymentMethod('01');
       setSelectedProduct('');
-      setQuantity(1);
-      setDiscount(0);
       setErrors({});
       setEditingCustomer(null);
     }
@@ -222,45 +218,65 @@ export function InvoiceDialog({
     };
   };
 
-  const handleAddItem = () => {
-    if (!selectedProduct) {
-      setErrors({ ...errors, product: 'Selecciona un producto' });
-      return;
+  /** La línea con sus totales recalculados (al agregarla o al editar cantidad o descuento). */
+  const withTotals = (item: InvoiceItemWithCalc): InvoiceItemWithCalc => ({
+    ...item,
+    ...calculateItemTotals(
+      item.unitPrice,
+      item.quantity,
+      item.discount ?? 0,
+      item.taxPercentageCode ?? '',
+    ),
+  });
+
+  /**
+   * Elegir un producto lo agrega con cantidad 1; si ya está en la factura, suma uno a su cantidad.
+   * La cantidad y el descuento se editan en la misma tabla.
+   */
+  const addProduct = (product: Product) => {
+    const existing = items.findIndex((item) => item.productId === product.id);
+    if (existing >= 0) {
+      updateItem(existing, { quantity: items[existing].quantity + 1 });
+    } else {
+      // Sin IVA, lo gravado pasa a 0%; lo no objeto y lo exento quedan igual (como en la API).
+      const taxPercentageCode =
+        sellsWithoutVat &&
+        getTaxPercentage(taxCodesData?.taxCodes || [], product.taxPercentageCode) > 0
+          ? '0'
+          : product.taxPercentageCode;
+      setItems((current) => [
+        ...current,
+        withTotals({
+          mainCode: product.mainCode,
+          description: product.name,
+          quantity: 1,
+          unitPrice: Number(product.unitPrice),
+          discount: 0,
+          productId: product.id,
+          taxPercentageCode,
+          subtotal: 0,
+          taxValue: 0,
+          total: 0,
+        }),
+      ]);
     }
-
-    const product = products.find((p) => p.id === selectedProduct);
-    if (!product) return;
-
-    if (quantity <= 0) {
-      setErrors({ ...errors, quantity: 'La cantidad debe ser mayor a 0' });
-      return;
-    }
-
-    const unitPrice = Number(product.unitPrice);
-    // Sin IVA, lo gravado pasa a 0%; lo no objeto y lo exento quedan igual (como en la API).
-    const taxPercentageCode =
-      sellsWithoutVat &&
-      getTaxPercentage(taxCodesData?.taxCodes || [], product.taxPercentageCode) > 0
-        ? '0'
-        : product.taxPercentageCode;
-    const totals = calculateItemTotals(unitPrice, quantity, discount, taxPercentageCode);
-
-    const newItem: InvoiceItemWithCalc = {
-      mainCode: product.mainCode,
-      description: product.name,
-      quantity,
-      unitPrice,
-      discount,
-      productId: product.id,
-      taxPercentageCode,
-      ...totals,
-    };
-
-    setItems([...items, newItem]);
     setSelectedProduct('');
-    setQuantity(1);
-    setDiscount(0);
-    setErrors({ ...errors, product: '', quantity: '', items: '' });
+    setErrors((current) => ({ ...current, items: '' }));
+  };
+
+  const handleSelectProduct = (id: string) => {
+    const product = products.find((p) => p.id === id);
+    if (product) addProduct(product);
+  };
+
+  const updateItem = (
+    index: number,
+    patch: Partial<Pick<InvoiceItemWithCalc, 'quantity' | 'discount'>>,
+  ) => {
+    setItems((current) =>
+      current.map((item, i) => (i === index ? withTotals({ ...item, ...patch }) : item)),
+    );
+    setErrors((current) => ({ ...current, items: '' }));
   };
 
   const handleRemoveItem = (index: number) => {
@@ -324,6 +340,10 @@ export function InvoiceDialog({
 
     if (items.length === 0) {
       newErrors.items = 'Agrega al menos un producto';
+    } else if (items.some((item) => item.quantity <= 0)) {
+      newErrors.items = 'La cantidad de cada producto debe ser mayor a 0';
+    } else if (items.some((item) => (item.discount ?? 0) > item.subtotal)) {
+      newErrors.items = 'El descuento de un producto no puede ser mayor que su subtotal';
     }
 
     setErrors(newErrors);
@@ -401,7 +421,7 @@ export function InvoiceDialog({
     try {
       const newProduct = await createProductMutation.mutateAsync(data);
       setShowProductDialog(false);
-      setSelectedProduct(newProduct.id);
+      addProduct(newProduct);
     } catch (error: any) {
       // Error handling is done in the mutation hook
       throw error;
@@ -552,59 +572,29 @@ export function InvoiceDialog({
               <h3 className="text-lg font-semibold text-on-surface mb-4">
                 2. Productos y Servicios
               </h3>
-              <div className="border rounded-lg p-4 bg-surface-container-low">
-                <h4 className="font-medium mb-4 text-on-surface-variant">Agregar Producto</h4>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
-                  <div className="md:col-span-2 lg:col-span-3 space-y-2">
-                    <Label htmlFor="product">Producto</Label>
-                    <SearchableSelect
-                      id="product"
-                      items={products}
-                      value={selectedProduct}
-                      onChange={setSelectedProduct}
-                      getId={(p) => p.id}
-                      getLabel={(p) => p.name}
-                      getSubLabel={(p) => `${formatCurrency(Number(p.unitPrice))}`}
-                      placeholder="Seleccionar producto..."
-                      searchPlaceholder="Buscar producto..."
-                      emptyMessage="No se encontraron productos"
-                      onAddNew={() => setShowProductDialog(true)}
-                      addNewLabel="Nuevo Producto"
-                      error={!!errors.product}
-                    />
-                  </div>
-
-                  <div className="space-y-2 md:col-span-1 lg:col-span-1">
-                    <Label htmlFor="quantity">Cantidad</Label>
-                    <NumberInput
-                      id="quantity"
-                      value={quantity}
-                      onChange={setQuantity}
-                      allowDecimals
-                      decimalPlaces={3}
-                      min={0}
-                      placeholder="Ej: 5 o 1.250"
-                    />
-                  </div>
-
-                  <div className="space-y-2 md:col-span-1 lg:col-span-2">
-                    <Label htmlFor="discount">Descuento ($)</Label>
-                    <NumberInput
-                      id="discount"
-                      value={discount}
-                      onChange={setDiscount}
-                      allowDecimals={true}
-                      decimalPlaces={2}
-                      min={0}
-                      placeholder="Ej: 10.50"
-                    />
-                  </div>
-                </div>
-                <Button type="button" onClick={handleAddItem} className="mt-4 w-full lg:w-auto">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Agregar Producto
-                </Button>
-              </div>
+              <FormField
+                label="Agregar producto"
+                htmlFor="product"
+                error={errors.items}
+                hint="Elige un producto para agregarlo. La cantidad y el descuento se cambian en la tabla."
+                className="mb-4"
+              >
+                <SearchableSelect
+                  id="product"
+                  items={products}
+                  value={selectedProduct}
+                  onChange={handleSelectProduct}
+                  getId={(p) => p.id}
+                  getLabel={(p) => p.name}
+                  getSubLabel={(p) => `${formatCurrency(Number(p.unitPrice))}`}
+                  placeholder="Buscar y agregar producto..."
+                  searchPlaceholder="Buscar producto..."
+                  emptyMessage="No se encontraron productos"
+                  onAddNew={() => setShowProductDialog(true)}
+                  addNewLabel="Nuevo Producto"
+                  error={!!errors.items}
+                />
+              </FormField>
 
               {/* Items List - Responsive: Cards on mobile, Table on desktop */}
               {items.length > 0 && (
@@ -622,8 +612,7 @@ export function InvoiceDialog({
                               {item.description}
                             </h4>
                             <p className="text-sm text-on-surface-variant">
-                              Cantidad: {formatQuantity(item.quantity)} ×{' '}
-                              {formatCurrency(item.unitPrice)}
+                              {formatCurrency(item.unitPrice)} c/u
                             </p>
                           </div>
                           <IconButton
@@ -636,13 +625,30 @@ export function InvoiceDialog({
                           </IconButton>
                         </div>
 
+                        <div className="mb-3 grid grid-cols-2 gap-2">
+                          <FormField label="Cantidad" htmlFor={`quantity-m-${index}`}>
+                            <NumberInput
+                              id={`quantity-m-${index}`}
+                              value={item.quantity}
+                              onChange={(value) => updateItem(index, { quantity: value })}
+                              allowDecimals
+                              decimalPlaces={3}
+                              min={0}
+                            />
+                          </FormField>
+                          <FormField label="Descuento ($)" htmlFor={`discount-m-${index}`}>
+                            <NumberInput
+                              id={`discount-m-${index}`}
+                              value={item.discount}
+                              onChange={(value) => updateItem(index, { discount: value })}
+                              allowDecimals
+                              decimalPlaces={2}
+                              min={0}
+                            />
+                          </FormField>
+                        </div>
+
                         <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>
-                            <span className="text-on-surface-variant">Descuento:</span>
-                            <span className="ml-1 font-medium">
-                              {formatCurrency(item.discount)}
-                            </span>
-                          </div>
                           <div>
                             <span className="text-on-surface-variant">Subtotal:</span>
                             <span className="ml-1 font-medium">
@@ -686,13 +692,29 @@ export function InvoiceDialog({
                           <TableRow key={index}>
                             <TableCell>{item.description}</TableCell>
                             <TableCell className="text-right">
-                              {formatQuantity(item.quantity)}
+                              <NumberInput
+                                aria-label={`Cantidad de ${item.description}`}
+                                value={item.quantity}
+                                onChange={(value) => updateItem(index, { quantity: value })}
+                                allowDecimals
+                                decimalPlaces={3}
+                                min={0}
+                                className="ml-auto w-24 text-right"
+                              />
                             </TableCell>
                             <TableCell className="text-right">
                               {formatCurrency(item.unitPrice)}
                             </TableCell>
                             <TableCell className="text-right">
-                              {formatCurrency(item.discount)}
+                              <NumberInput
+                                aria-label={`Descuento de ${item.description}`}
+                                value={item.discount}
+                                onChange={(value) => updateItem(index, { discount: value })}
+                                allowDecimals
+                                decimalPlaces={2}
+                                min={0}
+                                className="ml-auto w-24 text-right"
+                              />
                             </TableCell>
                             <TableCell className="text-right">
                               {formatCurrency(item.subtotal)}
@@ -786,16 +808,12 @@ export function InvoiceDialog({
                   </div>
                 </div>
               )}
-
-              <FieldError message={errors.items} className="mt-2" />
             </div>
           </div>
 
           {/* SECCIÓN 3: Forma de Pago */}
           <div>
-            <h3 className="text-lg font-semibold text-on-surface mb-4">
-              3. Forma de Pago
-            </h3>
+            <h3 className="text-lg font-semibold text-on-surface mb-4">3. Forma de Pago</h3>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="paymentMethod" className="text-base font-semibold">
