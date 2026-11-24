@@ -90,13 +90,28 @@ export class SuppliersService {
     }
   }
 
-  /**
-   * Elimina un proveedor de la empresa. Cuando existan compras registradas (C1), uno con
-   * compras no se podrá eliminar.
-   */
+  /** Elimina un proveedor de la empresa; uno con compras registradas no se puede eliminar. */
   async remove(id: string, companyId: string) {
     const supplier = await this.findOne(id, companyId);
-    await this.prisma.supplier.delete({ where: { id: supplier.id } });
+    const inUse = (count: number) =>
+      new ConflictException(
+        `Este proveedor tiene ${count === 1 ? '1 compra registrada' : `${count} compras registradas`}: no se puede eliminar`,
+      );
+    const purchases = await this.prisma.receivedDocument.count({
+      where: { supplierId: supplier.id, companyId },
+    });
+    if (purchases > 0) {
+      throw inUse(purchases);
+    }
+    try {
+      await this.prisma.supplier.delete({ where: { id: supplier.id } });
+    } catch (error) {
+      // Alguien registró una compra justo ahora: la clave foránea frena el borrado.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+        throw inUse(1);
+      }
+      throw error;
+    }
     return { message: 'Proveedor eliminado' };
   }
 

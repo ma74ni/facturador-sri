@@ -42,6 +42,7 @@ import {
 } from '@/components/ui/table';
 
 import { CreateInvoiceDto, InvoiceItemDto } from '@/lib/api/invoices';
+import { PAYMENT_METHODS } from '@/lib/sri-catalogs';
 
 import { Customer, CreateCustomerDto } from '@/lib/api/customers';
 
@@ -85,30 +86,6 @@ interface InvoiceItemWithCalc extends InvoiceItemDto {
   taxValue: number;
   total: number;
 }
-
-// Formas de pago del SRI (Tabla 24). La API valida los mismos códigos.
-const PAYMENT_METHODS = [
-  {
-    code: '01',
-    label: 'Efectivo',
-    description: 'Sin utilización del sistema financiero',
-  },
-  {
-    code: '19',
-    label: 'Tarjeta de Crédito',
-    description: 'Visa, Mastercard, etc.',
-  },
-  { code: '16', label: 'Tarjeta de Débito', description: 'Débito bancario' },
-  {
-    code: '20',
-    label: 'Transferencia u otro medio bancario',
-    description: 'Transferencias, depósitos, cheques',
-  },
-  { code: '17', label: 'Dinero Electrónico', description: 'Billetera de dinero electrónico' },
-  { code: '15', label: 'Compensación de Deudas', description: 'Compensación' },
-  { code: '18', label: 'Tarjeta Prepago', description: 'Tarjetas prepagadas' },
-  { code: '21', label: 'Endoso de Títulos', description: 'Endoso' },
-];
 
 // Fecha LOCAL del navegador (asumido Ecuador) en formato YYYY-MM-DD — NO
 // new Date().toISOString() (UTC): después de las 19:00 hora Ecuador (UTC-5)
@@ -762,9 +739,7 @@ export function InvoiceDialog({
 
           {/* SECCIÓN 3: Forma de Pago */}
           <div>
-            <h3 className="text-lg font-semibold text-on-surface mb-4">
-              3. Forma de Pago
-            </h3>
+            <h3 className="text-lg font-semibold text-on-surface mb-4">3. Forma de Pago</h3>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="paymentMethod" className="text-base font-semibold">

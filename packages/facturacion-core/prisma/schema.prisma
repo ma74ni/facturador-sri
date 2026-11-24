@@ -109,6 +109,7 @@ model User {
   invoices    Invoice[]    @relation("CreatedBy")
   creditNotes CreditNote[] @relation("CreditNotesCreatedBy")
   payments    Payment[]    @relation("PaymentsCreatedBy")
+  receivedDocuments ReceivedDocument[] @relation("ReceivedDocumentsCreatedBy")
 
   platformAuditActions PlatformAuditLog[] @relation("PlatformAuditActor")
   platformAuditTargets PlatformAuditLog[] @relation("PlatformAuditTarget")
@@ -195,6 +196,7 @@ model Company {
   payments       Payment[]
   suppliers      Supplier[]
   expenseAccounts ExpenseAccount[]
+  receivedDocuments ReceivedDocument[]
 
   platformAuditLogs PlatformAuditLog[]
 
@@ -649,6 +651,8 @@ model Supplier {
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
+  receivedDocuments ReceivedDocument[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -668,6 +672,8 @@ model ExpenseAccount {
   // Inactiva: ya no se ofrece al registrar compras, pero las que la usan la conservan.
   isActive Boolean @default(true)
 
+  receivedDocuments ReceivedDocument[]
+
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
@@ -678,4 +684,96 @@ model ExpenseAccount {
   @@unique([companyId, code])
   @@index([companyId])
   @@map("expense_accounts")
+}
+
+enum ReceivedDocumentSource {
+  MANUAL // tipeado (comprobante físico, o electrónico sin traerlo del SRI)
+  SRI_ACCESS_KEY // traído del SRI con su clave de acceso (C2)
+  SRI_REPORT // importado del reporte de comprobantes recibidos (C3)
+}
+
+enum ReceivedDocumentStatus {
+  PENDING_FETCH // importado del reporte; falta traer el XML del SRI (C3)
+  REGISTERED // cuenta para los reportes
+  VOIDED // descartado por el usuario, con motivo; no cuenta
+}
+
+// Comprobante de compra recibido de un proveedor (módulo Compras): factura o nota de venta.
+// Solo datos tributarios; lo operativo (insumos, inventario) vive en cada app cliente.
+model ReceivedDocument {
+  id String @id @default(cuid())
+
+  documentType      String // Tabla 3 del SRI: 01 factura, 02 nota de venta
+  establishmentCode String
+  emissionPointCode String
+  sequential        String // 9 dígitos
+  issueDate         DateTime // medianoche UTC, como Invoice
+
+  accessKey           String? // 49 dígitos, si es electrónico
+  authorizationNumber String? // electrónico: la clave; físico: la autorización de la imprenta
+  authorizationDate   DateTime?
+
+  source     ReceivedDocumentSource
+  status     ReceivedDocumentStatus @default(REGISTERED)
+  fetchError String? // último error al traerlo del SRI (C3)
+
+  subtotal      Decimal @db.Decimal(12, 2) // suma de las bases (ya neta de descuentos)
+  totalDiscount Decimal @default(0) @db.Decimal(12, 2)
+  ivaValue      Decimal @db.Decimal(12, 2)
+  iceValue      Decimal @default(0) @db.Decimal(12, 2)
+  otherCharges  Decimal @default(0) @db.Decimal(12, 2) // propina u otros valores
+  total         Decimal @db.Decimal(12, 2)
+
+  paymentMethodCode String? // Tabla 24 del SRI
+  taxSupportCode    String? // sustento tributario del ATS
+  description       String? // nota libre: "leche y fresas"
+
+  xmlPath String? // XML autorizado tal como lo devolvió el SRI (C2)
+
+  voidedAt   DateTime?
+  voidReason String?
+
+  // Para clientes de la API (POS): ids externos, sin significado tributario.
+  metadata Json?
+
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: NoAction)
+
+  // Cuenta de gasto asignada; sin ella la compra aparece en "Sin cuenta".
+  expenseAccountId String?
+  expenseAccount   ExpenseAccount? @relation(fields: [expenseAccountId], references: [id], onDelete: NoAction)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation("ReceivedDocumentsCreatedBy", fields: [createdById], references: [id])
+
+  taxes ReceivedDocumentTax[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Un mismo comprobante no se registra dos veces, ni desde la web ni desde otra app.
+  @@unique([companyId, accessKey])
+  @@unique([companyId, supplierId, documentType, establishmentCode, emissionPointCode, sequential])
+  @@index([companyId, issueDate])
+  @@index([companyId, status])
+  @@index([expenseAccountId])
+  @@map("received_documents")
+}
+
+// Una fila por tarifa de IVA del comprobante (totalConImpuestos del SRI).
+model ReceivedDocumentTax {
+  id                 String           @id @default(cuid())
+  receivedDocumentId String
+  receivedDocument   ReceivedDocument @relation(fields: [receivedDocumentId], references: [id], onDelete: Cascade)
+
+  ivaCode  String // Tabla 17 (iva-rate.catalog.ts), incluidas las tarifas históricas
+  ivaRate  Decimal @db.Decimal(5, 2)
+  taxBase  Decimal @db.Decimal(12, 2)
+  ivaValue Decimal @db.Decimal(12, 2)
+
+  @@unique([receivedDocumentId, ivaCode])
+  @@map("received_document_taxes")
 }

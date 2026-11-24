@@ -8,8 +8,9 @@ import { useAuth } from '@/lib/context/auth-context';
 import { COMPRAS_MODULE, hasModule } from '@/lib/product-modules';
 
 const TABS = [
-  { name: 'Proveedores', href: '/dashboard/compras/proveedores' },
-  { name: 'Cuentas de gasto', href: '/dashboard/compras/cuentas' },
+  { name: 'Compras', href: '/dashboard/compras', exact: true },
+  { name: 'Proveedores', href: '/dashboard/compras/proveedores', exact: false },
+  { name: 'Cuentas de gasto', href: '/dashboard/compras/cuentas', exact: false },
 ];
 
 /**
@@ -39,7 +40,8 @@ export default function ComprasLayout({ children }: { children: React.ReactNode 
         className="flex gap-1 overflow-x-auto overflow-y-hidden border-b border-outline-variant"
       >
         {TABS.map((tab) => {
-          const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
+          const active =
+            pathname === tab.href || (!tab.exact && pathname.startsWith(`${tab.href}/`));
           return (
             <Link
               key={tab.href}
