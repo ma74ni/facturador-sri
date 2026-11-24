@@ -16,6 +16,7 @@ import { TaxCalculatorService } from '../../../tax-codes/domain/services/tax-cal
 import { availableForCreditNote } from '../../../credit-notes/domain/credit-note-limit';
 import { SignatureStatus, signatureWarning, unusableCertificateReason } from '../../domain/signing-status';
 import { DEFAULT_PAYMENT_METHOD } from '../../domain/payment-methods';
+import { saleIvaCode } from '../../../companies/domain/tax-profile';
 import {
   LineIvaResolverService,
   toBadRequest,
@@ -96,8 +97,11 @@ export class InvoicesService {
       throw new BadRequestException(certificateProblem);
     }
 
-    // 4. IVA por línea (tarifa de la línea o de su producto) y totales
-    const ivaCodes = await this.lineIvaResolver.resolve(companyId, dto.items);
+    // 4. IVA por línea (tarifa de la línea o de su producto) y totales. Un negocio popular
+    //    vende con 0%: no cobra IVA.
+    const ivaCodes = (await this.lineIvaResolver.resolve(companyId, dto.items)).map((code) =>
+      saleIvaCode(company.taxRegime, code),
+    );
     const taxes = toBadRequest(() =>
       this.taxCalculator.calculate(
         dto.items.map((item, index) => ({

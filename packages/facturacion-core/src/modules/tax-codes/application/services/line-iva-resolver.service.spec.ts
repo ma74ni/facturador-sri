@@ -35,6 +35,19 @@ describe('LineIvaResolverService', () => {
     ).resolves.toEqual(['5']);
   });
 
+  it('la tarifa heredada manda sobre la explícita: la nota no cambia la tarifa de la factura', async () => {
+    await expect(
+      resolver.resolve(
+        'c1',
+        [
+          { mainCode: 'AGUA-GAS', taxPercentageCode: '4' },
+          { mainCode: 'OTRO', taxPercentageCode: '4' },
+        ],
+        new Map([['AGUA-GAS', '0']]),
+      ),
+    ).resolves.toEqual(['0', '4']);
+  });
+
   it('busca los productos solo de la empresa', async () => {
     await resolver.resolve('empresa-7', [{ mainCode: 'AGUA-GAS' }]);
     expect(prisma.product.findMany).toHaveBeenLastCalledWith(

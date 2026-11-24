@@ -50,7 +50,7 @@ import { Product, CreateProductDto } from '@/lib/api/products';
 
 import { Establishment } from '@/lib/api/establishments';
 
-import { Plus, Trash2 } from 'lucide-react';
+import { Info, Plus, Trash2 } from 'lucide-react';
 import { CustomerDialog } from '@/components/customers/customer-dialog';
 
 import { CustomerInfoCard } from '@/components/customers/customer-info-card';
@@ -70,6 +70,10 @@ import { useCertificateStatus } from '@/lib/hooks/use-certificate';
 import { CertificateRequiredDialog } from '@/components/shared/certificate-required-dialog';
 
 import { formatCurrency, formatQuantity } from '@/lib/utils/formatters';
+
+import { useAuth } from '@/lib/context/auth-context';
+
+import { chargesVat, rimpeLegendFor, VAT_FILING_PERIOD_LABELS } from '@/lib/api/company';
 
 interface InvoiceDialogProps {
   open: boolean;
@@ -124,6 +128,10 @@ export function InvoiceDialog({
   establishments,
 }: InvoiceDialogProps) {
   const { toast } = useToast();
+  const { company } = useAuth();
+  // Un negocio popular del RIMPE vende con IVA 0%: la API lo emite así y la vista previa lo muestra.
+  const sellsWithoutVat = !chargesVat(company?.taxRegime);
+  const rimpeLegend = rimpeLegendFor(company?.taxRegime);
   const createCustomerMutation = useCreateCustomer();
   const updateCustomerMutation = useUpdateCustomer();
   const createProductMutation = useCreateProduct();
@@ -206,7 +214,13 @@ export function InvoiceDialog({
     }
 
     const unitPrice = Number(product.unitPrice);
-    const totals = calculateItemTotals(unitPrice, quantity, discount, product.taxPercentageCode);
+    // Sin IVA, lo gravado pasa a 0%; lo no objeto y lo exento quedan igual (como en la API).
+    const taxPercentageCode =
+      sellsWithoutVat &&
+      getTaxPercentage(taxCodesData?.taxCodes || [], product.taxPercentageCode) > 0
+        ? '0'
+        : product.taxPercentageCode;
+    const totals = calculateItemTotals(unitPrice, quantity, discount, taxPercentageCode);
 
     const newItem: InvoiceItemWithCalc = {
       mainCode: product.mainCode,
@@ -215,7 +229,7 @@ export function InvoiceDialog({
       unitPrice,
       discount,
       productId: product.id,
-      taxPercentageCode: product.taxPercentageCode,
+      taxPercentageCode,
       ...totals,
     };
 
@@ -385,6 +399,23 @@ export function InvoiceDialog({
 
         <DialogBody className="pr-1">
           <div className="space-y-6">
+            {/* Régimen RIMPE: la leyenda que sale en el comprobante y si declara IVA */}
+            {rimpeLegend && (
+              <div className="flex items-start gap-2 rounded-md bg-surface-container px-3 py-2 text-body-md text-on-surface">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-on-surface-variant" />
+                <div>
+                  <p className="font-medium">{rimpeLegend}</p>
+                  <p className="text-on-surface-variant">
+                    {sellsWithoutVat
+                      ? 'No declara IVA: los productos gravados se facturan con IVA 0%.'
+                      : `Declara IVA ${VAT_FILING_PERIOD_LABELS[
+                          company?.vatFilingPeriod ?? 'MONTHLY'
+                        ].toLowerCase()}.`}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* SECCIÓN 1: Datos Generales */}
             <div className="border-b pb-4">
               <h3 className="text-lg font-semibold text-on-surface mb-4">1. Datos Generales</h3>

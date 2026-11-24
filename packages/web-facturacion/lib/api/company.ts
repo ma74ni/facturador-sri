@@ -28,6 +28,21 @@ export const TAX_REGIME_LABELS: Record<TaxRegime, string> = {
   RIMPE_NEGOCIO_POPULAR: 'RIMPE negocio popular',
 };
 
+/**
+ * Si el régimen cobra y declara IVA. Un negocio popular del RIMPE no lo declara y vende con
+ * tarifa 0% (la API aplica la misma regla al emitir).
+ */
+export const chargesVat = (regime: TaxRegime | null | undefined): boolean =>
+  regime !== 'RIMPE_NEGOCIO_POPULAR';
+
+/** Leyenda `contribuyenteRimpe` que la API pone en el XML y el RIDE; `null` en régimen general. */
+export const rimpeLegendFor = (regime: TaxRegime | null | undefined): string | null =>
+  regime === 'RIMPE_EMPRENDEDOR'
+    ? 'CONTRIBUYENTE RÉGIMEN RIMPE'
+    : regime === 'RIMPE_NEGOCIO_POPULAR'
+      ? 'CONTRIBUYENTE NEGOCIO POPULAR - RÉGIMEN RIMPE'
+      : null;
+
 export const VAT_FILING_PERIOD_LABELS: Record<VatFilingPeriod, string> = {
   MONTHLY: 'Mensual',
   SEMIANNUAL: 'Semestral',
