@@ -31,6 +31,7 @@ import {
 import { syncInvoicePaymentStatus } from '../../../payments/application/services/invoice-payment-status';
 import { errorMessage } from '../../../../shared/errors/error-message';
 import { Prisma } from '@prisma/client';
+import { saleIvaCode } from '../../../companies/domain/tax-profile';
 
 /** Lo que necesita el envío por email: cliente, factura modificada y la configuración de email. */
 const CREDIT_NOTE_EMAIL_INCLUDE = {
@@ -140,7 +141,12 @@ export class CreditNotesService {
     const invoiceIvaCodes = new Map(
       modifiedInvoice.items.map((item) => [item.mainCode, item.ivaCode] as const),
     );
-    const ivaCodes = await this.lineIvaResolver.resolve(companyId, dto.items, invoiceIvaCodes);
+    //    Una línea que no está en la factura sigue la regla del régimen (negocio popular: 0%).
+    const ivaCodes = (
+      await this.lineIvaResolver.resolve(companyId, dto.items, invoiceIvaCodes)
+    ).map((code, index) =>
+      invoiceIvaCodes.has(dto.items[index].mainCode) ? code : saleIvaCode(company.taxRegime, code),
+    );
     const taxes = toBadRequest(() =>
       this.taxCalculator.calculate(
         dto.items.map((item, index) => ({

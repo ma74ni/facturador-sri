@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { apiErrorMessage } from '@/lib/hooks/use-platform-admin';
 import {
+  chargesVat,
   companyApi,
   CompanyTaxProfile,
   TAX_REGIME_LABELS,
@@ -105,6 +106,7 @@ export function TaxProfileCard() {
   };
 
   const shown = editing ? form : fromCompany(company);
+  const declaresVat = chargesVat(shown.taxRegime);
 
   return (
     <Card>
@@ -138,18 +140,30 @@ export function TaxProfileCard() {
               ))}
             </NativeSelect>
           </FormField>
-          <FormField label="Declaras IVA" htmlFor="vatFilingPeriod">
+          <FormField
+            label="Declaras IVA"
+            htmlFor="vatFilingPeriod"
+            hint={
+              editing && !declaresVat
+                ? 'Un negocio popular no declara IVA y factura con 0%.'
+                : undefined
+            }
+          >
             <NativeSelect
               id="vatFilingPeriod"
-              value={shown.vatFilingPeriod}
+              value={declaresVat ? shown.vatFilingPeriod : 'NONE'}
               onChange={(e) => set('vatFilingPeriod', e.target.value as VatFilingPeriod)}
-              disabled={!editing}
+              disabled={!editing || !declaresVat}
             >
-              {Object.entries(VAT_FILING_PERIOD_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
+              {declaresVat ? (
+                Object.entries(VAT_FILING_PERIOD_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))
+              ) : (
+                <option value="NONE">No declara</option>
+              )}
             </NativeSelect>
           </FormField>
           <FormField label="Obligada a llevar contabilidad" htmlFor="keepsAccounting">
