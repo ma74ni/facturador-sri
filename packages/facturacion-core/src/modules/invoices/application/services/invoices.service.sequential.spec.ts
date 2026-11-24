@@ -9,7 +9,11 @@ import { TaxCalculatorService } from '../../../tax-codes/domain/services/tax-cal
 describe('InvoicesService.create · secuencial', () => {
   const companyId = 'company_1';
 
-  function setup({ nextSequence = 7, failXmlStorage = false } = {}) {
+  function setup({
+    nextSequence = 7,
+    failXmlStorage = false,
+    taxRegime = 'GENERAL',
+  }: { nextSequence?: number; failXmlStorage?: boolean; taxRegime?: string } = {}) {
     // Contador en memoria con la semántica de `increment` de Postgres.
     let invoiceSequence = nextSequence;
     let created = 0;
@@ -38,6 +42,7 @@ describe('InvoicesService.create · secuencial', () => {
           ruc: '1790000000001',
           environment: 'TEST',
           hasCertificate: false,
+          taxRegime,
         }),
       },
       invoice: {
@@ -138,5 +143,27 @@ describe('InvoicesService.create · secuencial', () => {
 
     const saved = prisma.invoice.create.mock.calls.map(([args]: any) => args.data.paymentMethod);
     expect(saved).toEqual(['19', '01']);
+  });
+
+  it('un negocio popular del RIMPE emite lo gravado con IVA 0%', async () => {
+    const { service, prisma } = setup({ taxRegime: 'RIMPE_NEGOCIO_POPULAR' });
+
+    await service.create(dto, companyId, 'user_1');
+
+    const { data } = prisma.invoice.create.mock.calls[0][0];
+    expect(data.items.create[0]).toMatchObject({ ivaCode: '0', ivaValue: expect.anything() });
+    expect(Number(data.items.create[0].ivaValue)).toBe(0);
+    expect(Number(data.ivaValue)).toBe(0);
+    expect(Number(data.total)).toBe(10);
+  });
+
+  it('en régimen general la línea conserva su tarifa', async () => {
+    const { service, prisma } = setup();
+
+    await service.create(dto, companyId, 'user_1');
+
+    const { data } = prisma.invoice.create.mock.calls[0][0];
+    expect(data.items.create[0].ivaCode).toBe('4');
+    expect(Number(data.total)).toBe(11.5);
   });
 });

@@ -14,8 +14,9 @@ export interface LineIvaSource {
 
 /**
  * Decide la tarifa de IVA de cada línea de un comprobante nuevo, en este
- * orden: la que trae la línea, la heredada (por ejemplo, la de la factura
- * que modifica una nota de crédito) y la del producto del catálogo de la
+ * orden: la heredada (la de la misma línea de la factura que modifica una nota
+ * de crédito: la nota no puede cambiar la tarifa de lo que corrige), la que
+ * trae la línea y la del producto del catálogo de la
  * empresa (por id o por código principal). Nunca supone una tarifa: si no
  * encuentra una vigente, rechaza la línea.
  */
@@ -32,8 +33,8 @@ export class LineIvaResolverService {
 
     return lines.map((line, index) => {
       const code =
-        line.taxPercentageCode ??
         inherited.get(line.mainCode) ??
+        line.taxPercentageCode ??
         (line.productId ? products.byId.get(line.productId) : undefined) ??
         products.byCode.get(line.mainCode);
 
