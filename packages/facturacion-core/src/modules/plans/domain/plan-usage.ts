@@ -102,3 +102,26 @@ export function billingPeriod(anchor: Date | null | undefined, now: Date): Billi
   const from = ecuadorDate(start);
   return { start, end: cycleDay(from.year, from.month + 1, anchorDay) };
 }
+
+/** De dónde sale el día de inicio del ciclo. */
+export type BillingAnchorSource = 'CUSTOM' | 'PRODUCTION' | 'PLAN' | 'CALENDAR';
+
+/**
+ * Fecha desde la que se cuentan los ciclos: la que pactó el administrador; si no, el día en que
+ * pasó a producción; si no, el día en que se le asignó el plan; si no, el mes calendario.
+ */
+export function billingAnchorOf(company: {
+  billingCycleStart: Date | null;
+  productionSince: Date | null;
+  planSince: Date | null;
+}): { date: Date | null; source: BillingAnchorSource } {
+  if (company.billingCycleStart) return { date: company.billingCycleStart, source: 'CUSTOM' };
+  if (company.productionSince) return { date: company.productionSince, source: 'PRODUCTION' };
+  if (company.planSince) return { date: company.planSince, source: 'PLAN' };
+  return { date: null, source: 'CALENDAR' };
+}
+
+/** "2026-12-05" como las 00:00 de ese día en Quito. */
+export function quitoDate(value: string): Date {
+  return new Date(`${value}T${String(ECUADOR_OFFSET_HOURS).padStart(2, '0')}:00:00Z`);
+}

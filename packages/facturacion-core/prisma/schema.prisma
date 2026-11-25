@@ -189,6 +189,8 @@ model Company {
   // reemplazan el límite del plan para un cliente puntual (A medida o un acuerdo).
   plan                       CompanyPlan?
   planSince                  DateTime?
+  // Inicio del ciclo de cobro, si se pactó otro día. Por defecto, la fecha en que pasó a producción.
+  billingCycleStart          DateTime?
   documentLimitOverride      Int?
   userLimitOverride          Int?
   emissionPointLimitOverride Int?

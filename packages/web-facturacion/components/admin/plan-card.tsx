@@ -21,6 +21,13 @@ const STATE_TEXT = {
   BLOCKED: 'Bloqueada: no puede emitir facturas este mes',
 } as const;
 
+/** "2026-12-05" del día en Quito de un instante (para el campo de fecha). */
+const quitoDay = (value: string) =>
+  new Date(new Date(value).getTime() - 5 * 3_600_000).toISOString().slice(0, 10);
+
+const formatDay = (value: string) =>
+  new Date(value).toLocaleDateString('es-EC', { timeZone: 'America/Guayaquil' });
+
 /**
  * Número opcional de un campo de texto: vacío = usar el del plan (null). Un texto que no es un
  * número entero positivo da `undefined`, y el formulario no se guarda (nunca se borra un límite
@@ -45,6 +52,7 @@ export function PlanCard({ companyId }: { companyId: string }) {
   const [documents, setDocuments] = useState('');
   const [users, setUsers] = useState('');
   const [points, setPoints] = useState('');
+  const [cycleStart, setCycleStart] = useState('');
   const [extra, setExtra] = useState('');
   const [note, setNote] = useState('');
 
@@ -54,6 +62,11 @@ export function PlanCard({ companyId }: { companyId: string }) {
     setDocuments(data.overrides.documentLimitOverride?.toString() ?? '');
     setUsers(data.overrides.userLimitOverride?.toString() ?? '');
     setPoints(data.overrides.emissionPointLimitOverride?.toString() ?? '');
+    setCycleStart(
+      data.billingAnchor.source === 'CUSTOM' && data.billingAnchor.date
+        ? quitoDay(data.billingAnchor.date)
+        : '',
+    );
   }, [data]);
 
   if (isLoading || !data) {
@@ -73,6 +86,7 @@ export function PlanCard({ companyId }: { companyId: string }) {
       documentLimitOverride: optionalInt(documents) ?? null,
       userLimitOverride: optionalInt(users) ?? null,
       emissionPointLimitOverride: optionalInt(points) ?? null,
+      billingCycleStart: cycleStart || null,
     });
 
   const extraCount = optionalInt(extra);
@@ -164,6 +178,23 @@ export function PlanCard({ companyId }: { companyId: string }) {
               />
             </FormField>
           </div>
+          <FormField
+            label="Inicio del ciclo de cobro"
+            htmlFor="cycleStart"
+            hint={
+              data.productionSince
+                ? `Vacío: el día en que pasó a producción (${formatDay(data.productionSince)}). Solo importa el día del mes.`
+                : 'Vacío: el día en que pase a producción. Solo importa el día del mes.'
+            }
+          >
+            <Input
+              id="cycleStart"
+              type="date"
+              value={cycleStart}
+              onChange={(e) => setCycleStart(e.target.value)}
+              className="sm:max-w-xs"
+            />
+          </FormField>
           <p className="text-body-sm text-on-surface-variant">
             Al guardar se encienden los módulos que incluye el plan; no se apaga ninguno (los
             módulos se siguen controlando abajo).

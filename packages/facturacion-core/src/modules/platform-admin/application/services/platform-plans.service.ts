@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 
 import { PrismaService } from '@/shared/database/prisma.service';
 import { PRODUCT_MODULE_KEYS } from '../../../companies/domain/product-modules.catalog';
 import { PlanUsageService } from '../../../plans/application/plan-usage.service';
 import { PLANS } from '../../../plans/domain/plan.catalog';
+import { quitoDate } from '../../../plans/domain/plan-usage';
 import { GrantExtraDocumentsDto, SetCompanyPlanDto } from '../dto/company-plan.dto';
 import { PlatformAuditService } from './platform-audit.service';
 
@@ -66,6 +67,7 @@ export class PlatformPlansService {
         documentLimitOverride: true,
         userLimitOverride: true,
         emissionPointLimitOverride: true,
+        billingCycleStart: true,
       },
     });
     if (!company) throw new NotFoundException('Empresa no encontrada');
@@ -87,6 +89,22 @@ export class PlatformPlansService {
       ),
     };
 
+    // Sin enviar = no tocar; null = volver a la fecha en que pasó a producción.
+    const billingCycleStart =
+      dto.billingCycleStart === undefined
+        ? company.billingCycleStart
+        : dto.billingCycleStart === null
+          ? null
+          : quitoDate(dto.billingCycleStart);
+    // "2026-02-31" se convertiría en 3 de marzo: la fecha tiene que existir tal cual.
+    if (
+      billingCycleStart &&
+      dto.billingCycleStart &&
+      billingCycleStart.toISOString().slice(0, 10) !== dto.billingCycleStart
+    ) {
+      throw new BadRequestException('La fecha de inicio del ciclo no es válida');
+    }
+
     await this.prisma.$transaction(async (tx) => {
       await tx.company.update({
         where: { id: companyId },
@@ -94,6 +112,7 @@ export class PlatformPlansService {
           plan: dto.plan,
           ...(dto.plan !== company.plan ? { planSince: dto.plan ? new Date() : null } : {}),
           ...overrides,
+          billingCycleStart,
           enabledModules: modules,
         },
       });
@@ -109,6 +128,8 @@ export class PlatformPlansService {
             emissionPointLimitOverride: company.emissionPointLimitOverride,
           },
           overrides,
+          previousBillingCycleStart: company.billingCycleStart,
+          billingCycleStart,
           enabledModules,
         },
       });

@@ -29,6 +29,9 @@ export interface PlanUsage {
   environment: 'TEST' | 'PRODUCTION';
   /** Ciclo del plan en curso: cuenta desde el día en que la empresa pasó a producción. */
   period: { start: string; end: string };
+  productionSince: string | null;
+  /** Desde dónde se cuentan los ciclos: pactado, producción, plan o mes calendario. */
+  billingAnchor: { date: string | null; source: 'CUSTOM' | 'PRODUCTION' | 'PLAN' | 'CALENDAR' };
   documents: DocumentUsage;
   users: { used: number; limit: number | null };
   emissionPoints: { used: number; limit: number | null };
@@ -58,6 +61,8 @@ export interface SetPlanPayload {
   documentLimitOverride?: number | null;
   userLimitOverride?: number | null;
   emissionPointLimitOverride?: number | null;
+  /** AAAA-MM-DD; null vuelve a la fecha en que pasó a producción. */
+  billingCycleStart?: string | null;
 }
 
 const DAY_MS = 86_400_000;

@@ -16,6 +16,7 @@ function setup({
         plan,
         planSince: null,
         productionSince: new Date('2026-11-18T20:00:00Z'),
+        billingCycleStart: null,
         environment,
         documentLimitOverride: null,
         userLimitOverride: null,

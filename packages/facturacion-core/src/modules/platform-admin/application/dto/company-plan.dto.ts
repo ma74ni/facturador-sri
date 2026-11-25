@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
   Max,
+  Matches,
   MaxLength,
   Min,
   ValidateIf,
@@ -48,6 +49,19 @@ export class SetCompanyPlanDto {
   @Min(1)
   @Max(10_000)
   emissionPointLimitOverride?: number | null;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    example: '2026-12-05',
+    description:
+      'Inicio del ciclo de cobro (AAAA-MM-DD). null vuelve a la fecha en que pasó a producción.',
+  })
+  @IsOptional()
+  @Matches(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, {
+    message: 'La fecha de inicio del ciclo debe tener el formato AAAA-MM-DD',
+  })
+  billingCycleStart?: string | null;
 }
 
 /** Comprobantes extra de este mes, para cobrarlos después. */

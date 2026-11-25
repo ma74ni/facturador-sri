@@ -13,7 +13,8 @@ ALTER TYPE "PlatformAuditAction" ADD VALUE 'COMPANY_PLAN_CHANGED';
 ALTER TYPE "PlatformAuditAction" ADD VALUE 'COMPANY_EXTRA_DOCUMENTS_GRANTED';
 
 -- AlterTable
-ALTER TABLE "companies" ADD COLUMN     "documentLimitOverride" INTEGER,
+ALTER TABLE "companies" ADD COLUMN     "billingCycleStart" TIMESTAMP(3),
+ADD COLUMN     "documentLimitOverride" INTEGER,
 ADD COLUMN     "emissionPointLimitOverride" INTEGER,
 ADD COLUMN     "plan" "CompanyPlan",
 ADD COLUMN     "planSince" TIMESTAMP(3),
