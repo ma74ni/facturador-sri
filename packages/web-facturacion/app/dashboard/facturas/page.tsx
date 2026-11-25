@@ -36,7 +36,9 @@ import {
   FileDown,
   FileMinus,
   Ban,
+  History,
 } from 'lucide-react';
+import { DocumentHistoryDialog } from '@/components/shared/document-history';
 import { Label } from '@/components/ui/label';
 import { CreditNoteDialog } from '@/components/credit-notes/credit-note-dialog';
 import { invoicesApi, Invoice, CreateInvoiceDto } from '@/lib/api/invoices';
@@ -109,6 +111,8 @@ export default function FacturasPage() {
   // Dialog states
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+  // Factura cuyo historial se muestra (firma, SRI, correo).
+  const [historyFor, setHistoryFor] = useState<{ id: string; number: string } | null>(null);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [invoiceToCancel, setInvoiceToCancel] = useState<Invoice | null>(null);
   const [cancelReason, setCancelReason] = useState('');
@@ -347,6 +351,13 @@ export default function FacturasPage() {
     const numero = `${factura.establishmentCode}-${factura.emissionPointCode}-${factura.sequential}`;
     return (
       <>
+        <IconButton
+          label="Ver historial"
+          tone="neutral"
+          onClick={() => setHistoryFor({ id: factura.id, number: numero })}
+        >
+          <History />
+        </IconButton>
         {(factura.status === 'PENDING' || factura.status === 'SENT') && (
           <IconButton
             label="Enviar al SRI"
@@ -795,6 +806,13 @@ export default function FacturasPage() {
       <EmailVerificationRequiredDialog
         open={emailVerificationDialogOpen}
         onOpenChange={setEmailVerificationDialogOpen}
+      />
+
+      <DocumentHistoryDialog
+        kind="INVOICE"
+        documentId={historyFor?.id ?? null}
+        number={historyFor?.number}
+        onClose={() => setHistoryFor(null)}
       />
     </div>
   );

@@ -8,6 +8,7 @@ import { ProductsModule } from './modules/products/products.module';
 import { EstablishmentsModule } from './modules/establishments/establishments.module';
 import { InvoicesModule } from './modules/invoices/invoices.module';
 import { CreditNotesModule } from './modules/credit-notes/credit-notes.module';
+import { DocumentEventsModule } from './modules/document-events/document-events.module';
 import { CompaniesModule } from './modules/companies/companies.module';
 import { TaxCodesModule } from './modules/tax-codes/tax-codes.module';
 import { PaymentsModule } from './modules/payments/payments.module';
@@ -31,6 +32,7 @@ import { EmailModule } from './shared/email/email.module';
     EstablishmentsModule,
     InvoicesModule,
     CreditNotesModule,
+    DocumentEventsModule,
     CompaniesModule,
     TaxCodesModule,
     PaymentsModule,
