@@ -60,6 +60,19 @@
       </table>
       {{/if}}
 
+      {{#if planLines.length}}
+      <h2>Empresas cerca del límite de su plan</h2>
+      <table class="list">
+        {{#each planLines}}
+        <tr>
+          <td>{{company}}</td>
+          <td>{{plan}}</td>
+          <td>{{used}} de {{allowed}} comprobantes · {{state}}</td>
+        </tr>
+        {{/each}}
+      </table>
+      {{/if}}
+
       <p style="text-align: center; margin-top: 24px;">
         <a href="{{incidentsLink}}" class="button">Ver incidencias</a>
       </p>

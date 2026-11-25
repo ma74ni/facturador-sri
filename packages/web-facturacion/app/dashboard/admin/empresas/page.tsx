@@ -4,11 +4,19 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { ChevronRight, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { CompanyStatusBadge, ReadinessPills } from '@/components/admin/company-status';
 import { CertificateExpiry } from '@/components/admin/certificate-card';
 import { useAdminCompanies, useProductModules } from '@/lib/hooks/use-platform-admin';
 import { CompanyListFilter } from '@/lib/api/platform-admin';
+import { DocumentUsage, PLAN_OPTIONS, PlanKey } from '@/lib/api/plans';
 
 /** Módulos habilitados de una empresa, por nombre. */
 function ModuleBadges({ keys, names }: { keys: string[]; names: Record<string, string> }) {
@@ -16,7 +24,10 @@ function ModuleBadges({ keys, names }: { keys: string[]; names: Record<string, s
   return (
     <div className="mt-1 flex flex-wrap gap-1">
       {keys.map((key) => (
-        <span key={key} className="rounded bg-surface-container-high px-1.5 py-0.5 text-[11px] text-on-surface">
+        <span
+          key={key}
+          className="rounded bg-surface-container-high px-1.5 py-0.5 text-[11px] text-on-surface"
+        >
           {names[key] ?? key}
         </span>
       ))}
@@ -34,9 +45,31 @@ const FILTERS: Array<{ value: CompanyListFilter | 'ALL'; label: string }> = [
 
 const formatDate = (value: string) => new Date(value).toLocaleDateString('es-EC');
 
+const PLAN_NAMES = Object.fromEntries(PLAN_OPTIONS.map((option) => [option.key, option.name]));
+
+/** Plan y uso del mes: en color cuando se acerca o pasó el límite, para ofrecer el cambio. */
+function PlanBadge({ plan, usage }: { plan: PlanKey | null; usage?: DocumentUsage | null }) {
+  if (!plan) return <p className="text-xs text-on-surface-variant">Sin plan</p>;
+  const tone =
+    usage?.state === 'BLOCKED'
+      ? 'text-error'
+      : usage?.state === 'OVER' || usage?.state === 'NEAR'
+        ? 'text-warning'
+        : 'text-on-surface-variant';
+  return (
+    <p className={`text-xs ${tone}`}>
+      {PLAN_NAMES[plan]}
+      {usage && usage.allowed !== null && ` · ${usage.used}/${usage.allowed} este mes`}
+      {usage?.state === 'BLOCKED' && ' · bloqueada'}
+    </p>
+  );
+}
+
 export default function AdminEmpresasPage() {
   const [filter, setFilter] = useState<CompanyListFilter | 'ALL'>('PENDING');
-  const { data: companies = [], isLoading } = useAdminCompanies(filter === 'ALL' ? undefined : filter);
+  const { data: companies = [], isLoading } = useAdminCompanies(
+    filter === 'ALL' ? undefined : filter,
+  );
   const { data: modules = [] } = useProductModules();
   const moduleNames = Object.fromEntries(modules.map((module) => [module.key, module.name]));
 
@@ -73,7 +106,11 @@ export default function AdminEmpresasPage() {
           {/* Celular: tarjetas */}
           <div className="space-y-3 md:hidden">
             {companies.map((company) => (
-              <Link key={company.id} href={`/dashboard/admin/empresas/${company.id}`} className="block">
+              <Link
+                key={company.id}
+                href={`/dashboard/admin/empresas/${company.id}`}
+                className="block"
+              >
                 <Card>
                   <CardContent className="space-y-3 p-4">
                     <div className="flex items-start justify-between gap-2">
@@ -82,7 +119,10 @@ export default function AdminEmpresasPage() {
                         <p className="text-xs text-muted-foreground">RUC {company.ruc}</p>
                         <ModuleBadges keys={company.enabledModules} names={moduleNames} />
                       </div>
-                      <CompanyStatusBadge status={company.status} environment={company.environment} />
+                      <CompanyStatusBadge
+                        status={company.status}
+                        environment={company.environment}
+                      />
                     </div>
                     <ReadinessPills readiness={company.readiness} />
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -118,6 +158,7 @@ export default function AdminEmpresasPage() {
                     <TableCell className="whitespace-normal min-w-[10rem] max-w-[18rem]">
                       <Link href={`/dashboard/admin/empresas/${company.id}`} className="block">
                         <p className="font-medium break-words">{company.businessName}</p>
+                        <PlanBadge plan={company.plan} usage={company.documentUsage} />
                         <p className="text-xs text-muted-foreground">
                           RUC {company.ruc} · {company.email}
                         </p>
@@ -125,7 +166,10 @@ export default function AdminEmpresasPage() {
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <CompanyStatusBadge status={company.status} environment={company.environment} />
+                      <CompanyStatusBadge
+                        status={company.status}
+                        environment={company.environment}
+                      />
                     </TableCell>
                     <TableCell>
                       <ReadinessPills readiness={company.readiness} />
@@ -137,9 +181,14 @@ export default function AdminEmpresasPage() {
                         readiness={company.readiness}
                       />
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{formatDate(company.createdAt)}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatDate(company.createdAt)}
+                    </TableCell>
                     <TableCell>
-                      <Link href={`/dashboard/admin/empresas/${company.id}`} aria-label="Ver detalle">
+                      <Link
+                        href={`/dashboard/admin/empresas/${company.id}`}
+                        aria-label="Ver detalle"
+                      >
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </Link>
                     </TableCell>

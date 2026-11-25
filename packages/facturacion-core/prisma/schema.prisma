@@ -70,6 +70,16 @@ enum PlatformAuditAction {
   PLATFORM_ADMIN_REVOKED
   COMPANY_MODULES_CHANGED
   CERTIFICATE_REMINDER_SENT
+  COMPANY_PLAN_CHANGED
+  COMPANY_EXTRA_DOCUMENTS_GRANTED
+}
+
+// Plan contratado (hoja de precios). Sin plan, la empresa no tiene límites (las que ya existían).
+enum CompanyPlan {
+  EMPRENDE
+  NEGOCIO
+  EMPRESA
+  A_MEDIDA
 }
 
 // ==================== USERS ====================
@@ -175,6 +185,16 @@ model Company {
   // Módulos de producto habilitados para este tenant (ej. "cobranza") — ver RequireModuleGuard
   enabledModules String[] @default([])
 
+  // Plan contratado y sus límites (modules/plans/domain/plan.catalog.ts). Los *Override
+  // reemplazan el límite del plan para un cliente puntual (A medida o un acuerdo).
+  plan                       CompanyPlan?
+  planSince                  DateTime?
+  // Inicio del ciclo de cobro, si se pactó otro día. Por defecto, la fecha en que pasó a producción.
+  billingCycleStart          DateTime?
+  documentLimitOverride      Int?
+  userLimitOverride          Int?
+  emissionPointLimitOverride Int?
+
   // Perfil tributario: cómo ve el SRI a la empresa. Va en el XML y el RIDE
   // (obligadoContabilidad, contribuyenteRimpe, agenteRetencion) y decide el
   // período de sus reportes. Los valores por defecto son lo que se emitía antes.
@@ -201,6 +221,7 @@ model Company {
 
   platformAuditLogs PlatformAuditLog[]
   documentEvents    DocumentEvent[]
+  planAllowances    PlanAllowance[]
 
   @@index([ruc])
   @@map("companies")
@@ -831,4 +852,21 @@ model DocumentEvent {
   @@index([companyId, createdAt])
   @@index([outcome, createdAt])
   @@map("document_events")
+}
+
+// Comprobantes extra que la plataforma le otorga a una empresa en un ciclo (por encima de su plan),
+// para cobrarlos después. Solo se agrega: es también el registro de lo que hay que facturar.
+model PlanAllowance {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  // Inicio del ciclo del plan al que aplica (00:00 en Quito; ver billingPeriod).
+  periodStart DateTime
+  documents   Int
+  note        String?
+  grantedById String
+  createdAt   DateTime @default(now())
+
+  @@index([companyId, periodStart])
+  @@map("plan_allowances")
 }

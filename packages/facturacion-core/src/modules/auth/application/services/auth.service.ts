@@ -15,6 +15,7 @@ import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '@/shared/database/prisma.service';
 import { EmailService } from '@/shared/email/email.service';
 import { maskEmail } from '@/shared/observability/redact';
+import { PlanUsageService } from '@/modules/plans/application/plan-usage.service';
 
 const PASSWORD_RESET_TTL_MINUTES = 60;
 // Evita que alguien llene de correos la bandeja de otra persona.
@@ -34,6 +35,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private emailService: EmailService,
+    private planUsage?: PlanUsageService,
   ) {}
 
   async register(dto: RegisterCompanyDto) {
@@ -182,6 +184,9 @@ export class AuthService {
     if (!admin) {
       throw new UnauthorizedException('Usuario no encontrado');
     }
+
+    // El plan limita cuántos usuarios activos puede tener la empresa.
+    await this.planUsage?.assertCanAddUser(admin.companyId);
 
     // Verificar si el usuario ya existe
     const existingUser = await this.prisma.user.findUnique({
