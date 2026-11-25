@@ -1,4 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import { apiErrorMessage } from '@/lib/hooks/use-platform-admin';
 import { documentHistoryApi, DocumentKind } from '@/lib/api/document-history';
 import { useAuth } from '@/lib/context/auth-context';
 
@@ -24,5 +26,25 @@ export function useIncidents(hours: number) {
     queryFn: () => documentHistoryApi.incidents(hours),
     enabled: !!user?.isPlatformAdmin,
     refetchInterval: 60_000,
+  });
+}
+
+/** Manda ya el resumen diario de incidencias (para probarlo sin esperar a las 08:00). */
+export function useSendIncidentDigest() {
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: () => documentHistoryApi.sendDigest(),
+    onSuccess: ({ sent }) =>
+      toast({
+        title: sent > 0 ? `Resumen enviado a ${sent} administrador(es)` : 'Nada pendiente',
+        description:
+          sent > 0 ? undefined : 'Sin errores sin resolver ni atascados: no se envió correo.',
+      }),
+    onError: (error) =>
+      toast({
+        variant: 'destructive',
+        title: 'No se pudo enviar el resumen',
+        description: apiErrorMessage(error, 'Inténtalo de nuevo.'),
+      }),
   });
 }
