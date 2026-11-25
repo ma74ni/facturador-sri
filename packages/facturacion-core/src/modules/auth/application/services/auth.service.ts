@@ -14,6 +14,7 @@ import * as bcrypt from 'bcryptjs';
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '@/shared/database/prisma.service';
 import { EmailService } from '@/shared/email/email.service';
+import { maskEmail } from '@/shared/observability/redact';
 
 const PASSWORD_RESET_TTL_MINUTES = 60;
 // Evita que alguien llene de correos la bandeja de otra persona.
@@ -131,9 +132,9 @@ export class AuthService {
         },
       });
 
-      console.log('✅ Email de verificación enviado a:', result.user.email);
+      this.logger.log(`✅ Email de verificación enviado a ${maskEmail(result.user.email)}`);
     } catch (error) {
-      console.error('❌ Error al enviar email de verificación:', error);
+      this.logger.error('❌ Error al enviar email de verificación', error as Error);
       // No lanzar error, el usuario fue creado exitosamente
     }
 
@@ -410,9 +411,9 @@ export class AuthService {
         },
       });
 
-      console.log('✅ Email de verificación enviado a:', user.email);
+      this.logger.log(`✅ Email de verificación enviado a ${maskEmail(user.email)}`);
     } catch (error) {
-      console.error('❌ Error al enviar email de verificación:', error);
+      this.logger.error('❌ Error al enviar email de verificación', error as Error);
       // No lanzar error, solo loguear. El token ya fue guardado.
     }
 

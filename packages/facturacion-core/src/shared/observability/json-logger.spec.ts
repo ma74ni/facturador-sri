@@ -63,4 +63,14 @@ describe('JsonLogger', () => {
     expect(useJsonLogs({ NODE_ENV: 'development', LOG_FORMAT: 'json' })).toBe(true);
     expect(useJsonLogs({ NODE_ENV: 'production', LOG_FORMAT: 'pretty' })).toBe(false);
   });
+
+  it('no deja salir un email entero aunque un log lo traiga', () => {
+    const { logger, lines } = capture();
+
+    logger.log('Factura enviada a cliente@correo.com', 'InvoicesService');
+    logger.log({ to: 'otra@correo.com' }, 'Mailjet');
+
+    expect(lines[0].entry.msg).toBe('Factura enviada a c***@correo.com');
+    expect(lines[1].entry.data).toEqual({ to: 'o***@correo.com' });
+  });
 });
