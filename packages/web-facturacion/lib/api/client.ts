@@ -139,6 +139,23 @@ apiClient.interceptors.response.use(
       error.response.data.message = error.response.data.message.join('. ');
     }
 
+    // Un error del servidor lleva el código de la petición (X-Request-Id): el usuario lo dicta
+    // a soporte y con él se encuentra en los logs y en Sentry. Las pantallas muestran
+    // data.message, así que el código va dentro del mensaje.
+    const requestId = error.response?.headers?.['x-request-id'];
+    if (requestId) {
+      error.requestId = requestId;
+      if (error.response.status >= 500) {
+        const data =
+          typeof error.response.data === 'object' && error.response.data ? error.response.data : {};
+        const message =
+          typeof data.message === 'string' && data.message !== 'Internal server error'
+            ? data.message
+            : 'Ocurrió un error inesperado';
+        error.response.data = { ...data, message: `${message} (código ${requestId})` };
+      }
+    }
+
     const config = error.config as RetriableConfig | undefined;
     if (
       error.response?.status === 401 &&

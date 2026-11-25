@@ -7,11 +7,18 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { allowsCredentials, isAllowedOrigin, parseCorsOrigins } from './shared/http/cors-origins';
+import { JsonLogger, useJsonLogs } from './shared/observability/json-logger';
+import { requestContextMiddleware } from './shared/observability/request-context.middleware';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
+  // En producción, logs en JSON con el id de la petición y la empresa (ver JsonLogger).
+  if (useJsonLogs()) app.useLogger(new JsonLogger());
+
+  // Primero de todo: cada petición recibe su id y su contexto (logs, Sentry, "código" del error).
+  app.use(requestContextMiddleware);
 
   // Render pone un proxy delante: sin esto todas las peticiones llegan con su IP
   // y el límite de intentos de auth bloquearía a todos los usuarios a la vez.
