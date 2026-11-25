@@ -1,4 +1,4 @@
-import { billingPeriod, documentUsage, limitsOf } from './plan-usage';
+import { billingAnchorOf, billingPeriod, documentUsage, limitsOf, quitoDate } from './plan-usage';
 
 const company = (overrides = {}) => ({
   plan: null,
@@ -88,5 +88,34 @@ describe('ciclo de facturación', () => {
       start: quito('2026-11-01'),
       end: quito('2026-12-01'),
     });
+  });
+});
+
+describe('inicio del ciclo', () => {
+  const live = new Date('2026-11-18T20:00:00Z');
+  const plan = new Date('2026-11-10T12:00:00Z');
+
+  it('por defecto, la fecha en que pasó a producción; se puede pactar otra', () => {
+    expect(
+      billingAnchorOf({ billingCycleStart: null, productionSince: live, planSince: plan }),
+    ).toEqual({
+      date: live,
+      source: 'PRODUCTION',
+    });
+    expect(
+      billingAnchorOf({
+        billingCycleStart: quitoDate('2026-12-05'),
+        productionSince: live,
+        planSince: plan,
+      }),
+    ).toEqual({ date: quitoDate('2026-12-05'), source: 'CUSTOM' });
+    expect(
+      billingAnchorOf({ billingCycleStart: null, productionSince: null, planSince: null }).source,
+    ).toBe('CALENDAR');
+  });
+
+  it('con un inicio pactado el 5, el ciclo va del 5 al 4', () => {
+    const period = billingPeriod(quitoDate('2026-12-05'), new Date('2027-01-03T12:00:00Z'));
+    expect(period).toEqual({ start: quitoDate('2026-12-05'), end: quitoDate('2027-01-05') });
   });
 });

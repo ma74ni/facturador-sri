@@ -9,7 +9,13 @@ import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { PLANS } from '../domain/plan.catalog';
-import { billingPeriod, BillingPeriod, documentUsage, limitsOf } from '../domain/plan-usage';
+import {
+  billingAnchorOf,
+  billingPeriod,
+  BillingPeriod,
+  documentUsage,
+  limitsOf,
+} from '../domain/plan-usage';
 
 /** Cómo pedir más: va en los mensajes de límite. */
 const UPGRADE_HINT = 'Escríbenos por WhatsApp al 0967155626 para ampliar tu plan.';
@@ -24,6 +30,7 @@ const COMPANY_PLAN_SELECT = {
   plan: true,
   planSince: true,
   productionSince: true,
+  billingCycleStart: true,
   environment: true,
   documentLimitOverride: true,
   userLimitOverride: true,
@@ -47,7 +54,8 @@ export class PlanUsageService {
 
     const limits = limitsOf(company);
     // El ciclo cuenta desde que pasó a producción (o desde que tiene plan, si aún no pasó).
-    const period = billingPeriod(company.productionSince ?? company.planSince, now);
+    const anchor = billingAnchorOf(company);
+    const period = billingPeriod(anchor.date, now);
     const [documents, extra, users, emissionPoints] = await Promise.all([
       this.countDocuments(db, companyId, period.start),
       this.extraDocuments(db, companyId, period),
@@ -59,6 +67,8 @@ export class PlanUsageService {
       plan: company.plan,
       planName: company.plan ? PLANS[company.plan].name : null,
       planSince: company.planSince,
+      productionSince: company.productionSince,
+      billingAnchor: anchor,
       environment: company.environment,
       period,
       documents: documentUsage(documents, limits.documentsPerMonth, extra),
