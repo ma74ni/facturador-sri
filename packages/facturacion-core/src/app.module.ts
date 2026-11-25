@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 import { SentryGlobalFilter, SentryModule } from '@sentry/nestjs/setup';
 import { AuthModule } from './modules/auth/auth.module';
@@ -8,6 +9,7 @@ import { ProductsModule } from './modules/products/products.module';
 import { EstablishmentsModule } from './modules/establishments/establishments.module';
 import { InvoicesModule } from './modules/invoices/invoices.module';
 import { CreditNotesModule } from './modules/credit-notes/credit-notes.module';
+import { DocumentEventsModule } from './modules/document-events/document-events.module';
 import { CompaniesModule } from './modules/companies/companies.module';
 import { TaxCodesModule } from './modules/tax-codes/tax-codes.module';
 import { PaymentsModule } from './modules/payments/payments.module';
@@ -19,6 +21,8 @@ import { EmailModule } from './shared/email/email.module';
 @Module({
   imports: [
     SentryModule.forRoot(),
+    // Tareas programadas (resumen diario de incidencias).
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
@@ -31,6 +35,7 @@ import { EmailModule } from './shared/email/email.module';
     EstablishmentsModule,
     InvoicesModule,
     CreditNotesModule,
+    DocumentEventsModule,
     CompaniesModule,
     TaxCodesModule,
     PaymentsModule,

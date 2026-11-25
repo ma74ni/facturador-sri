@@ -287,7 +287,9 @@ export default function ReportesPage() {
                     <TableBody>
                       {topCustomers.map((customer, index) => (
                         <TableRow key={index}>
-                          <TableCell className="font-medium">{customer.name}</TableCell>
+                          <TableCell className="font-medium whitespace-normal min-w-[10rem] max-w-[18rem]">
+                            <span className="break-words line-clamp-2">{customer.name}</span>
+                          </TableCell>
                           <TableCell className="text-right">{customer.count}</TableCell>
                           <TableCell className="text-right">
                             {formatCurrency(customer.total)}

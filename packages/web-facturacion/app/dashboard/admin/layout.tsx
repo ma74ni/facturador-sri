@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/context/auth-context';
 
 const TABS = [
   { name: 'Empresas', href: '/dashboard/admin/empresas' },
+  { name: 'Incidencias', href: '/dashboard/admin/incidencias' },
   { name: 'Administradores', href: '/dashboard/admin/administradores' },
 ];
 
@@ -34,7 +35,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Administración</h1>
         <p className="text-sm sm:text-base text-muted-foreground">
-          Aprueba empresas y pásalas al ambiente de producción del SRI
+          Aprueba empresas, pásalas a producción y revisa lo que falló
         </p>
       </div>
 

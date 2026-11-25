@@ -17,9 +17,10 @@ import { TaxCodesModule } from '../tax-codes/tax-codes.module';
 import { RidePdfRenderer } from '../../shared/ride/ride-pdf.renderer';
 import { RidePublisher } from '../../shared/ride/ride-publisher.service';
 import { ElectronicDocumentMailer } from '../../shared/email/electronic-document-mailer';
+import { DocumentEventsModule } from '../document-events/document-events.module';
 
 @Module({
-  imports: [TaxCodesModule],
+  imports: [TaxCodesModule, DocumentEventsModule],
   controllers: [CreditNotesController],
   providers: [
     CreditNotesService,

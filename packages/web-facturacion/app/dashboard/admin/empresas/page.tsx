@@ -115,9 +115,9 @@ export default function AdminEmpresasPage() {
               <TableBody>
                 {companies.map((company) => (
                   <TableRow key={company.id} className="cursor-pointer">
-                    <TableCell>
+                    <TableCell className="whitespace-normal min-w-[10rem] max-w-[18rem]">
                       <Link href={`/dashboard/admin/empresas/${company.id}`} className="block">
-                        <p className="font-medium">{company.businessName}</p>
+                        <p className="font-medium break-words">{company.businessName}</p>
                         <p className="text-xs text-muted-foreground">
                           RUC {company.ruc} · {company.email}
                         </p>

@@ -33,6 +33,12 @@ import { errorMessage } from '../../../../shared/errors/error-message';
 import { Prisma } from '@prisma/client';
 import { saleIvaCode } from '../../../companies/domain/tax-profile';
 import { maskEmail } from '../../../../shared/observability/redact';
+import { DocumentEventsService } from '../../../document-events/application/document-events.service';
+import {
+  NewDocumentEvent,
+  signingEvent,
+  sriResultEvent,
+} from '../../../document-events/domain/document-event';
 
 /** Lo que necesita el envío por email: cliente, factura modificada y la configuración de email. */
 const CREDIT_NOTE_EMAIL_INCLUDE = {
@@ -72,7 +78,13 @@ export class CreditNotesService {
     private r2Storage: R2StorageService,
     private taxCalculator: TaxCalculatorService,
     private lineIvaResolver: LineIvaResolverService,
+    private documentEvents?: DocumentEventsService,
   ) {}
+
+  /** Anota un paso en el historial de la nota de crédito (nunca rompe el flujo). */
+  private async recordEvent(companyId: string, creditNoteId: string, event: NewDocumentEvent) {
+    await this.documentEvents?.record(companyId, 'CREDIT_NOTE', creditNoteId, event);
+  }
 
   async create(dto: CreateCreditNoteDto, companyId: string, userId: string) {
     // 1. Validar que la factura existe y está autorizada
@@ -303,6 +315,13 @@ export class CreditNotesService {
       signatureDetail = errorMessage(error);
     }
 
+    await this.recordEvent(companyId, creditNote.id, {
+      type: 'CREATED',
+      outcome: 'OK',
+      message: `Nota de crédito ${establishment.code}-${emissionPoint.code}-${sequential} creada`,
+    });
+    await this.recordEvent(companyId, creditNote.id, signingEvent(signatureStatus, signatureDetail));
+
     const warning = signatureWarning('La nota de crédito', signatureStatus, signatureDetail);
     return {
       message: 'Nota de crédito creada exitosamente',
@@ -456,10 +475,16 @@ export class CreditNotesService {
       // Mismo envío y sondeo que las facturas: antes se consultaba una sola vez
       // y una nota aún en proceso quedaba REJECTED, liberando su monto.
       this.logger.log(`📤 Enviando nota de crédito al SRI: ${creditNote.accessKey}`);
+      await this.recordEvent(companyId, creditNote.id, {
+        type: 'SRI_SENT',
+        outcome: 'OK',
+        message: `Enviada al SRI (${company.environment === 'PRODUCTION' ? 'producción' : 'pruebas'})`,
+      });
       const result = await this.sriWebService.sendAndAuthorize(
         creditNote.xmlSignedPath,
         company.environment,
       );
+      await this.recordEvent(companyId, creditNote.id, sriResultEvent(result));
 
       if (result.authorized) {
         await this.prisma.creditNote.update({
@@ -496,6 +521,11 @@ export class CreditNotesService {
           }
         } else {
           this.logger.warn('⚠️ Cliente no tiene email registrado, saltando envío automático');
+          await this.recordEvent(companyId, creditNote.id, {
+            type: 'EMAIL_SKIPPED',
+            outcome: 'WARNING',
+            message: 'El cliente no tiene email: el comprobante no se envió por correo',
+          });
         }
 
         return {
@@ -763,6 +793,18 @@ export class CreditNotesService {
         error: result.error || null,
       },
     });
+    await this.recordEvent(
+      companyId,
+      creditNote.id,
+      result.success
+        ? { type: 'EMAIL_SENT', outcome: 'OK', message: `Enviada por correo a ${maskEmail(emailTo)}` }
+        : {
+            type: 'EMAIL_FAILED',
+            outcome: 'ERROR',
+            message: `No se pudo enviar el correo a ${maskEmail(emailTo)}`,
+            ...(result.error ? { details: { error: result.error } } : {}),
+          },
+    );
 
     if (!result.success) {
       this.logger.error(`❌ Error enviando email: ${result.error}`);
