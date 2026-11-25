@@ -23,6 +23,7 @@ const base = {
   documentLimitOverride: null,
   userLimitOverride: null,
   emissionPointLimitOverride: null,
+  billingCycleStart: null,
 };
 
 describe('PlatformPlansService', () => {
@@ -103,5 +104,18 @@ describe('PlatformPlansService', () => {
       documentLimitOverride: 3000,
       userLimitOverride: null,
     });
+  });
+
+  it('se puede pactar otro inicio de ciclo; una fecha que no existe se rechaza', async () => {
+    const { service, prisma } = setup(base);
+
+    await service.setPlan('admin1', 'c1', { plan: 'NEGOCIO', billingCycleStart: '2026-12-05' });
+    expect(prisma.company.update.mock.calls[0][0].data.billingCycleStart).toEqual(
+      new Date('2026-12-05T05:00:00Z'),
+    );
+
+    await expect(
+      service.setPlan('admin1', 'c1', { plan: 'NEGOCIO', billingCycleStart: '2026-02-31' }),
+    ).rejects.toThrow(/no es válida/);
   });
 });
