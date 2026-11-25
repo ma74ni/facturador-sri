@@ -5,9 +5,16 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  // La cookie httpOnly de renovación de sesión viaja con credenciales (solo a /auth).
-  withCredentials: true,
+  // Sin credenciales por defecto: solo el login con "mantener la sesión", /auth/refresh y
+  // /auth/logout las envían. La API solo acepta credenciales de orígenes exactos con https; si
+  // todas las peticiones las llevaran, una vista previa de Netlify no podría ni iniciar sesión.
 });
+
+/**
+ * "Mantener la sesión iniciada" está disponible en este despliegue. Las vistas previas de
+ * Netlify lo desactivan (NEXT_PUBLIC_KEEP_SESSION=false): la API no les acepta la cookie.
+ */
+export const KEEP_SESSION_AVAILABLE = process.env.NEXT_PUBLIC_KEEP_SESSION !== 'false';
 
 /**
  * "Mantener la sesión iniciada": hay una cookie de renovación en este navegador. Es solo una

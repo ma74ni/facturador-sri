@@ -25,6 +25,9 @@
 
 [context.deploy-preview.environment]
   NEXT_PUBLIC_API_URL = "https://facturador-core-dev.onrender.com/api/v1"
+  # La API no acepta la cookie de sesión desde las vistas previas (las publica cualquier PR):
+  # aquí no hay "mantener la sesión iniciada".
+  NEXT_PUBLIC_KEEP_SESSION = "false"
 
 # Configuración de redirecciones para Next.js App Router
 [[redirects]]
