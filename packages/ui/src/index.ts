@@ -112,3 +112,13 @@ export { FilterBar, FilterField, type FilterBarProps } from './molecules/filter-
 export { StatCard, type StatCardProps, type StatCardTone } from './molecules/stat-card';
 
 export { FormField, type FormFieldProps } from './molecules/form-field';
+
+export {
+  Menu,
+  MenuTrigger,
+  MenuIconTrigger,
+  MenuContent,
+  MenuItem,
+  MenuGroup,
+  MenuSeparator,
+} from './molecules/menu';

@@ -3,7 +3,15 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { IconButton, StatCard } from '@facturador-sri/ui';
+import {
+  IconButton,
+  Menu,
+  MenuContent,
+  MenuIconTrigger,
+  MenuItem,
+  MenuSeparator,
+  StatCard,
+} from '@facturador-sri/ui';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -346,73 +354,80 @@ export default function FacturasPage() {
     `${searchTerm}|${statusFilter}|${dateRange.from}|${dateRange.to}|${sortBy}`,
   );
 
-  // Botones de acción según estado — compartidos entre la card mobile y la tabla
+  /**
+   * Acciones de una factura: la principal según su estado queda a la vista (enviar al SRI,
+   * descargar el PDF o, si algo falló, ver el historial) y el resto va en el menú "⋮".
+   * Compartidas entre la card mobile y la tabla.
+   */
   const renderActions = (factura: Invoice) => {
     const numero = `${factura.establishmentCode}-${factura.emissionPointCode}-${factura.sequential}`;
+    const canSend = factura.status === 'PENDING' || factura.status === 'SENT';
+    const authorized = factura.status === 'AUTHORIZED';
+    const showHistory = () => setHistoryFor({ id: factura.id, number: numero });
+    const historyIsPrimary = !canSend && !authorized;
     return (
       <>
-        <IconButton
-          label="Ver historial"
-          tone="neutral"
-          onClick={() => setHistoryFor({ id: factura.id, number: numero })}
-        >
-          <History />
-        </IconButton>
-        {(factura.status === 'PENDING' || factura.status === 'SENT') && (
-          <IconButton
-            label="Enviar al SRI"
-            tone="primary"
-            onClick={() => handleSendToSri(factura.id)}
-          >
+        {canSend && (
+          <IconButton label="Enviar al SRI" tone="primary" onClick={() => handleSendToSri(factura.id)}>
             <Send />
           </IconButton>
         )}
-        {/* El XML existe desde que se genera, aunque el SRI lo haya rechazado:
-            sirve para revisar qué se envió. */}
-        {factura.xmlPath && (
+        {authorized && (
           <IconButton
-            label="Descargar XML"
-            tone={factura.status === 'AUTHORIZED' ? 'success' : 'neutral'}
-            onClick={() => handleDownloadXml(factura.id, numero)}
+            label="Descargar PDF"
+            tone="success"
+            onClick={() => handleDownloadPdf(factura.id, numero)}
           >
-            <FileDown />
+            <Download />
           </IconButton>
         )}
-        {factura.status === 'AUTHORIZED' && (
-          <>
-            <IconButton
-              label="Descargar PDF"
-              tone="success"
-              onClick={() => handleDownloadPdf(factura.id, numero)}
-            >
-              <Download />
-            </IconButton>
-            <IconButton
-              label="Enviar por email"
-              tone="tertiary"
-              onClick={() => handleSendEmail(factura.id)}
-            >
-              <Mail />
-            </IconButton>
-            {/* Una autorizada no se cancela: se corrige con nota de crédito */}
-            <IconButton
-              label="Emitir nota de crédito"
-              tone="warning"
-              onClick={() => setCreditNoteInvoiceId(factura.id)}
-            >
-              <FileMinus />
-            </IconButton>
-          </>
-        )}
-        {CANCELLABLE_STATUSES.includes(factura.status) && (
-          <IconButton
-            label="Cancelar factura"
-            tone="destructive"
-            onClick={() => handleCancelClick(factura)}
-          >
-            <Ban />
+        {/* Rechazada, con error o en borrador: lo primero es saber qué pasó. */}
+        {historyIsPrimary && (
+          <IconButton label="Ver historial" onClick={showHistory}>
+            <History />
           </IconButton>
         )}
+        <Menu>
+          <MenuIconTrigger label={`Más acciones de la factura ${numero}`} />
+          <MenuContent>
+            {!historyIsPrimary && (
+              <MenuItem onSelect={showHistory}>
+                <History />
+                Ver historial
+              </MenuItem>
+            )}
+            {/* El XML existe desde que se genera, aunque el SRI lo haya rechazado:
+                sirve para revisar qué se envió. */}
+            {factura.xmlPath && (
+              <MenuItem onSelect={() => handleDownloadXml(factura.id, numero)}>
+                <FileDown />
+                Descargar XML
+              </MenuItem>
+            )}
+            {authorized && (
+              <>
+                <MenuItem onSelect={() => handleSendEmail(factura.id)}>
+                  <Mail />
+                  Enviar por email
+                </MenuItem>
+                {/* Una autorizada no se cancela: se corrige con nota de crédito */}
+                <MenuItem onSelect={() => setCreditNoteInvoiceId(factura.id)}>
+                  <FileMinus />
+                  Emitir nota de crédito
+                </MenuItem>
+              </>
+            )}
+            {CANCELLABLE_STATUSES.includes(factura.status) && (
+              <>
+                <MenuSeparator />
+                <MenuItem tone="destructive" onSelect={() => handleCancelClick(factura)}>
+                  <Ban />
+                  Cancelar factura
+                </MenuItem>
+              </>
+            )}
+          </MenuContent>
+        </Menu>
       </>
     );
   };
@@ -649,9 +664,12 @@ export default function FacturasPage() {
                             })}
                           </div>
                         </TableCell>
-                        <TableCell>
+                        {/* Nombres largos: se parten en líneas (máx. 2), nunca empujan la tabla. */}
+                        <TableCell className="whitespace-normal min-w-[10rem] max-w-[18rem]">
                           <div className="flex flex-col gap-1">
-                            <span className="text-sm">{factura.customerName}</span>
+                            <span className="text-sm break-words line-clamp-2" title={factura.customerName}>
+                              {factura.customerName}
+                            </span>
                             {/* RUC/CI debajo del nombre cuando no hay columna RUC/CI */}
                             <span className="lg:hidden font-mono text-xs text-muted-foreground">
                               {factura.customerIdentification}
@@ -668,7 +686,7 @@ export default function FacturasPage() {
                           {formatCurrency(Number(factura.totalAmount))}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-1">
                             {renderActions(factura)}
                           </div>
                         </TableCell>

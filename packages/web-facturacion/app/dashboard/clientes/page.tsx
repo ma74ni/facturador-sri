@@ -304,7 +304,8 @@ export default function ClientesPage() {
                   <TableBody>
                     {pagination.pageItems.map((customer) => (
                       <TableRow key={customer.id}>
-                        <TableCell>
+                        {/* Nombres largos: se parten en líneas (máx. 2), nunca empujan la tabla. */}
+                        <TableCell className="whitespace-normal min-w-[10rem] max-w-[18rem]">
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2">
                               <Badge
@@ -319,7 +320,7 @@ export default function ClientesPage() {
                                 {customer.identification}
                               </span>
                             </div>
-                            <span className="font-medium text-sm">
+                            <span className="font-medium text-sm break-words line-clamp-2">
                               {customer.businessName ||
                                 `${customer.firstName} ${customer.lastName}`}
                             </span>

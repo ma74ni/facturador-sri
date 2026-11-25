@@ -94,8 +94,10 @@ export default function CobranzaPage() {
                   <TableBody>
                     {pagination.pageItems.map((customer) => (
                       <TableRow key={customer.id}>
-                        <TableCell className="font-medium">
-                          {customer.businessName || `${customer.firstName} ${customer.lastName}`}
+                        <TableCell className="font-medium whitespace-normal min-w-[10rem] max-w-[18rem]">
+                          <span className="break-words line-clamp-2">
+                            {customer.businessName || `${customer.firstName} ${customer.lastName}`}
+                          </span>
                         </TableCell>
                         <TableCell className="font-mono text-xs text-muted-foreground">
                           {customer.identification}
