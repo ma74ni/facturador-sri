@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { IconButton } from '@facturador-sri/ui';
+import { IconButton, Menu, MenuContent, MenuIconTrigger, MenuItem } from '@facturador-sri/ui';
 import {
   Table,
   TableBody,
@@ -145,14 +145,18 @@ export default function NotasCreditoPage() {
 
   const pagination = usePagination(filtered, 10, `${searchTerm}|${statusFilter}`);
 
+  /**
+   * Acciones de una nota: la principal según su estado queda a la vista (enviar al SRI,
+   * descargar el PDF o, si algo falló, ver el historial) y el resto va en el menú "⋮".
+   */
   const renderActions = (cn: CreditNote) => {
     const busy = busyId === cn.id;
+    const sendable = canSend(cn);
+    const authorized = cn.sriStatus === 'AUTHORIZED';
+    const historyIsPrimary = !sendable && !authorized;
     return (
       <>
-        <IconButton label="Ver historial" tone="neutral" onClick={() => setHistoryFor(cn)}>
-          <History />
-        </IconButton>
-        {canSend(cn) && (
+        {sendable && (
           <IconButton
             label="Enviar al SRI"
             tone="primary"
@@ -162,36 +166,44 @@ export default function NotasCreditoPage() {
             <Send />
           </IconButton>
         )}
-        {cn.xmlPath && (
+        {authorized && (
           <IconButton
-            label="Descargar XML"
-            tone={cn.sriStatus === 'AUTHORIZED' ? 'success' : 'neutral'}
-            onClick={() => handleDownloadXml(cn)}
+            label="Descargar PDF"
+            tone="success"
+            onClick={() => handleDownloadPdf(cn)}
             disabled={busy}
           >
-            <FileDown />
+            <Download />
           </IconButton>
         )}
-        {cn.sriStatus === 'AUTHORIZED' && (
-          <>
-            <IconButton
-              label="Descargar PDF"
-              tone="success"
-              onClick={() => handleDownloadPdf(cn)}
-              disabled={busy}
-            >
-              <Download />
-            </IconButton>
-            <IconButton
-              label="Enviar por email"
-              tone="tertiary"
-              onClick={() => handleSendEmail(cn)}
-              disabled={busy}
-            >
-              <Mail />
-            </IconButton>
-          </>
+        {historyIsPrimary && (
+          <IconButton label="Ver historial" onClick={() => setHistoryFor(cn)}>
+            <History />
+          </IconButton>
         )}
+        <Menu>
+          <MenuIconTrigger label={`Más acciones de la nota ${cn.formattedNumber}`} disabled={busy} />
+          <MenuContent>
+            {!historyIsPrimary && (
+              <MenuItem onSelect={() => setHistoryFor(cn)}>
+                <History />
+                Ver historial
+              </MenuItem>
+            )}
+            {cn.xmlPath && (
+              <MenuItem onSelect={() => handleDownloadXml(cn)}>
+                <FileDown />
+                Descargar XML
+              </MenuItem>
+            )}
+            {authorized && (
+              <MenuItem onSelect={() => handleSendEmail(cn)}>
+                <Mail />
+                Enviar por email
+              </MenuItem>
+            )}
+          </MenuContent>
+        </Menu>
       </>
     );
   };
@@ -329,16 +341,21 @@ export default function NotasCreditoPage() {
                         <TableCell className="font-mono text-sm text-muted-foreground">
                           {cn.modifiedInvoiceNumber}
                         </TableCell>
-                        <TableCell>
+                        {/* Nombres largos: se parten en líneas (máx. 2), nunca empujan la tabla. */}
+                        <TableCell className="whitespace-normal min-w-[10rem] max-w-[18rem]">
                           <div className="flex flex-col gap-1">
-                            <span className="text-sm">{cn.customerName}</span>
+                            <span className="text-sm break-words line-clamp-2" title={cn.customerName}>
+                              {cn.customerName}
+                            </span>
                             <span className="font-mono text-xs text-muted-foreground">
                               {cn.customerIdentification}
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell className="hidden lg:table-cell text-sm text-muted-foreground max-w-[16rem]">
-                          {cn.reason}
+                        <TableCell className="hidden lg:table-cell whitespace-normal text-sm text-muted-foreground max-w-[16rem]">
+                          <span className="line-clamp-2 break-words" title={cn.reason}>
+                            {cn.reason}
+                          </span>
                         </TableCell>
                         <TableCell>
                           <SriStatusBadge status={cn.sriStatus} />
