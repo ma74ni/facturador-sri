@@ -1,6 +1,7 @@
 import { LoggerService, LogLevel } from '@nestjs/common';
 
 import { currentRequestContext } from './request-context';
+import { redactPersonalData } from './redact';
 
 type Level = Exclude<LogLevel, 'fatal'> | 'fatal';
 
@@ -69,7 +70,11 @@ export class JsonLogger implements LoggerService {
     else entry.msg = String(message);
     if (stack) entry.stack = stack;
 
-    this.write(safeStringify(entry), level === 'error' || level === 'fatal' ? 'stderr' : 'stdout');
+    // Red de seguridad: ningún email de un cliente sale entero a un servicio externo.
+    this.write(
+      redactPersonalData(safeStringify(entry)),
+      level === 'error' || level === 'fatal' ? 'stderr' : 'stdout',
+    );
   }
 }
 

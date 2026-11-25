@@ -23,6 +23,7 @@ import {
 } from '../../../tax-codes/application/services/line-iva-resolver.service';
 import { errorMessage } from '../../../../shared/errors/error-message';
 import { Prisma } from '@prisma/client';
+import { maskEmail } from '../../../../shared/observability/redact';
 
 /** Lo que necesita el envío por email: cliente y la configuración de email de la empresa. */
 const INVOICE_EMAIL_INCLUDE = {
@@ -195,7 +196,7 @@ export class InvoicesService {
 
     try {
       // 8. Generar XML
-      this.logger.log(`📋 Cliente info - Tipo ID: ${invoice.customer.identificationType}, ID: ${invoice.customer.identification}`);
+      this.logger.log(`📋 Cliente con identificación tipo ${invoice.customer.identificationType}`);
       const xml = this.xmlGenerator.generateInvoiceXml(invoice, company);
       xmlPath = await this.xmlStorage.saveXml(accessKey, xml, companyId);
 
@@ -454,7 +455,7 @@ export class InvoicesService {
 
       // Enviar email automáticamente si el cliente tiene email
       if (invoice.customer?.email) {
-        this.logger.log(`📧 Enviando factura automáticamente a: ${invoice.customer.email}`);
+        this.logger.log(`📧 Enviando factura automáticamente a: ${maskEmail(invoice.customer.email)}`);
         
         await this.sendInvoiceByEmail(invoiceId, companyId);
         
@@ -559,7 +560,7 @@ export class InvoicesService {
     }
 
     // 3. Generar el PDF
-    console.log('📄 Generando RIDE (PDF)...');
+    this.logger.log('📄 Generando RIDE (PDF)...');
     const ridePath = await this.rideGenerator.generateRide(invoice, invoice.company);
 
     // 4. Actualizar factura con la ruta del PDF
@@ -568,7 +569,7 @@ export class InvoicesService {
       data: { ridePdfPath: ridePath },
     });
 
-    console.log(`✅ RIDE generado: ${ridePath}`);
+    this.logger.log(`✅ RIDE generado: ${ridePath}`);
 
     return {
       message: 'RIDE generado exitosamente',
@@ -619,7 +620,7 @@ async sendInvoiceByEmail(invoiceId: string, companyId: string, recipientEmail?: 
     }
 
     const invoiceNumber = documentNumber(invoice);
-    this.logger.log(`📧 Enviando factura ${invoiceNumber} a ${emailTo}...`);
+    this.logger.log(`📧 Enviando factura ${invoiceNumber} a ${maskEmail(emailTo)}...`);
 
     const result = await this.documentMailer.send({
       template: 'invoice',
@@ -656,7 +657,7 @@ async sendInvoiceByEmail(invoiceId: string, companyId: string, recipientEmail?: 
       throw new InternalServerErrorException(`Error al enviar el correo: ${result.error}`);
     }
 
-    this.logger.log(`✅ Factura enviada exitosamente a ${emailTo}`);
+    this.logger.log(`✅ Factura enviada exitosamente a ${maskEmail(emailTo)}`);
 
     return {
       message: 'Factura enviada exitosamente por correo electrónico',
