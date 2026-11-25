@@ -200,6 +200,7 @@ model Company {
   receivedDocuments ReceivedDocument[]
 
   platformAuditLogs PlatformAuditLog[]
+  documentEvents    DocumentEvent[]
 
   @@index([ruc])
   @@map("companies")
@@ -802,4 +803,32 @@ model RefreshToken {
   @@index([userId])
   @@index([familyId])
   @@map("refresh_tokens")
+}
+
+// Historial de cada comprobante: qué pasó en cada paso (creado, firmado, enviado al SRI,
+// autorizado o rechazado, correo) y con qué resultado. Lo ve la empresa en su comprobante y
+// el administrador de la plataforma en "Incidencias". Solo se agrega, nunca se edita.
+model DocumentEvent {
+  id           String   @id @default(cuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  // INVOICE | CREDIT_NOTE (sin FK: apunta a facturas o a notas de crédito)
+  documentType String
+  documentId   String
+  // CREATED, SIGNED, SIGN_FAILED, AUTHORIZED, REJECTED, EMAIL_SENT… (domain/document-event.ts)
+  type         String
+  // OK | WARNING | ERROR
+  outcome      String
+  message      String
+  // Mensajes del SRI u otro detalle técnico.
+  details      Json?
+  // Para cruzar con los logs y Sentry.
+  requestId    String?
+  userId       String?
+  createdAt    DateTime @default(now())
+
+  @@index([documentType, documentId, createdAt])
+  @@index([companyId, createdAt])
+  @@index([outcome, createdAt])
+  @@map("document_events")
 }

@@ -13,7 +13,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Calendar, Download, FileDown, FileMinus, Mail, Send } from 'lucide-react';
+import { Calendar, Download, FileDown, FileMinus, History, Mail, Send } from 'lucide-react';
+import { DocumentHistoryDialog } from '@/components/shared/document-history';
 import {
   creditNotesApi,
   CreditNote,
@@ -52,6 +53,8 @@ export default function NotasCreditoPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Nota cuyo historial se muestra (firma, SRI, correo).
+  const [historyFor, setHistoryFor] = useState<CreditNote | null>(null);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['credit-notes'] });
@@ -146,6 +149,9 @@ export default function NotasCreditoPage() {
     const busy = busyId === cn.id;
     return (
       <>
+        <IconButton label="Ver historial" tone="neutral" onClick={() => setHistoryFor(cn)}>
+          <History />
+        </IconButton>
         {canSend(cn) && (
           <IconButton
             label="Enviar al SRI"
@@ -356,6 +362,13 @@ export default function NotasCreditoPage() {
           )}
         </CardContent>
       </Card>
+
+      <DocumentHistoryDialog
+        kind="CREDIT_NOTE"
+        documentId={historyFor?.id ?? null}
+        number={historyFor?.formattedNumber}
+        onClose={() => setHistoryFor(null)}
+      />
     </div>
   );
 }

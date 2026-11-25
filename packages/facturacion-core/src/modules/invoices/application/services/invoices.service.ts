@@ -24,6 +24,12 @@ import {
 import { errorMessage } from '../../../../shared/errors/error-message';
 import { Prisma } from '@prisma/client';
 import { maskEmail } from '../../../../shared/observability/redact';
+import { DocumentEventsService } from '../../../document-events/application/document-events.service';
+import {
+  NewDocumentEvent,
+  signingEvent,
+  sriResultEvent,
+} from '../../../document-events/domain/document-event';
 
 /** Lo que necesita el envío por email: cliente y la configuración de email de la empresa. */
 const INVOICE_EMAIL_INCLUDE = {
@@ -60,7 +66,13 @@ export class InvoicesService {
     private r2Storage: R2StorageService,
     private taxCalculator: TaxCalculatorService,
     private lineIvaResolver: LineIvaResolverService,
+    private documentEvents?: DocumentEventsService,
   ) {}
+
+  /** Anota un paso en el historial de la factura (nunca rompe el flujo). */
+  private async recordEvent(companyId: string, invoiceId: string, event: NewDocumentEvent) {
+    await this.documentEvents?.record(companyId, 'INVOICE', invoiceId, event);
+  }
 
   async create(dto: CreateInvoiceDto, companyId: string, userId: string) {
     // 1. Validar cliente
@@ -237,6 +249,13 @@ export class InvoicesService {
       // Conserva su número: la siguiente factura usa otro. Se puede cancelar.
       this.logger.warn(`⚠️ Factura ${invoice.id} quedó en estado DRAFT con el secuencial ${sequential}.`);
     }
+
+    await this.recordEvent(companyId, invoice.id, {
+      type: 'CREATED',
+      outcome: 'OK',
+      message: `Factura ${establishment.code}-${emissionPoint.code}-${sequential} creada`,
+    });
+    await this.recordEvent(companyId, invoice.id, signingEvent(signatureStatus, signatureDetail));
 
     const warning = signatureWarning('La factura', signatureStatus, signatureDetail);
     return {
@@ -425,10 +444,16 @@ export class InvoicesService {
 
   // 4. Enviar al SRI
   this.logger.log(`📤 [sendToSri] Enviando factura al SRI (ambiente: ${invoice.company.environment})...`);
+  await this.recordEvent(companyId, invoiceId, {
+    type: 'SRI_SENT',
+    outcome: 'OK',
+    message: `Enviada al SRI (${invoice.company.environment === 'PRODUCTION' ? 'producción' : 'pruebas'})`,
+  });
   const result = await this.sriService.sendAndAuthorize(
     invoice.xmlSignedPath,
     invoice.company.environment,
   );
+  await this.recordEvent(companyId, invoiceId, sriResultEvent(result));
 
   // 5. Actualizar estado según resultado
   if (result.authorized) {
@@ -450,7 +475,17 @@ export class InvoicesService {
     try {
       // Generar RIDE automáticamente
       this.logger.log('📄 Generando RIDE automáticamente...');
-      await this.generateRide(invoiceId, companyId);
+      try {
+        await this.generateRide(invoiceId, companyId);
+      } catch (rideError: unknown) {
+        await this.recordEvent(companyId, invoiceId, {
+          type: 'RIDE_FAILED',
+          outcome: 'ERROR',
+          message: 'No se pudo generar el RIDE (PDF); el correo no se envió',
+          details: { error: errorMessage(rideError) },
+        });
+        throw rideError;
+      }
       this.logger.log('✅ RIDE generado correctamente');
 
       // Enviar email automáticamente si el cliente tiene email
@@ -463,6 +498,11 @@ export class InvoicesService {
         this.logger.log('✅ Email enviado automáticamente al cliente');
       } else {
         this.logger.warn('⚠️ Cliente sin email configurado, no se envió automáticamente');
+        await this.recordEvent(companyId, invoiceId, {
+          type: 'EMAIL_SKIPPED',
+          outcome: 'WARNING',
+          message: 'El cliente no tiene email: el comprobante no se envió por correo',
+        });
         emailError = 'Cliente sin email configurado';
       }
     } catch (error: unknown) {
@@ -651,6 +691,18 @@ async sendInvoiceByEmail(invoiceId: string, companyId: string, recipientEmail?: 
         error: result.error || null,
       },
     });
+    await this.recordEvent(
+      companyId,
+      invoice.id,
+      result.success
+        ? { type: 'EMAIL_SENT', outcome: 'OK', message: `Enviada por correo a ${maskEmail(emailTo)}` }
+        : {
+            type: 'EMAIL_FAILED',
+            outcome: 'ERROR',
+            message: `No se pudo enviar el correo a ${maskEmail(emailTo)}`,
+            ...(result.error ? { details: { error: result.error } } : {}),
+          },
+    );
 
     if (!result.success) {
       this.logger.error(`❌ Error enviando email: ${result.error}`);
@@ -868,6 +920,11 @@ async sendInvoiceByEmail(invoiceId: string, companyId: string, recipientEmail?: 
       });
 
       this.logger.log(`✅ [cancelInvoice] Factura cancelada exitosamente: ${invoiceId}`);
+      await this.recordEvent(companyId, invoiceId, {
+        type: 'CANCELLED',
+        outcome: 'OK',
+        message: `Cancelada: ${cancelledInvoice.cancelReason}`,
+      });
 
       return {
         message: 'Factura cancelada exitosamente',
