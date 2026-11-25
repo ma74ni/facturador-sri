@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { ThrottlerModule } from '@nestjs/throttler';
 import * as request from 'supertest';
 import { AuthService } from '../../application/services/auth.service';
+import { SessionService } from '../../application/services/session.service';
 import { JwtAuthGuard } from '../../infrastructure/guards/jwt-auth.guard';
 import { AdminGuard } from '../../infrastructure/guards/admin.guard';
 import { AuthController } from './auth.controller';
@@ -24,6 +25,7 @@ describe('AuthController: límite de intentos', () => {
             getProfile: jest.fn().mockResolvedValue({ ok: true }),
           },
         },
+        { provide: SessionService, useValue: {} },
       ],
     })
       .overrideGuard(JwtAuthGuard)

@@ -1,4 +1,4 @@
-import { IsEmail, IsString, IsNotEmpty } from 'class-validator';
+import { IsBoolean, IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class LoginDto {
@@ -11,4 +11,14 @@ export class LoginDto {
   @IsString()
   @IsNotEmpty()
   password: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Mantener la sesión iniciada en este navegador: entrega un token de acceso corto y una ' +
+      'cookie httpOnly para renovarlo. Sin él, solo el token de siempre (integraciones como el POS).',
+  })
+  @IsOptional()
+  @IsBoolean()
+  keepSession?: boolean;
 }

@@ -516,6 +516,8 @@ export class AuthService {
         passwordResetTokenHash: null,
         passwordResetExpiry: null,
         passwordChangedAt: new Date(),
+        // Cierra también las sesiones que se renuevan solas.
+        refreshTokens: { updateMany: { where: { revokedAt: null }, data: { revokedAt: new Date() } } },
         // Abrir el enlace prueba que el correo es suyo.
         emailVerified: true,
         verificationToken: null,

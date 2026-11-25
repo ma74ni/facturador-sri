@@ -1,7 +1,26 @@
-import { Controller, Post, Get, Body, UseGuards, Query, HttpCode } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Post,
+  Query,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { SkipThrottle, Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from '../../application/services/auth.service';
+import { SessionService } from '../../application/services/session.service';
+import {
+  clearRefreshCookie,
+  readRefreshCookie,
+  SESSION_HEADER,
+  setRefreshCookie,
+} from '../../infrastructure/session-cookie';
 import { RegisterDto } from '../../application/dto/register.dto';
 import { RegisterCompanyDto } from '../../application/dto/register-company.dto';
 import { LoginDto } from '../../application/dto/login.dto';
@@ -15,12 +34,24 @@ import {
 
 // Las rutas que envían emails admiten menos intentos que el límite por defecto del módulo.
 const EMAIL_SENDING_LIMIT = { default: { limit: 5, ttl: 15 * 60_000 } };
+// Renovar no prueba contraseñas: varios usuarios detrás de la misma IP renuevan a la vez.
+const REFRESH_LIMIT = { default: { limit: 60, ttl: 60_000 } };
+
+/** /auth/refresh y /auth/logout solo desde la web: ver SESSION_HEADER. */
+function requireSessionHeader(req: Request): void {
+  if (req.headers[SESSION_HEADER] !== '1') {
+    throw new BadRequestException('Falta la cabecera de sesión');
+  }
+}
 
 @ApiTags('auth')
 @Controller('auth')
 @UseGuards(ThrottlerGuard)
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly sessions: SessionService,
+  ) {}
 
   @Post('register')
   @Throttle(EMAIL_SENDING_LIMIT)
@@ -40,8 +71,63 @@ export class AuthController {
 
   @Post('login')
   @ApiOperation({ summary: 'Iniciar sesión' })
-  async login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.login(dto);
+
+    // Otra persona pudo dejar su sesión en este navegador: se cierra antes de abrir la nueva,
+    // para que nunca se renueve con la cookie de otro usuario.
+    const previous = readRefreshCookie(req);
+    if (previous) {
+      await this.sessions.end(previous);
+      clearRefreshCookie(res);
+    }
+    if (!dto.keepSession) return result;
+
+    // La web: token de acceso corto y la cookie para renovarlo.
+    const session = await this.sessions.start(result.user.id, req.headers['user-agent']);
+    setRefreshCookie(res, session.refreshToken!, session.refreshExpiresAt!);
+    return { ...result, access_token: session.accessToken };
+  }
+
+  @Post('refresh')
+  @HttpCode(200)
+  @Throttle(REFRESH_LIMIT)
+  @ApiOperation({
+    summary: 'Renovar la sesión de la web',
+    description:
+      'Cambia la cookie de renovación por una nueva y entrega un token de acceso. ' +
+      `Exige la cabecera \`${SESSION_HEADER}: 1\`.`,
+  })
+  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    requireSessionHeader(req);
+    try {
+      const session = await this.sessions.refresh(
+        readRefreshCookie(req),
+        req.headers['user-agent'],
+      );
+      if (session.refreshToken && session.refreshExpiresAt) {
+        setRefreshCookie(res, session.refreshToken, session.refreshExpiresAt);
+      }
+      return { access_token: session.accessToken };
+    } catch (error) {
+      clearRefreshCookie(res);
+      throw error;
+    }
+  }
+
+  @Post('logout')
+  @HttpCode(200)
+  @Throttle(REFRESH_LIMIT)
+  @ApiOperation({ summary: 'Cerrar la sesión de la web en este navegador' })
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    requireSessionHeader(req);
+    await this.sessions.end(readRefreshCookie(req));
+    clearRefreshCookie(res);
+    return { message: 'Sesión cerrada' };
   }
 
   @Get('profile')
