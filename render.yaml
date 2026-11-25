@@ -41,6 +41,10 @@ services:
       # servidor y no necesita estar aquí.
       - key: CORS_ORIGIN
         value: https://app.facturador.siete8.com
+      # Resumen diario de incidencias (08:00 Ecuador) a los administradores de la plataforma.
+      # Solo producción: staging se duerme y sus datos son de prueba.
+      - key: INCIDENT_DIGEST_ENABLED
+        value: "true"
       # Errores inesperados -> Sentry, proyecto facturador-core. El DSN no es secreto.
       - key: SENTRY_DSN
         value: https://ed01e9e8ee6d38c398e683a8812497f4@o4512205677395968.ingest.us.sentry.io/4512246525263872

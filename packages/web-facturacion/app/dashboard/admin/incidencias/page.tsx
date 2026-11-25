@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Mail } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -15,7 +16,7 @@ import {
 import { SriStatusBadge } from '@/components/shared/sri-status-badge';
 import { EventDetails, formatDateTime, OutcomeIcon } from '@/components/shared/document-history';
 import { DocumentKind, IncidentEvent } from '@/lib/api/document-history';
-import { useIncidents } from '@/lib/hooks/use-document-history';
+import { useIncidents, useSendIncidentDigest } from '@/lib/hooks/use-document-history';
 
 const WINDOWS = [
   { hours: 24, label: 'Últimas 24 h' },
@@ -51,6 +52,7 @@ function CompanyLink({ company }: { company: IncidentEvent['company'] }) {
 export default function AdminIncidentsPage() {
   const [hours, setHours] = useState(24);
   const { data, isLoading, isError } = useIncidents(hours);
+  const sendDigest = useSendIncidentDigest();
   const events = data?.events ?? [];
   const stuck = data?.stuck ?? [];
   const open = events.filter((event) => event.document?.status !== 'AUTHORIZED');
@@ -76,6 +78,17 @@ export default function AdminIncidentsPage() {
             {open.length} sin resolver de {events.length} · se actualiza cada minuto
           </span>
         )}
+        {/* El resumen llega solo cada día a las 08:00; esto lo manda ya, para probarlo. */}
+        <Button
+          variant="outlined"
+          size="sm"
+          className="ml-auto"
+          onClick={() => sendDigest.mutate()}
+          disabled={sendDigest.isPending}
+        >
+          <Mail />
+          {sendDigest.isPending ? 'Enviando…' : 'Enviar resumen ahora'}
+        </Button>
       </div>
 
       {isLoading && (

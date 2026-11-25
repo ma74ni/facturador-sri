@@ -62,6 +62,12 @@ export const documentHistoryApi = {
     return data;
   },
 
+  /** Manda ya el resumen diario a los administradores; devuelve a cuántos llegó (0: nada pendiente). */
+  sendDigest: async (): Promise<{ sent: number }> => {
+    const { data } = await apiClient.post('/admin/incidents/digest');
+    return data;
+  },
+
   incidents: async (hours: number): Promise<Incidents> => {
     const { data } = await apiClient.get('/admin/incidents', { params: { hours } });
     return data;

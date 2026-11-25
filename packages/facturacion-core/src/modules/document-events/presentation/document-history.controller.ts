@@ -1,9 +1,11 @@
 import {
   Controller,
+  DefaultValuePipe,
   Get,
+  HttpCode,
   Param,
   ParseIntPipe,
-  DefaultValuePipe,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -17,6 +19,7 @@ import {
   CurrentUser,
 } from '../../auth/infrastructure/decorators/current-user.decorator';
 import { DocumentEventsService } from '../application/document-events.service';
+import { IncidentDigestService } from '../application/incident-digest.service';
 
 /** Historial de una factura: lo ve la empresa dueña (con email verificado, como el resto de facturas). */
 @ApiTags('document-history')
@@ -54,7 +57,10 @@ export class CreditNoteHistoryController {
 @UseGuards(JwtAuthGuard, PlatformAdminGuard)
 @ApiBearerAuth()
 export class IncidentsController {
-  constructor(private readonly events: DocumentEventsService) {}
+  constructor(
+    private readonly events: DocumentEventsService,
+    private readonly digest: IncidentDigestService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Errores y comprobantes atascados de todas las empresas' })
@@ -65,5 +71,14 @@ export class IncidentsController {
   })
   list(@Query('hours', new DefaultValuePipe(24), ParseIntPipe) hours: number) {
     return this.events.incidents(hours);
+  }
+
+  @Post('digest')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Enviar ahora el resumen diario de incidencias a los administradores de la plataforma',
+  })
+  async sendDigest() {
+    return { sent: await this.digest.sendNow() };
   }
 }
