@@ -4,10 +4,14 @@ import { CreateEstablishmentDto } from '../dto/create-establishment.dto';
 import { UpdateEstablishmentDto } from '../dto/update-establishment.dto';
 import { CreateEmissionPointDto } from '../dto/create-emission-point.dto';
 import { UpdateEmissionPointDto } from '../dto/update-emission-point.dto';
+import { PlanUsageService } from '../../../plans/application/plan-usage.service';
 
 @Injectable()
 export class EstablishmentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private planUsage?: PlanUsageService,
+  ) {}
 
   // ==================== ESTABLISHMENTS ====================
 
@@ -122,6 +126,9 @@ export class EstablishmentsService {
     dto: CreateEmissionPointDto,
     companyId: string,
   ) {
+    // El plan limita cuántos puntos de emisión puede tener la empresa.
+    await this.planUsage?.assertCanAddEmissionPoint(companyId);
+
     // Verificar que el establecimiento existe y pertenece a la empresa
     await this.findOneEstablishment(establishmentId, companyId);
 

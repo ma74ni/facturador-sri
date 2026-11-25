@@ -30,6 +30,7 @@ import {
   signingEvent,
   sriResultEvent,
 } from '../../../document-events/domain/document-event';
+import { PlanUsageService } from '../../../plans/application/plan-usage.service';
 
 /** Lo que necesita el envío por email: cliente y la configuración de email de la empresa. */
 const INVOICE_EMAIL_INCLUDE = {
@@ -67,6 +68,7 @@ export class InvoicesService {
     private taxCalculator: TaxCalculatorService,
     private lineIvaResolver: LineIvaResolverService,
     private documentEvents?: DocumentEventsService,
+    private planUsage?: PlanUsageService,
   ) {}
 
   /** Anota un paso en el historial de la factura (nunca rompe el flujo). */
@@ -109,7 +111,6 @@ export class InvoicesService {
     if (certificateProblem) {
       throw new BadRequestException(certificateProblem);
     }
-
     // 4. IVA por línea (tarifa de la línea o de su producto) y totales. Un negocio popular
     //    vende con 0%: no cobra IVA.
     const ivaCodes = (await this.lineIvaResolver.resolve(companyId, dto.items)).map((code) =>
@@ -132,6 +133,12 @@ export class InvoicesService {
     // El increment bloquea la fila del punto de emisión: dos facturas simultáneas
     // reciben números distintos, y si la creación falla el número se libera.
     const invoice = await this.prisma.$transaction(async (prisma) => {
+      // Plan agotado (pasado el margen): no se emite. Con el bloqueo por empresa, el conteo y la
+      // creación de esta factura no se cruzan con otra emisión simultánea de la misma empresa.
+      if (this.planUsage) {
+        await this.planUsage.lockCompany(prisma, companyId);
+        await this.planUsage.assertCanIssueInvoice(companyId, prisma);
+      }
       const reserved = await prisma.emissionPoint.update({
         where: { id: emissionPoint.id },
         data: { invoiceSequence: { increment: 1 } },

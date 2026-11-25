@@ -27,6 +27,7 @@ import { companyApi, UpdateCompanyDto } from '@/lib/api/company';
 import { useToast } from '@/hooks/use-toast';
 import { LogoManager } from '@/components/company/logo-manager';
 import { TaxProfileCard } from '@/components/company/tax-profile-card';
+import { PlanUsageCard } from '@/components/company/plan-usage-card';
 
 type CompanyForm = {
   businessName: string;
@@ -322,6 +323,8 @@ export default function EmpresaPage() {
       </Card>
 
       <TaxProfileCard />
+
+      <PlanUsageCard />
 
       <LogoManager />
 

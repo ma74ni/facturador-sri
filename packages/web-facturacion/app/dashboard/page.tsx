@@ -14,6 +14,7 @@ import { useProducts } from '@/lib/hooks/use-products';
 import { CertificateAlertBanner } from '@/components/shared/certificate-alert-banner';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { SriStatusBadge } from '@/components/shared/sri-status-badge';
+import { PlanLimitBanner } from '@/components/plans/plan-limit-banner';
 
 interface RecentInvoice {
   id: string;
@@ -88,6 +89,7 @@ export default function DashboardPage() {
     <div className="space-y-4 sm:space-y-6 lg:space-y-8">
       {/* Certificate Alert Banner */}
       <CertificateAlertBanner />
+      <PlanLimitBanner />
 
       {/* Header */}
       <div className="flex justify-between items-start md:items-center md:flex-row flex-col gap-4">

@@ -71,6 +71,7 @@ import {
 } from '@/lib/utils/date-range';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { SriStatusBadge } from '@/components/shared/sri-status-badge';
+import { PlanLimitBanner } from '@/components/plans/plan-limit-banner';
 
 type InvoiceSort = 'recent' | 'oldest' | 'amountDesc' | 'amountAsc';
 
@@ -434,6 +435,9 @@ export default function FacturasPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* Aviso del límite del plan (80%, pasado, bloqueado) */}
+      <PlanLimitBanner />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>

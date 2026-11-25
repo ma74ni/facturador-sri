@@ -1,4 +1,5 @@
 import apiClient from './client';
+import type { DocumentUsage, PlanKey } from './plans';
 
 // Panel de administración de la plataforma (/admin/*). Solo responde a
 // usuarios con isPlatformAdmin.
@@ -40,6 +41,10 @@ export interface AdminCompanySummary {
   /** Módulos de producto habilitados (claves de ProductModule). */
   enabledModules: string[];
   readiness: CompanyReadiness;
+  /** Plan contratado; null = sin plan (sin límites). */
+  plan: PlanKey | null;
+  /** Uso de comprobantes del mes (solo empresas con plan en producción). */
+  documentUsage?: DocumentUsage | null;
 }
 
 /** Módulo de producto que se habilita por empresa (catálogo de la API). */
