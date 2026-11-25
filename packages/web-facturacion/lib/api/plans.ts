@@ -27,7 +27,8 @@ export interface PlanUsage {
   planName: string | null;
   planSince: string | null;
   environment: 'TEST' | 'PRODUCTION';
-  month: string;
+  /** Ciclo del plan en curso: cuenta desde el día en que la empresa pasó a producción. */
+  period: { start: string; end: string };
   documents: DocumentUsage;
   users: { used: number; limit: number | null };
   emissionPoints: { used: number; limit: number | null };
@@ -35,7 +36,8 @@ export interface PlanUsage {
 
 export interface PlanAllowance {
   id: string;
-  month: string;
+  /** Inicio del ciclo al que aplica. */
+  periodStart: string;
   documents: number;
   note: string | null;
   createdAt: string;
@@ -48,7 +50,7 @@ export interface AdminPlanDetail extends PlanUsage {
     emissionPointLimitOverride: number | null;
   };
   allowances: PlanAllowance[];
-  currentMonthAllowances: PlanAllowance[];
+  currentPeriodAllowances: PlanAllowance[];
 }
 
 export interface SetPlanPayload {
@@ -56,6 +58,26 @@ export interface SetPlanPayload {
   documentLimitOverride?: number | null;
   userLimitOverride?: number | null;
   emissionPointLimitOverride?: number | null;
+}
+
+const DAY_MS = 86_400_000;
+const shortDate = (value: Date) =>
+  value.toLocaleDateString('es-EC', {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'America/Guayaquil',
+  });
+
+/** "18 nov – 17 dic": el ciclo del plan (el fin es exclusivo, se muestra el día anterior). */
+export function formatPeriod(period: { start: string; end: string }): string {
+  const start = new Date(period.start);
+  const lastDay = new Date(new Date(period.end).getTime() - DAY_MS);
+  return `${shortDate(start)} – ${shortDate(lastDay)}`;
+}
+
+/** Día en que empieza el próximo ciclo ("18 dic"). */
+export function renewalDate(period: { end: string }): string {
+  return shortDate(new Date(period.end));
 }
 
 export const plansApi = {

@@ -3,6 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UsageMeter } from '@/components/plans/usage-meter';
 import { useMyPlanUsage } from '@/lib/hooks/use-plan';
+import { formatPeriod } from '@/lib/api/plans';
 
 /** "Tu plan" en la página Empresa: el plan contratado y su uso del mes. */
 export function PlanUsageCard() {
@@ -14,7 +15,8 @@ export function PlanUsageCard() {
       <CardHeader>
         <CardTitle>Tu plan: {data.planName}</CardTitle>
         <CardDescription>
-          Uso de este mes. Cuentan las facturas y notas de crédito autorizadas por el SRI
+          Ciclo del {formatPeriod(data.period)} (cuenta desde que pasaste a producción). Cuentan las
+          facturas y notas de crédito autorizadas por el SRI
           {data.environment === 'TEST' && ' (en modo pruebas no cuentan)'}. Para cambiar de plan,
           escríbenos por WhatsApp al 0967155626.
         </CardDescription>

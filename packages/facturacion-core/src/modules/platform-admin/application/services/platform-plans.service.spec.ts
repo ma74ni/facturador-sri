@@ -10,7 +10,8 @@ function setup(company: any) {
     resolveActor: jest.fn().mockResolvedValue({ id: 'admin1', email: 'admin@siete8.com' }),
     record: jest.fn(),
   };
-  const usage = { usage: jest.fn().mockResolvedValue({ plan: 'NEGOCIO' }) };
+  const period = { start: new Date('2026-11-18T05:00:00Z'), end: new Date('2026-12-18T05:00:00Z') };
+  const usage = { usage: jest.fn().mockResolvedValue({ plan: 'NEGOCIO', period }) };
   return { service: new PlatformPlansService(prisma, audit as any, usage as any), prisma, audit };
 }
 
@@ -68,7 +69,7 @@ describe('PlatformPlansService', () => {
     ]);
   });
 
-  it('los extras se registran en el mes en curso y en la auditoría', async () => {
+  it('los extras se registran en el ciclo en curso y en la auditoría', async () => {
     const { service, prisma, audit } = setup(base);
 
     await service.grantExtraDocuments('admin1', 'c1', {
@@ -79,6 +80,7 @@ describe('PlatformPlansService', () => {
     expect(prisma.planAllowance.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         companyId: 'c1',
+        periodStart: new Date('2026-11-18T05:00:00Z'),
         documents: 50,
         note: 'Cobrar en diciembre',
         grantedById: 'admin1',

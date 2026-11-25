@@ -852,19 +852,19 @@ model DocumentEvent {
   @@map("document_events")
 }
 
-// Comprobantes extra que la plataforma le otorga a una empresa en un mes (por encima de su plan),
+// Comprobantes extra que la plataforma le otorga a una empresa en un ciclo (por encima de su plan),
 // para cobrarlos después. Solo se agrega: es también el registro de lo que hay que facturar.
 model PlanAllowance {
   id          String   @id @default(cuid())
   companyId   String
   company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  // Mes de Ecuador al que aplica: "2026-11".
-  month       String
+  // Inicio del ciclo del plan al que aplica (00:00 en Quito; ver billingPeriod).
+  periodStart DateTime
   documents   Int
   note        String?
   grantedById String
   createdAt   DateTime @default(now())
 
-  @@index([companyId, month])
+  @@index([companyId, periodStart])
   @@map("plan_allowances")
 }

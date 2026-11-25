@@ -1,4 +1,4 @@
-import { documentUsage, ecuadorMonth, ecuadorMonthStart, limitsOf } from './plan-usage';
+import { billingPeriod, documentUsage, limitsOf } from './plan-usage';
 
 const company = (overrides = {}) => ({
   plan: null,
@@ -48,11 +48,45 @@ describe('uso de comprobantes', () => {
   });
 });
 
-describe('mes de Ecuador', () => {
-  it('a las 23:00 del 30 de noviembre en Quito todavía es noviembre', () => {
-    const lastNight = new Date('2026-12-01T04:00:00Z'); // 23:00 en Quito
-    expect(ecuadorMonth(lastNight)).toBe('2026-11');
-    expect(ecuadorMonthStart(lastNight)).toEqual(new Date('2026-11-01T05:00:00Z'));
-    expect(ecuadorMonth(new Date('2026-12-01T05:00:00Z'))).toBe('2026-12');
+describe('ciclo de facturación', () => {
+  const quito = (date: string) => new Date(`${date}T05:00:00Z`); // 00:00 en Quito
+
+  it('cuenta desde el día en que pasó a producción', () => {
+    const wentLive = new Date('2026-11-18T20:00:00Z'); // 15:00 del 18 en Quito
+    expect(billingPeriod(wentLive, new Date('2026-11-25T12:00:00Z'))).toEqual({
+      start: quito('2026-11-18'),
+      end: quito('2026-12-18'),
+    });
+    expect(billingPeriod(wentLive, new Date('2026-12-10T12:00:00Z'))).toEqual({
+      start: quito('2026-11-18'),
+      end: quito('2026-12-18'),
+    });
+    expect(billingPeriod(wentLive, quito('2026-12-18')).start).toEqual(quito('2026-12-18'));
+  });
+
+  it('el 17 a las 23:00 en Quito todavía es el ciclo anterior', () => {
+    const wentLive = new Date('2026-11-18T20:00:00Z');
+    expect(billingPeriod(wentLive, new Date('2026-12-18T04:00:00Z')).start).toEqual(
+      quito('2026-11-18'),
+    );
+  });
+
+  it('si pasó a producción un 31, en febrero el ciclo empieza el último día', () => {
+    const wentLive = quito('2026-01-31');
+    expect(billingPeriod(wentLive, new Date('2027-02-15T12:00:00Z'))).toEqual({
+      start: quito('2027-01-31'),
+      end: quito('2027-02-28'),
+    });
+    expect(billingPeriod(wentLive, new Date('2027-03-05T12:00:00Z'))).toEqual({
+      start: quito('2027-02-28'),
+      end: quito('2027-03-31'),
+    });
+  });
+
+  it('sin fecha de producción usa el mes calendario', () => {
+    expect(billingPeriod(null, new Date('2026-11-25T12:00:00Z'))).toEqual({
+      start: quito('2026-11-01'),
+      end: quito('2026-12-01'),
+    });
   });
 });

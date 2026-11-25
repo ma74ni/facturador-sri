@@ -6,7 +6,7 @@ import { FormField, Input, NativeSelect } from '@facturador-sri/ui';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UsageMeter } from '@/components/plans/usage-meter';
-import { PLAN_OPTIONS, PlanKey } from '@/lib/api/plans';
+import { formatPeriod, PLAN_OPTIONS, PlanKey } from '@/lib/api/plans';
 import {
   useAdminCompanyPlan,
   useGrantExtraDocuments,
@@ -90,22 +90,22 @@ export function PlanCard({ companyId }: { companyId: string }) {
   };
 
   const { documents: usage } = data;
-  const monthExtra = data.currentMonthAllowances.reduce((sum, item) => sum + item.documents, 0);
+  const monthExtra = data.currentPeriodAllowances.reduce((sum, item) => sum + item.documents, 0);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Plan</CardTitle>
         <CardDescription>
-          {data.planName ? `${data.planName}` : 'Sin plan asignado: sin límites'} · uso de{' '}
-          {data.month}
+          {data.planName ? `${data.planName}` : 'Sin plan asignado: sin límites'} · ciclo{' '}
+          {formatPeriod(data.period)}
           {data.environment === 'TEST' && ' (en pruebas no cuenta)'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="space-y-3">
           <UsageMeter
-            label="Comprobantes autorizados este mes"
+            label="Comprobantes de este ciclo"
             used={usage.used}
             limit={usage.allowed}
             state={usage.state}
@@ -113,7 +113,7 @@ export function PlanCard({ companyId }: { companyId: string }) {
           <p className="text-body-sm text-on-surface-variant">
             {STATE_TEXT[usage.state]}
             {usage.hardLimit !== null && ` · se bloquea al llegar a ${usage.hardLimit}`}
-            {monthExtra > 0 && ` · incluye ${monthExtra} extra este mes`}
+            {monthExtra > 0 && ` · incluye ${monthExtra} extra en este ciclo`}
           </p>
           <UsageMeter label="Usuarios activos" used={data.users.used} limit={data.users.limit} />
           <UsageMeter
@@ -179,10 +179,10 @@ export function PlanCard({ companyId }: { companyId: string }) {
         </div>
 
         <div className="space-y-3 border-t border-outline-variant pt-4">
-          <p className="text-title-sm text-on-surface">Comprobantes extra este mes</p>
+          <p className="text-title-sm text-on-surface">Comprobantes extra en este ciclo</p>
           <p className="text-body-sm text-on-surface-variant">
-            Amplían lo permitido solo en {data.month}, para que no se quede sin facturar. Quedan
-            registrados para cobrarlos después.
+            Amplían lo permitido solo del {formatPeriod(data.period)}, para que no se quede sin
+            facturar. Quedan registrados para cobrarlos después.
           </p>
           <div className="grid gap-3 sm:grid-cols-[8rem_1fr_auto] sm:items-end">
             <FormField label="Cantidad" htmlFor="extra">
@@ -213,7 +213,11 @@ export function PlanCard({ companyId }: { companyId: string }) {
             <ul className="space-y-1 text-body-sm text-on-surface-variant">
               {data.allowances.map((allowance) => (
                 <li key={allowance.id}>
-                  {allowance.month}: +{allowance.documents}
+                  Ciclo desde{' '}
+                  {new Date(allowance.periodStart).toLocaleDateString('es-EC', {
+                    timeZone: 'America/Guayaquil',
+                  })}
+                  : +{allowance.documents}
                   {allowance.note ? ` · ${allowance.note}` : ''}
                 </li>
               ))}

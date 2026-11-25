@@ -15,6 +15,7 @@ function setup({
       findUnique: jest.fn().mockResolvedValue({
         plan,
         planSince: null,
+        productionSince: new Date('2026-11-18T20:00:00Z'),
         environment,
         documentLimitOverride: null,
         userLimitOverride: null,
@@ -80,7 +81,7 @@ describe('PlanUsageService', () => {
     const usage = await service.usage('c1', new Date('2026-11-25T12:00:00Z'));
     expect(usage).toMatchObject({
       planName: 'Negocio',
-      month: '2026-11',
+      period: { start: new Date('2026-11-18T05:00:00Z'), end: new Date('2026-12-18T05:00:00Z') },
       documents: { used: 170, limit: 200, extra: 10, allowed: 210, state: 'NEAR' },
     });
   });

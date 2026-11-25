@@ -65,15 +65,40 @@ export function documentUsage(used: number, limit: number | null, extra: number)
 }
 
 const ECUADOR_OFFSET_HOURS = 5; // UTC-5 todo el año, sin horario de verano.
+const HOUR_MS = 3_600_000;
 
-/** Mes de Ecuador ("2026-11") de un instante. */
-export function ecuadorMonth(now: Date): string {
-  const local = new Date(now.getTime() - ECUADOR_OFFSET_HOURS * 3_600_000);
-  return `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, '0')}`;
+/** Ciclo de facturación del plan: [start, end), instantes UTC de las 00:00 en Quito. */
+export interface BillingPeriod {
+  start: Date;
+  end: Date;
 }
 
-/** Inicio del mes de Ecuador (00:00 en Quito) como instante UTC. */
-export function ecuadorMonthStart(now: Date): Date {
-  const [year, month] = ecuadorMonth(now).split('-').map(Number);
-  return new Date(Date.UTC(year, month - 1, 1, ECUADOR_OFFSET_HOURS));
+/** Fecha de Ecuador (año, mes 0-11, día) de un instante. */
+function ecuadorDate(instant: Date) {
+  const local = new Date(instant.getTime() - ECUADOR_OFFSET_HOURS * HOUR_MS);
+  return { year: local.getUTCFullYear(), month: local.getUTCMonth(), day: local.getUTCDate() };
+}
+
+const daysInMonth = (year: number, month: number) =>
+  new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+
+/** 00:00 en Quito del día `anchorDay` del mes indicado; si ese mes es más corto, su último día. */
+function cycleDay(year: number, month: number, anchorDay: number): Date {
+  const y = year + Math.floor(month / 12);
+  const m = ((month % 12) + 12) % 12;
+  return new Date(Date.UTC(y, m, Math.min(anchorDay, daysInMonth(y, m)), ECUADOR_OFFSET_HOURS));
+}
+
+/**
+ * Ciclo mensual del plan que contiene `now`, contado desde el día en que la empresa pasó a
+ * producción: si fue el 18 de noviembre, los ciclos van del 18 al 17. Si ese día no existe en un
+ * mes (31), el ciclo empieza el último día de ese mes. Sin fecha de inicio, el mes calendario.
+ */
+export function billingPeriod(anchor: Date | null | undefined, now: Date): BillingPeriod {
+  const anchorDay = anchor ? ecuadorDate(anchor).day : 1;
+  const today = ecuadorDate(now);
+  let start = cycleDay(today.year, today.month, anchorDay);
+  if (now < start) start = cycleDay(today.year, today.month - 1, anchorDay);
+  const from = ecuadorDate(start);
+  return { start, end: cycleDay(from.year, from.month + 1, anchorDay) };
 }

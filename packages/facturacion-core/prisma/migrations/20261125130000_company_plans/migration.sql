@@ -23,7 +23,7 @@ ADD COLUMN     "userLimitOverride" INTEGER;
 CREATE TABLE "plan_allowances" (
     "id" TEXT NOT NULL,
     "companyId" TEXT NOT NULL,
-    "month" TEXT NOT NULL,
+    "periodStart" TIMESTAMP(3) NOT NULL,
     "documents" INTEGER NOT NULL,
     "note" TEXT,
     "grantedById" TEXT NOT NULL,
@@ -33,7 +33,7 @@ CREATE TABLE "plan_allowances" (
 );
 
 -- CreateIndex
-CREATE INDEX "plan_allowances_companyId_month_idx" ON "plan_allowances"("companyId", "month");
+CREATE INDEX "plan_allowances_companyId_periodStart_idx" ON "plan_allowances"("companyId", "periodStart");
 
 -- AddForeignKey
 ALTER TABLE "plan_allowances" ADD CONSTRAINT "plan_allowances_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "companies"("id") ON DELETE CASCADE ON UPDATE CASCADE;

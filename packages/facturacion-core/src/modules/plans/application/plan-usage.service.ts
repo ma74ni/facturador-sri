@@ -9,7 +9,7 @@ import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { PLANS } from '../domain/plan.catalog';
-import { documentUsage, ecuadorMonth, ecuadorMonthStart, limitsOf } from '../domain/plan-usage';
+import { billingPeriod, BillingPeriod, documentUsage, limitsOf } from '../domain/plan-usage';
 
 /** Cómo pedir más: va en los mensajes de límite. */
 const UPGRADE_HINT = 'Escríbenos por WhatsApp al 0967155626 para ampliar tu plan.';
@@ -23,6 +23,7 @@ type Db = PrismaService | Prisma.TransactionClient;
 const COMPANY_PLAN_SELECT = {
   plan: true,
   planSince: true,
+  productionSince: true,
   environment: true,
   documentLimitOverride: true,
   userLimitOverride: true,
@@ -45,10 +46,11 @@ export class PlanUsageService {
     if (!company) throw new NotFoundException('Empresa no encontrada');
 
     const limits = limitsOf(company);
-    const month = ecuadorMonth(now);
+    // El ciclo cuenta desde que pasó a producción (o desde que tiene plan, si aún no pasó).
+    const period = billingPeriod(company.productionSince ?? company.planSince, now);
     const [documents, extra, users, emissionPoints] = await Promise.all([
-      this.countDocuments(db, companyId, ecuadorMonthStart(now)),
-      this.extraDocuments(db, companyId, month),
+      this.countDocuments(db, companyId, period.start),
+      this.extraDocuments(db, companyId, period),
       db.user.count({ where: { companyId, isActive: true } }),
       db.emissionPoint.count({ where: { establishment: { companyId } } }),
     ]);
@@ -58,7 +60,7 @@ export class PlanUsageService {
       planName: company.plan ? PLANS[company.plan].name : null,
       planSince: company.planSince,
       environment: company.environment,
-      month,
+      period,
       documents: documentUsage(documents, limits.documentsPerMonth, extra),
       users: { used: users, limit: limits.users },
       emissionPoints: { used: emissionPoints, limit: limits.emissionPoints },
@@ -146,9 +148,9 @@ export class PlanUsageService {
   }
 
   /**
-   * Facturas y notas de crédito de producción (dígito 24 de la clave = 2) del mes:
-   * - las autorizadas en el mes (creadas como mucho dos meses antes, para acotar la búsqueda);
-   * - las creadas en el mes que siguen en camino o pendientes (borrador, enviada, con error): así
+   * Facturas y notas de crédito de producción (dígito 24 de la clave = 2) del ciclo:
+   * - las autorizadas en el ciclo (creadas como mucho dos meses antes, para acotar la búsqueda);
+   * - las creadas en el ciclo que siguen en camino o pendientes (borrador, enviada, con error): así
    *   ni dos emisiones a la vez ni una caída del SRI liberan cupo.
    * Solo los rechazos y los cancelados dejan de contar.
    */
@@ -175,9 +177,9 @@ export class PlanUsageService {
     return Number(row?.used ?? 0);
   }
 
-  private async extraDocuments(db: Db, companyId: string, month: string): Promise<number> {
+  private async extraDocuments(db: Db, companyId: string, period: BillingPeriod): Promise<number> {
     const result = await db.planAllowance.aggregate({
-      where: { companyId, month },
+      where: { companyId, periodStart: { gte: period.start, lt: period.end } },
       _sum: { documents: true },
     });
     return result._sum.documents ?? 0;

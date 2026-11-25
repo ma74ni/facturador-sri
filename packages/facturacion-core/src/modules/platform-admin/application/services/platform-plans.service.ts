@@ -4,7 +4,6 @@ import { PrismaService } from '@/shared/database/prisma.service';
 import { PRODUCT_MODULE_KEYS } from '../../../companies/domain/product-modules.catalog';
 import { PlanUsageService } from '../../../plans/application/plan-usage.service';
 import { PLANS } from '../../../plans/domain/plan.catalog';
-import { ecuadorMonth } from '../../../plans/domain/plan-usage';
 import { GrantExtraDocumentsDto, SetCompanyPlanDto } from '../dto/company-plan.dto';
 import { PlatformAuditService } from './platform-audit.service';
 
@@ -20,9 +19,8 @@ export class PlatformPlansService {
     private readonly usage: PlanUsageService,
   ) {}
 
-  /** Uso del mes y los extras otorgados este mes. */
+  /** Uso del ciclo en curso y los extras otorgados (los del ciclo, aparte). */
   async planDetail(companyId: string, now: Date = new Date()) {
-    const month = ecuadorMonth(now);
     const [company, usage, allowances] = await Promise.all([
       this.prisma.company.findUnique({
         where: { id: companyId },
@@ -37,7 +35,7 @@ export class PlatformPlansService {
         where: { companyId },
         orderBy: { createdAt: 'desc' },
         take: 24,
-        select: { id: true, month: true, documents: true, note: true, createdAt: true },
+        select: { id: true, periodStart: true, documents: true, note: true, createdAt: true },
       }),
     ]);
     if (!company) throw new NotFoundException('Empresa no encontrada');
@@ -45,7 +43,10 @@ export class PlatformPlansService {
       ...usage,
       overrides: company,
       allowances,
-      currentMonthAllowances: allowances.filter((allowance) => allowance.month === month),
+      currentPeriodAllowances: allowances.filter(
+        (allowance) =>
+          allowance.periodStart >= usage.period.start && allowance.periodStart < usage.period.end,
+      ),
     };
   }
 
@@ -124,16 +125,28 @@ export class PlatformPlansService {
     });
     if (!company) throw new NotFoundException('Empresa no encontrada');
 
-    const month = ecuadorMonth(new Date());
+    // Para el ciclo en curso de la empresa (desde que pasó a producción).
+    const { period } = await this.usage.usage(companyId);
     const note = dto.note?.trim() || null;
     await this.prisma.$transaction(async (tx) => {
       await tx.planAllowance.create({
-        data: { companyId, month, documents: dto.documents, note, grantedById: actor.id },
+        data: {
+          companyId,
+          periodStart: period.start,
+          documents: dto.documents,
+          note,
+          grantedById: actor.id,
+        },
       });
       await this.audit.record(tx, actor, {
         action: 'COMPANY_EXTRA_DOCUMENTS_GRANTED',
         company,
-        details: { month, documents: dto.documents, note },
+        details: {
+          periodStart: period.start,
+          periodEnd: period.end,
+          documents: dto.documents,
+          note,
+        },
       });
     });
     return this.planDetail(companyId);
