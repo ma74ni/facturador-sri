@@ -14,7 +14,9 @@ export const platformAdminKeys = {
 export function apiErrorMessage(error: any, fallback: string): string {
   const message = error?.response?.data?.message;
   if (Array.isArray(message)) return message.join('. ');
-  return message || fallback;
+  if (message) return message;
+  // Sin mensaje de la API pero con código de petición: que el usuario lo pueda dictar a soporte.
+  return error?.requestId ? `${fallback} (código ${error.requestId})` : fallback;
 }
 
 function useIsPlatformAdmin() {
