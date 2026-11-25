@@ -702,53 +702,6 @@ export default function FacturasPage() {
         </CardContent>
       </Card>
 
-      {/* Authorization Info */}
-      {facturas.some((f) => f.status === 'AUTHORIZED' && f.authorizationNumber) && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Últimas Autorizaciones</CardTitle>
-            <CardDescription>Facturas autorizadas recientemente por el SRI</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {facturas
-                .filter((f) => f.status === 'AUTHORIZED' && f.authorizationNumber)
-                .slice(0, 5)
-                .map((factura) => (
-                  <div
-                    key={factura.id}
-                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 border rounded-lg bg-success-container/50"
-                  >
-                    <div className="space-y-1 flex-1 min-w-0">
-                      <p className="text-sm font-medium">
-                        {factura.establishmentCode}-{factura.emissionPointCode}-{factura.sequential}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {factura.customerName} • {factura.customerIdentification}
-                      </p>
-                      <p
-                        className="text-xs font-mono text-on-success-container truncate"
-                        title={factura.authorizationNumber}
-                      >
-                        {factura.authorizationNumber}
-                      </p>
-                    </div>
-                    <div className="text-left sm:text-right flex-shrink-0">
-                      <p className="text-sm font-medium">
-                        {formatCurrency(Number(factura.totalAmount))}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {factura.authorizationDate &&
-                          new Date(factura.authorizationDate).toLocaleDateString('es-EC')}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Invoice Dialog */}
       <InvoiceDialog
         open={invoiceDialogOpen}
