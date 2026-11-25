@@ -40,6 +40,34 @@ const STATUS_VARIANT: Record<InvoicePaymentStatus, 'secondary' | 'warning' | 'su
   PAID: 'success',
 };
 
+type Allocation = {
+  invoiceId: string;
+  amount: number;
+  retentionAmount: number;
+  invoice?: { sequential?: string } | null;
+};
+
+/** Cuántas facturas aplicadas se muestran de un pago antes de resumir el resto. */
+const APPLIED_SHOWN = 3;
+
+/**
+ * Facturas a las que se aplicó un pago. Un pago puede cubrir muchas facturas: se muestran las
+ * primeras y "y N más" (la lista completa queda en el tooltip), para que la fila no crezca sin fin.
+ */
+function AppliedInvoices({ allocations }: { allocations: Allocation[] }) {
+  const labels = allocations.map((a) => {
+    const label = `${a.invoice?.sequential ?? a.invoiceId} (${formatCurrency(a.amount)})`;
+    return a.retentionAmount > 0 ? `${label} + ${formatCurrency(a.retentionAmount)} ret.` : label;
+  });
+  const hidden = labels.length - APPLIED_SHOWN;
+  return (
+    <p className="text-xs text-muted-foreground break-words" title={labels.join(', ')}>
+      {labels.slice(0, APPLIED_SHOWN).join(', ')}
+      {hidden > 0 && ` y ${hidden} ${hidden === 1 ? 'factura' : 'facturas'} más`}
+    </p>
+  );
+}
+
 export default function CobranzaClientePage() {
   const { customerId } = useParams<{ customerId: string }>();
   const { data: statement, isLoading } = useAccountStatement(customerId);
@@ -274,16 +302,7 @@ export default function CobranzaClientePage() {
                     </IconButton>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {payment.allocations
-                    .map((a) => {
-                      const label = `${a.invoice?.sequential ?? a.invoiceId} (${formatCurrency(a.amount)})`;
-                      return a.retentionAmount > 0
-                        ? `${label} + ${formatCurrency(a.retentionAmount)} ret.`
-                        : label;
-                    })
-                    .join(', ')}
-                </p>
+                <AppliedInvoices allocations={payment.allocations} />
               </div>
             ))}
             {statement.payments.length === 0 && (
@@ -311,17 +330,12 @@ export default function CobranzaClientePage() {
                     <TableCell>
                       {new Date(payment.paymentDate).toLocaleDateString('es-EC')}
                     </TableCell>
-                    <TableCell>{payment.reference || '—'}</TableCell>
+                    <TableCell className="whitespace-normal max-w-[14rem] break-words">
+                      {payment.reference || '—'}
+                    </TableCell>
                     <TableCell>{formatCurrency(payment.totalAmount)}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {payment.allocations
-                        .map((a) => {
-                          const label = `${a.invoice?.sequential ?? a.invoiceId} (${formatCurrency(a.amount)})`;
-                          return a.retentionAmount > 0
-                            ? `${label} + ${formatCurrency(a.retentionAmount)} ret.`
-                            : label;
-                        })
-                        .join(', ')}
+                    <TableCell className="whitespace-normal min-w-[12rem] max-w-[24rem]">
+                      <AppliedInvoices allocations={payment.allocations} />
                     </TableCell>
                     <TableCell className="text-right">
                       <IconButton
