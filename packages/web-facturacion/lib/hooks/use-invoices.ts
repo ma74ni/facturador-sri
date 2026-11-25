@@ -69,6 +69,8 @@ export function useCreateInvoice() {
     mutationFn: (data: any) => invoicesApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: invoiceKeys.all(user?.companyId) });
+      // El uso del plan cambia al emitir o autorizar.
+      queryClient.invalidateQueries({ queryKey: ['plan'] });
       queryClient.invalidateQueries({ queryKey: invoiceKeys.stats(user?.companyId) });
       toast({
         title: 'Factura creada',
@@ -98,6 +100,8 @@ export function useDeleteInvoice() {
     mutationFn: (id: string) => invoicesApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: invoiceKeys.all(user?.companyId) });
+      // El uso del plan cambia al emitir o autorizar.
+      queryClient.invalidateQueries({ queryKey: ['plan'] });
       queryClient.invalidateQueries({ queryKey: invoiceKeys.stats(user?.companyId) });
       toast({
         title: 'Factura eliminada',

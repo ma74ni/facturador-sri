@@ -8,6 +8,8 @@ import { RejectCompanyDto } from '../../application/dto/reject-company.dto';
 import { GoLiveDto } from '../../application/dto/go-live.dto';
 import { UpdateEmissionSequenceDto } from '../../application/dto/update-emission-sequence.dto';
 import { UpdateCompanyModulesDto } from '../../application/dto/update-company-modules.dto';
+import { GrantExtraDocumentsDto, SetCompanyPlanDto } from '../../application/dto/company-plan.dto';
+import { PlatformPlansService } from '../../application/services/platform-plans.service';
 import {
   AuthenticatedUser,
   CurrentUser,
@@ -18,7 +20,10 @@ import {
 @UseGuards(JwtAuthGuard, PlatformAdminGuard)
 @ApiBearerAuth()
 export class PlatformCompaniesController {
-  constructor(private readonly companies: PlatformCompaniesService) {}
+  constructor(
+    private readonly companies: PlatformCompaniesService,
+    private readonly plans: PlatformPlansService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Listar empresas con sus requisitos para producción' })
@@ -70,6 +75,34 @@ export class PlatformCompaniesController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.companies.updateModules(user.userId, id, dto.modules);
+  }
+
+  @Get(':id/plan')
+  @ApiOperation({ summary: 'Plan de la empresa, su uso este mes y los extras otorgados' })
+  plan(@Param('id') id: string) {
+    return this.plans.planDetail(id);
+  }
+
+  @Put(':id/plan')
+  @ApiOperation({
+    summary: 'Asignar el plan (y límites propios); enciende los módulos que incluye',
+  })
+  setPlan(
+    @Param('id') id: string,
+    @Body() dto: SetCompanyPlanDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.plans.setPlan(user.userId, id, dto);
+  }
+
+  @Post(':id/extra-documents')
+  @ApiOperation({ summary: 'Dar comprobantes extra este mes (se cobran después)' })
+  grantExtraDocuments(
+    @Param('id') id: string,
+    @Body() dto: GrantExtraDocumentsDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.plans.grantExtraDocuments(user.userId, id, dto);
   }
 
   @Patch(':id/emission-points/:emissionPointId/sequence')

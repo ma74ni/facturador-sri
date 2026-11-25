@@ -27,6 +27,16 @@ export interface DigestLine {
   production: boolean;
 }
 
+/** Empresa que se acerca o pasó el límite de su plan este mes. */
+export interface PlanLimitLine {
+  company: string;
+  plan: string;
+  used: number;
+  allowed: number;
+  /** NEAR (80%+), OVER (pasó, dentro del margen) o BLOCKED (ya no puede facturar). */
+  state: string;
+}
+
 export interface IncidentDigest {
   /** Errores cuyo comprobante sigue sin autorizar. */
   unresolved: number;
@@ -38,6 +48,8 @@ export interface IncidentDigest {
   /** Lo que conviene mirar, lo de producción primero. Recortado a MAX_LINES. */
   lines: DigestLine[];
   stuckLines: DigestLine[];
+  /** Empresas cerca o pasadas del límite de su plan: para ofrecer el cambio de plan o cobrar extras. */
+  planLines: PlanLimitLine[];
   /** Hay algo que hacer: si no, no se manda correo. */
   actionable: boolean;
 }
@@ -68,7 +80,10 @@ const productionFirst = (a: DigestLine, b: DigestLine) =>
  * Resumen diario para el administrador de la plataforma. Cuenta lo pendiente y lista los errores
  * sin resolver y los comprobantes atascados, primero los de producción (afectan a facturas reales).
  */
-export function buildIncidentDigest(snapshot: IncidentsSnapshot): IncidentDigest {
+export function buildIncidentDigest(
+  snapshot: IncidentsSnapshot,
+  planLines: PlanLimitLine[] = [],
+): IncidentDigest {
   const errors = snapshot.events.filter((event) => event.outcome === 'ERROR');
   const unresolvedErrors = errors.filter((event) => event.document?.status !== 'AUTHORIZED');
   const warnings = snapshot.events.filter((event) => event.outcome === 'WARNING');
@@ -106,6 +121,7 @@ export function buildIncidentDigest(snapshot: IncidentsSnapshot): IncidentDigest
     stuck: stuckLines.length,
     lines: lines.slice(0, MAX_LINES),
     stuckLines: stuckLines.slice(0, MAX_LINES),
-    actionable: lines.length > 0 || stuckLines.length > 0,
+    planLines: planLines.slice(0, MAX_LINES),
+    actionable: lines.length > 0 || stuckLines.length > 0 || planLines.length > 0,
   };
 }

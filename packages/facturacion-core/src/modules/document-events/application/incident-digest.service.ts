@@ -6,6 +6,7 @@ import { PrismaService } from '../../../shared/database/prisma.service';
 import { EmailService } from '../../../shared/email/email.service';
 import { buildIncidentDigest } from '../domain/incident-digest';
 import { DocumentEventsService } from './document-events.service';
+import { PlanUsageService } from '../../plans/application/plan-usage.service';
 
 /** Entre dos envíos manuales: el botón no debe poder llenar buzones ni gastar la cuota de correo. */
 export const MANUAL_DIGEST_COOLDOWN_MS = 10 * 60_000;
@@ -25,6 +26,7 @@ export class IncidentDigestService {
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
     private readonly config: ConfigService,
+    private readonly planUsage?: PlanUsageService,
   ) {}
 
   // 08:00 en Ecuador, antes de que empiece el día de facturación.
@@ -61,7 +63,20 @@ export class IncidentDigestService {
   }
 
   private async deliver(now: Date): Promise<number> {
-    const digest = buildIncidentDigest(await this.events.incidents(24, now));
+    // Si el conteo de planes falla, el resumen de incidencias igual sale.
+    const usageRows = this.planUsage
+      ? await this.planUsage.documentUsageByCompany(now).catch(() => [])
+      : [];
+    const planLines = usageRows
+      .filter((row) => ['NEAR', 'OVER', 'BLOCKED'].includes(row.documents.state))
+      .map((row) => ({
+        company: row.businessName,
+        plan: row.planName ?? '',
+        used: row.documents.used,
+        allowed: row.documents.allowed ?? 0,
+        state: row.documents.state,
+      }));
+    const digest = buildIncidentDigest(await this.events.incidents(24, now), planLines);
     if (!digest.actionable) {
       this.logger.log('Resumen de incidencias: nada pendiente, no se envía');
       return 0;

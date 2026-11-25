@@ -23,6 +23,7 @@ import {
   PRODUCT_MODULE_KEYS,
   ProductModuleKey,
 } from '../../../companies/domain/product-modules.catalog';
+import { PlanUsageService } from '../../../plans/application/plan-usage.service';
 
 const TEST_DOCUMENT_REASON = 'Emitida en el ambiente de pruebas del SRI, antes de producción';
 
@@ -64,6 +65,7 @@ export class PlatformCompaniesService {
     private readonly prisma: PrismaService,
     private readonly audit: PlatformAuditService,
     private readonly notifier: CompanyNotifierService,
+    private readonly planUsage?: PlanUsageService,
   ) {}
 
   async list(filter?: CompanyListFilter) {
@@ -89,6 +91,7 @@ export class PlatformCompaniesService {
         rejectedAt: true,
         createdAt: true,
         enabledModules: true,
+        plan: true,
         certificateHolder: true,
         certificateIssuer: true,
         certificateValidFrom: true,
@@ -97,9 +100,16 @@ export class PlatformCompaniesService {
     });
 
     const now = new Date();
+    // Uso de comprobantes del mes de las empresas con plan en producción.
+    // Si el conteo falla, la lista igual se muestra (sin el uso).
+    const rows = this.planUsage
+      ? await this.planUsage.documentUsageByCompany(now).catch(() => [])
+      : [];
+    const usage = new Map(rows.map((row) => [row.companyId, row.documents]));
     return companies.map(({ users, establishments, ...company }) => ({
       ...company,
       readiness: readinessOf({ ...company, users, establishments }, now),
+      documentUsage: usage.get(company.id) ?? null,
     }));
   }
 
@@ -121,6 +131,7 @@ export class PlatformCompaniesService {
         rejectedAt: true,
         createdAt: true,
         enabledModules: true,
+        plan: true,
         certificateHolder: true,
         certificateIssuer: true,
         certificateValidFrom: true,

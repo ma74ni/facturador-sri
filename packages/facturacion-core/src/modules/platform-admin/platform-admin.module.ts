@@ -8,9 +8,12 @@ import { PlatformCompaniesService } from './application/services/platform-compan
 import { PlatformAdminsService } from './application/services/platform-admins.service';
 import { PlatformAuditService } from './application/services/platform-audit.service';
 import { CompanyNotifierService } from './application/services/company-notifier.service';
+import { PlatformPlansService } from './application/services/platform-plans.service';
+import { PlansModule } from '../plans/plans.module';
 
 /** Panel de administración de la plataforma (EmailModule es global). */
 @Module({
+  imports: [PlansModule],
   controllers: [PlatformCompaniesController, PlatformAdminsController, PlatformModulesController],
   providers: [
     PrismaService,
@@ -19,6 +22,7 @@ import { CompanyNotifierService } from './application/services/company-notifier.
     PlatformAdminsService,
     PlatformAuditService,
     CompanyNotifierService,
+    PlatformPlansService,
   ],
 })
 export class PlatformAdminModule {}
