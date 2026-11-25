@@ -1,5 +1,7 @@
 'use client';
 
+import { KEEP_SESSION_AVAILABLE } from '@/lib/api/client';
+
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -117,20 +119,22 @@ export default function LoginPage() {
               <FieldError message={errors.password?.message} />
             </div>
 
-            <label className="flex items-start gap-2 text-body-md text-on-surface">
-              <input
-                type="checkbox"
-                {...register('keepSession')}
-                disabled={isLoading}
-                className="mt-1 h-4 w-4 accent-primary"
-              />
-              <span>
-                Mantener la sesión iniciada
-                <span className="block text-body-sm text-on-surface-variant">
-                  No la marques en una computadora compartida.
+            {KEEP_SESSION_AVAILABLE && (
+              <label className="flex items-start gap-2 text-body-md text-on-surface">
+                <input
+                  type="checkbox"
+                  {...register('keepSession')}
+                  disabled={isLoading}
+                  className="mt-1 h-4 w-4 accent-primary"
+                />
+                <span>
+                  Mantener la sesión iniciada
+                  <span className="block text-body-sm text-on-surface-variant">
+                    No la marques en una computadora compartida.
+                  </span>
                 </span>
-              </span>
-            </label>
+              </label>
+            )}
 
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (

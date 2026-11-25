@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import apiClient, {
+  KEEP_SESSION_AVAILABLE,
   endSession,
   refreshSession,
   SESSION_KEPT_KEY,
@@ -150,10 +151,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (data: LoginFormData) => {
     try {
-      const response = await apiClient.post('/auth/login', data);
+      let keepSession = KEEP_SESSION_AVAILABLE && !!data.keepSession;
+      // Solo con la sesión que se renueva: la cookie viaja con credenciales.
+      const post = () =>
+        apiClient.post('/auth/login', { ...data, keepSession }, { withCredentials: keepSession });
+      let response;
+      try {
+        response = await post();
+      } catch (error: any) {
+        // Sin respuesta legible (CORS: un origen al que la API no le acepta la cookie): se entra
+        // igual, sin "mantener la sesión", en vez de impedir el login.
+        if (!keepSession || error.response) throw error;
+        keepSession = false;
+        response = await post();
+      }
       await startSession(response.data.access_token);
       // Sin la casilla no queda marca: nunca se renueva con una cookie que no es de esta sesión.
-      if (data.keepSession) localStorage.setItem(SESSION_KEPT_KEY, '1');
+      if (keepSession) localStorage.setItem(SESSION_KEPT_KEY, '1');
       else localStorage.removeItem(SESSION_KEPT_KEY);
       router.push('/dashboard');
     } catch (error: any) {
