@@ -1,5 +1,7 @@
 'use client';
 
+import { SESSION_KEPT_KEY } from '@/lib/api/client';
+
 import { Suspense, useState } from 'react';
 
 import { useForm } from 'react-hook-form';
@@ -54,6 +56,7 @@ function ResetPasswordContent() {
       // Una sesión abierta en este navegador quedó invalidada por el cambio.
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      localStorage.removeItem(SESSION_KEPT_KEY);
       setDone(true);
     } catch (err: any) {
       const message = err.response?.data?.message;

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { openSecret } from '../../crypto/secret-cipher';
 import { errorMessage } from '../../errors/error-message';
+import { maskEmail } from '../../observability/redact';
 // node-mailjet no expone un default compatible sin esModuleInterop.
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const Mailjet = require('node-mailjet');
@@ -203,7 +204,7 @@ export class MailjetProvider {
       const result = response.body.Messages[0];
 
       if (result.Status === 'success') {
-        this.logger.log(`✅ Email enviado exitosamente a ${options.to}`);
+        this.logger.log(`✅ Email enviado exitosamente a ${maskEmail(options.to)}`);
         return {
           success: true,
           messageId: result.To[0]?.MessageUUID || String(result.To[0]?.MessageID),

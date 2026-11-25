@@ -1,8 +1,17 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import apiClient from '../api/client';
+import apiClient, {
+  endSession,
+  refreshSession,
+  SESSION_KEPT_KEY,
+  SessionExpiredError,
+} from '../api/client';
+
+/** Si la API no responde al abrir la app, se reintenta así (con espera creciente). */
+const MAX_CHECK_AUTH_RETRIES = 4;
+const CHECK_AUTH_RETRY_MS = 5000;
 import { LoginFormData, RegisterFormData } from '../validations/schemas';
 import type { TaxRegime, VatFilingPeriod } from '../api/company';
 
@@ -48,7 +57,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (data: LoginFormData) => Promise<void>;
   register: (data: RegisterFormData) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
 }
 
@@ -63,27 +72,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const isAuthenticated = !!user && !!token;
 
+  // Reintentos de checkAuth cuando la API no responde (por ejemplo, mientras Render despierta).
+  const retries = useRef(0);
+
+  /**
+   * Restaura la sesión guardada y la valida con la API. Solo la cierra si la API dice que ya
+   * no vale (401 o renovación rechazada): un corte de red o un servidor despertando no saca a
+   * nadie del sistema, se reintenta.
+   */
   const checkAuth = async () => {
     try {
-      const savedToken = localStorage.getItem('token');
+      let savedToken = localStorage.getItem('token');
       const savedUser = localStorage.getItem('user');
+      if (savedUser) setUser(JSON.parse(savedUser));
 
-      if (savedToken && savedUser) {
+      // Sin token de acceso pero con "mantener la sesión iniciada": se renueva con la cookie.
+      if (!savedToken && localStorage.getItem(SESSION_KEPT_KEY) === '1') {
+        savedToken = await refreshSession();
+      }
+
+      if (savedToken) {
         setToken(savedToken);
-        setUser(JSON.parse(savedUser));
-
-        // Verificar token con el servidor
+        // Verificar token con el servidor (si venció, el cliente lo renueva y reintenta)
         const response = await apiClient.get('/auth/profile');
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        setToken(localStorage.getItem('token'));
         setUser(response.data.user);
         setCompany(response.data.company);
       }
+      retries.current = 0;
     } catch (error) {
-      // Token inválido o expirado
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      setUser(null);
-      setToken(null);
-      setCompany(null);
+      const sessionGone =
+        error instanceof SessionExpiredError ||
+        (error as { response?: { status?: number } })?.response?.status === 401;
+      if (sessionGone) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem(SESSION_KEPT_KEY);
+        setUser(null);
+        setToken(null);
+        setCompany(null);
+      } else if (retries.current < MAX_CHECK_AUTH_RETRIES) {
+        // La sesión guardada sigue; se vuelve a validar en un momento.
+        retries.current += 1;
+        setTimeout(checkAuth, CHECK_AUTH_RETRY_MS * retries.current);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -119,6 +152,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const response = await apiClient.post('/auth/login', data);
       await startSession(response.data.access_token);
+      // Sin la casilla no queda marca: nunca se renueva con una cookie que no es de esta sesión.
+      if (data.keepSession) localStorage.setItem(SESSION_KEPT_KEY, '1');
+      else localStorage.removeItem(SESSION_KEPT_KEY);
       router.push('/dashboard');
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Error al iniciar sesión');
@@ -161,7 +197,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    // Revoca la sesión en la API (la cookie de renovación) antes de olvidar la local.
+    await endSession();
     setUser(null);
     setToken(null);
     setCompany(null);

@@ -4,6 +4,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../../shared/database/prisma.service';
 import { AuthenticatedUser } from '../decorators/current-user.decorator';
+import { setRequestUser } from '../../../../shared/observability/request-context';
 
 interface JwtPayload {
   sub: string;
@@ -43,6 +44,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException();
     }
 
+    // Los logs y los errores de esta petición quedan con su empresa y su usuario.
+    setRequestUser(user.id, user.companyId);
     return { userId: user.id, email: user.email, companyId: user.companyId };
   }
 }

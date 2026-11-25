@@ -32,6 +32,7 @@ import { syncInvoicePaymentStatus } from '../../../payments/application/services
 import { errorMessage } from '../../../../shared/errors/error-message';
 import { Prisma } from '@prisma/client';
 import { saleIvaCode } from '../../../companies/domain/tax-profile';
+import { maskEmail } from '../../../../shared/observability/redact';
 
 /** Lo que necesita el envío por email: cliente, factura modificada y la configuración de email. */
 const CREDIT_NOTE_EMAIL_INCLUDE = {
@@ -483,7 +484,7 @@ export class CreditNotesService {
         });
 
         if (creditNoteWithCustomer?.customer?.email) {
-          this.logger.log(`📧 Enviando nota de crédito automáticamente a: ${creditNoteWithCustomer.customer.email}`);
+          this.logger.log(`📧 Enviando nota de crédito automáticamente a: ${maskEmail(creditNoteWithCustomer.customer.email)}`);
 
           try {
             await this.sendCreditNoteByEmail(creditNote.id, companyId);
@@ -731,7 +732,7 @@ export class CreditNotesService {
     const modifiedInvoiceNumber = creditNote.modifiedInvoice
       ? documentNumber(creditNote.modifiedInvoice)
       : creditNote.modifiedNumber;
-    this.logger.log(`📧 Enviando nota de crédito ${creditNoteNumber} a ${emailTo}...`);
+    this.logger.log(`📧 Enviando nota de crédito ${creditNoteNumber} a ${maskEmail(emailTo)}...`);
 
     const result = await this.documentMailer.send({
       template: 'credit-note',
@@ -768,7 +769,7 @@ export class CreditNotesService {
       throw new BadRequestException(`Error al enviar el correo: ${result.error}`);
     }
 
-    this.logger.log(`✅ Nota de crédito enviada exitosamente a ${emailTo}`);
+    this.logger.log(`✅ Nota de crédito enviada exitosamente a ${maskEmail(emailTo)}`);
 
     return {
       message: 'Nota de crédito enviada exitosamente por correo electrónico',

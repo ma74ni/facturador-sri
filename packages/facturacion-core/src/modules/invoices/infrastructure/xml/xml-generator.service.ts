@@ -130,9 +130,6 @@ export class XmlGeneratorService {
     this.logger.log(
       `📝 Mapeo tipo identificación: "${invoice.customer.identificationType}" → "${tipoIdentificacionCodigo}"`,
     );
-    this.logger.log(
-      `📝 Identificación normalizada: "${invoice.customer.identification}" → "${identificacionNormalizada}"`,
-    );
 
     infoFactura.ele('tipoIdentificacionComprador').txt(tipoIdentificacionCodigo);
     infoFactura

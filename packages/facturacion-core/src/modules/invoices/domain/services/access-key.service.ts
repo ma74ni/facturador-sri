@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 @Injectable()
 export class AccessKeyService {
+  private readonly logger = new Logger(AccessKeyService.name);
+
   /**
    * Genera la clave de acceso de 49 dígitos según normativa SRI
    * Formato: DDMMAAAATCCEEEPPPNNNNNNNNND
@@ -76,7 +78,7 @@ export class AccessKeyService {
       throw new Error(`Error: la clave de acceso debe tener 49 dígitos, tiene ${fullKey.length}`);
     }
 
-    console.log(`🔑 Clave de acceso generada: ${fullKey} (longitud: ${fullKey.length})`);
+    this.logger.log(`🔑 Clave de acceso generada: ${fullKey}`);
 
     return fullKey;
   }
