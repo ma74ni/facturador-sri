@@ -51,6 +51,7 @@ export interface ReceivedDocumentFilters {
   type?: unknown;
   supplierId?: unknown;
   withoutAccount?: unknown;
+  withoutTaxSupport?: unknown;
   search?: unknown;
 }
 
@@ -369,6 +370,19 @@ export class ReceivedDocumentsService {
     return { updated: count };
   }
 
+  /** El sustento tributario de varias compras a la vez (lo necesita el 104 para ubicarlas). */
+  async assignTaxSupport(ids: string[], taxSupportCode: string | null, companyId: string) {
+    const { count } = await this.prisma.receivedDocument.updateMany({
+      where: {
+        id: { in: [...new Set(ids)] },
+        companyId,
+        status: { not: ReceivedDocumentStatus.VOIDED },
+      },
+      data: { taxSupportCode },
+    });
+    return { updated: count };
+  }
+
   /**
    * Lo que se usó en la última compra registrada del proveedor, para proponerlo en la siguiente:
    * cuenta de gasto (si sigue activa), sustento y forma de pago.
@@ -424,6 +438,11 @@ export class ReceivedDocumentsService {
     const supplierId = str(filters.supplierId);
     if (supplierId) where.supplierId = supplierId;
     if (str(filters.withoutAccount) === 'true') where.expenseAccountId = null;
+    // Las que el 104 no puede ubicar: con base gravada y sin sustento.
+    if (str(filters.withoutTaxSupport) === 'true') {
+      where.taxSupportCode = null;
+      where.taxes = { some: { ivaRate: { gt: 0 } } };
+    }
     const search = str(filters.search).slice(0, 100);
     if (search) {
       where.OR = [

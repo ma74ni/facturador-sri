@@ -173,10 +173,12 @@ export class ReceivedDocumentsImportService {
         registered: 0,
         pending: [] as PendingImport[],
         voided: [] as PendingImport[],
+        suggestedSupport: 0,
       };
     }
 
     const supplierIds = await this.ensureSuppliers(fresh, companyId);
+    const suggested = await this.suggestions([...supplierIds.values()], companyId);
     await this.prisma.receivedDocument.createMany({
       data: fresh.map((row) => ({
         documentType: row.documentType,
@@ -194,6 +196,10 @@ export class ReceivedDocumentsImportService {
         ivaValue: row.ivaValue,
         total: row.total,
         supplierId: supplierIds.get(row.supplierRuc)!,
+        // Lo de la última compra del proveedor: el 104 necesita el sustento para ubicarla.
+        taxSupportCode: suggested.get(supplierIds.get(row.supplierRuc)!)?.taxSupportCode ?? null,
+        expenseAccountId:
+          suggested.get(supplierIds.get(row.supplierRuc)!)?.expenseAccountId ?? null,
         companyId,
         createdById: userId,
       })),
@@ -247,6 +253,10 @@ export class ReceivedDocumentsImportService {
       ),
       // Lo que el SRI rechazó (otro comprador, no autorizada…): queda descartada con el motivo.
       voided: voided.map((document) => item(document, document.voidReason ?? '')),
+      // Con el sustento copiado de la última compra del proveedor: conviene revisarlas.
+      suggestedSupport: fresh.filter(
+        (row) => suggested.get(supplierIds.get(row.supplierRuc)!)?.taxSupportCode,
+      ).length,
     };
   }
 
@@ -354,6 +364,44 @@ export class ReceivedDocumentsImportService {
       found.add(numberKey(document.supplier.identification, document));
     }
     return found;
+  }
+
+  /**
+   * El sustento y la cuenta de la última compra registrada de cada proveedor que los tenga (la
+   * cuenta, solo si sigue activa). Lo mismo que propone el registro por clave.
+   */
+  private async suggestions(supplierIds: string[], companyId: string) {
+    const base = {
+      companyId,
+      supplierId: { in: supplierIds },
+      status: ReceivedDocumentStatus.REGISTERED,
+    };
+    const order = [{ issueDate: 'desc' as const }, { createdAt: 'desc' as const }];
+    const [supports, accounts] = await Promise.all([
+      this.prisma.receivedDocument.findMany({
+        where: { ...base, taxSupportCode: { not: null } },
+        orderBy: order,
+        distinct: ['supplierId'],
+        select: { supplierId: true, taxSupportCode: true },
+      }),
+      this.prisma.receivedDocument.findMany({
+        where: { ...base, expenseAccount: { isActive: true } },
+        orderBy: order,
+        distinct: ['supplierId'],
+        select: { supplierId: true, expenseAccountId: true },
+      }),
+    ]);
+    const result = new Map<
+      string,
+      { taxSupportCode: string | null; expenseAccountId: string | null }
+    >();
+    for (const id of supplierIds) {
+      result.set(id, {
+        taxSupportCode: supports.find((row) => row.supplierId === id)?.taxSupportCode ?? null,
+        expenseAccountId: accounts.find((row) => row.supplierId === id)?.expenseAccountId ?? null,
+      });
+    }
+    return result;
   }
 
   /** Proveedor por RUC: el que ya existe, o uno nuevo con la razón social del listado. */

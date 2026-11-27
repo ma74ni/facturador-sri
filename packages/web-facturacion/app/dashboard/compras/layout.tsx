@@ -11,6 +11,7 @@ const TABS = [
   { name: 'Compras', href: '/dashboard/compras', exact: true },
   { name: 'Proveedores', href: '/dashboard/compras/proveedores', exact: false },
   { name: 'Cuentas de gasto', href: '/dashboard/compras/cuentas', exact: false },
+  { name: 'Reporte', href: '/dashboard/compras/reporte', exact: false },
 ];
 
 /**
