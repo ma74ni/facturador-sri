@@ -11,7 +11,13 @@ import { PrismaService } from '../../../../shared/database/prisma.service';
 import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
 import { errorMessage } from '../../../../shared/errors/error-message';
 import { SRI_PAYMENT_METHOD_CODES } from '../../../invoices/domain/payment-methods';
-import { AccessKeyParts, documentTypeName, parseAccessKey } from '../../domain/access-key-parser';
+import {
+  AccessKeyParts,
+  daysSinceIssue,
+  documentTypeName,
+  parseAccessKey,
+  SRI_QUERY_MAX_DAYS,
+} from '../../domain/access-key-parser';
 import {
   accessKeyMismatch,
   computeReceivedTotals,
@@ -282,11 +288,20 @@ export class ReceivedDocumentsSriService {
   }
 
   private async fetchFromSri(parts: AccessKeyParts) {
+    // Una factura vieja que el SRI no devuelve no es un problema de conexión: ya no la entrega.
+    const tooOld = daysSinceIssue(parts.issueDate) > SRI_QUERY_MAX_DAYS;
+    const tooOldError = () => {
+      const [year, month, day] = parts.issueDate.split('-');
+      return new UnprocessableEntityException(
+        `El SRI solo entrega las facturas de los últimos 2 meses y esta es del ${day}/${month}/${year}: regístrala a mano`,
+      );
+    };
     let answer;
     try {
       answer = await this.sri.fetch(parts.accessKey, parts.environment);
     } catch (error) {
       if (error instanceof SriUnavailableError) {
+        if (tooOld) throw tooOldError();
         throw new ServiceUnavailableException(`El SRI no responde: ${TRY_MANUAL}`);
       }
       this.logger.error(`Respuesta inesperada del SRI: ${errorMessage(error)}`);
@@ -295,6 +310,7 @@ export class ReceivedDocumentsSriService {
       );
     }
     if (answer.status === 'NOT_FOUND') {
+      if (tooOld) throw tooOldError();
       throw new UnprocessableEntityException(
         `El SRI no tiene autorizada esta clave (o no existe). Si el proveedor la emitió hoy, ${TRY_MANUAL}`,
       );

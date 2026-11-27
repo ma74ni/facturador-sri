@@ -96,3 +96,16 @@ export function parseAccessKey(
 export function documentTypeName(documentType: string): string | null {
   return DOCUMENT_NAMES[documentType] ?? null;
 }
+
+/**
+ * El servicio de autorización del SRI solo devuelve los comprobantes recientes: medido en
+ * noviembre de 2026, hasta unos 72 días siempre, y desde unos 75 días nunca. Pasado este límite,
+ * que no los tenga es lo esperado y se manda a registrar a mano.
+ */
+export const SRI_QUERY_MAX_DAYS = 60;
+
+/** Días desde la emisión hasta hoy en Ecuador (UTC-5, sin horario de verano). */
+export function daysSinceIssue(issueDate: string, now: Date = new Date()): number {
+  const today = new Date(now.getTime() - 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return Math.round((Date.parse(today) - Date.parse(issueDate)) / 86_400_000);
+}

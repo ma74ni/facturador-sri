@@ -15,9 +15,24 @@ function soapAnswering(...answers: unknown[]) {
   return call;
 }
 
+/** Sin las pausas entre intentos. */
+function newClient() {
+  const client = new SriReceivedDocumentClient();
+  jest.spyOn(client as unknown as { wait: () => Promise<void> }, 'wait').mockResolvedValue();
+  return client;
+}
+
+const NONE = { numeroComprobantes: '0', autorizaciones: null };
+const AUTHORIZED = {
+  autorizaciones: {
+    autorizacion: { estado: 'AUTORIZADO', numeroAutorizacion: KEY, comprobante: '<factura/>' },
+  },
+};
+
 describe('consulta de comprobantes recibidos en el SRI', () => {
   const env = process.env;
   beforeEach(() => {
+    jest.restoreAllMocks();
     jest.clearAllMocks();
     process.env = {
       ...env,
@@ -31,8 +46,8 @@ describe('consulta de comprobantes recibidos en el SRI', () => {
   });
 
   it('producción usa la URL de consulta, no la de emisión; pruebas, la de pruebas', async () => {
-    soapAnswering({ numeroComprobantes: '0', autorizaciones: null }, { autorizaciones: null });
-    const client = new SriReceivedDocumentClient();
+    soapAnswering(AUTHORIZED, AUTHORIZED);
+    const client = newClient();
 
     await client.fetch(KEY, 'PRODUCTION');
     await client.fetch(KEY, 'TEST');
@@ -54,7 +69,7 @@ describe('consulta de comprobantes recibidos en el SRI', () => {
       { autorizaciones: { autorizacion } },
       { autorizaciones: { autorizacion: [{ estado: 'NO AUTORIZADO' }, autorizacion] } },
     );
-    const client = new SriReceivedDocumentClient();
+    const client = newClient();
     const expected = {
       status: 'AUTHORIZED',
       xml: '<factura/>',
@@ -68,15 +83,18 @@ describe('consulta de comprobantes recibidos en el SRI', () => {
     expect(soap.createClientAsync).toHaveBeenCalledTimes(1);
   });
 
-  it('sin autorizaciones es NOT_FOUND; con una no autorizada, NOT_AUTHORIZED; en proceso, PENDING', async () => {
-    soapAnswering(
-      { numeroComprobantes: '0', autorizaciones: null },
+  it('sin autorizaciones es NOT_FOUND tras tres lecturas; no autorizada y en proceso, a la primera', async () => {
+    const call = soapAnswering(
+      NONE,
+      NONE,
+      NONE,
       { autorizaciones: { autorizacion: { estado: 'NO AUTORIZADO' } } },
       { autorizaciones: { autorizacion: { estado: 'EN PROCESO' } } },
     );
-    const client = new SriReceivedDocumentClient();
+    const client = newClient();
 
     expect(await client.fetch(KEY, 'PRODUCTION')).toEqual({ status: 'NOT_FOUND' });
+    expect(call).toHaveBeenCalledTimes(3);
     expect(await client.fetch(KEY, 'PRODUCTION')).toEqual({
       status: 'NOT_AUTHORIZED',
       state: 'NO AUTORIZADO',
@@ -85,19 +103,55 @@ describe('consulta de comprobantes recibidos en el SRI', () => {
       status: 'PENDING',
       state: 'EN PROCESO',
     });
+    expect(call).toHaveBeenCalledTimes(5);
   });
 
-  it('reintenta una vez y, si el SRI sigue sin responder, avisa que no está disponible', async () => {
-    const call = soapAnswering(new Error('ECONNRESET'), new Error('ETIMEDOUT'));
-    const client = new SriReceivedDocumentClient();
+  it('si un servidor del SRI dice que no la tiene y otro sí, devuelve la factura', async () => {
+    const call = soapAnswering(NONE, AUTHORIZED);
 
-    await expect(client.fetch(KEY, 'PRODUCTION')).rejects.toBeInstanceOf(SriUnavailableError);
+    expect(await newClient().fetch(KEY, 'PRODUCTION')).toMatchObject({ status: 'AUTHORIZED' });
     expect(call).toHaveBeenCalledTimes(2);
+  });
+
+  it('reintenta la página 302 y las conexiones cortadas hasta que el SRI responde', async () => {
+    const call = soapAnswering(
+      new Error('Cannot parse response'),
+      new Error('read ECONNRESET'),
+      AUTHORIZED,
+    );
+
+    expect(await newClient().fetch(KEY, 'PRODUCTION')).toMatchObject({ status: 'AUTHORIZED' });
+    expect(call).toHaveBeenCalledTimes(3);
+    // Un cliente SOAP que falló no se reutiliza.
+    expect(soap.createClientAsync).toHaveBeenCalledTimes(3);
+  });
+
+  it('tras cuatro fallos seguidos avisa que el SRI no está disponible', async () => {
+    const failure = () => new Error('read ECONNRESET');
+    const call = soapAnswering(failure(), failure(), failure(), failure(), AUTHORIZED);
+
+    await expect(newClient().fetch(KEY, 'PRODUCTION')).rejects.toBeInstanceOf(SriUnavailableError);
+    expect(call).toHaveBeenCalledTimes(4);
+  });
+
+  it('si el SRI ya dijo que no la tiene, los fallos de después no lo vuelven "no disponible"', async () => {
+    const failure = () => new Error('read ECONNRESET');
+    soapAnswering(NONE, failure(), failure(), failure(), failure());
+
+    expect(await newClient().fetch(KEY, 'PRODUCTION')).toEqual({ status: 'NOT_FOUND' });
+  });
+
+  it('no empieza otro intento cuando ya pasó el tiempo de la consulta', async () => {
+    const call = soapAnswering(new Error('el SRI no respondió a tiempo'), AUTHORIZED);
+    jest.spyOn(Date, 'now').mockReturnValueOnce(0).mockReturnValue(30_000);
+
+    await expect(newClient().fetch(KEY, 'PRODUCTION')).rejects.toBeInstanceOf(SriUnavailableError);
+    expect(call).toHaveBeenCalledTimes(1);
   });
 
   it('sin URL configurada no llama a nadie', async () => {
     delete process.env.SRI_AUTHORIZATION_URL_TEST;
-    const client = new SriReceivedDocumentClient();
+    const client = newClient();
 
     await expect(client.fetch(KEY, 'TEST')).rejects.toThrow(
       'La consulta al SRI no está configurada',

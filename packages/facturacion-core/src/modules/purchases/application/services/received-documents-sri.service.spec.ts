@@ -89,6 +89,10 @@ function setup({
 }
 
 describe('ReceivedDocumentsSriService', () => {
+  // Hoy fijo: la clave de prueba es del 25/10/2026 y tiene que seguir siendo "reciente".
+  beforeAll(() => jest.useFakeTimers({ now: new Date('2026-11-26T15:00:00.000Z') }));
+  afterAll(() => jest.useRealTimers());
+
   describe('vista previa', () => {
     it('trae la factura del SRI con el ambiente de la clave y no guarda nada', async () => {
       const { service, prisma, sri, storage } = setup();
@@ -243,6 +247,27 @@ describe('ReceivedDocumentsSriService', () => {
         const call = service.lookup(ACCESS_KEY, 'c-1');
         await expect(call).rejects.toBeInstanceOf(type);
         await expect(call).rejects.toThrow(message);
+      }
+    });
+
+    it('una factura de más de 2 meses que el SRI no devuelve se manda a registrar a mano', async () => {
+      jest.setSystemTime(new Date('2027-01-10T15:00:00.000Z'));
+      try {
+        for (const sriAnswer of [{ status: 'NOT_FOUND' }, new SriUnavailableError('ECONNRESET')]) {
+          const { service } = setup({ sriAnswer });
+          const call = service.lookup(ACCESS_KEY, 'c-1');
+          await expect(call).rejects.toBeInstanceOf(UnprocessableEntityException);
+          await expect(call).rejects.toThrow(
+            'El SRI solo entrega las facturas de los últimos 2 meses y esta es del 25/10/2026: regístrala a mano',
+          );
+        }
+        // Si igual la devuelve, se registra.
+        const { service } = setup();
+        await expect(service.lookup(ACCESS_KEY, 'c-1')).resolves.toMatchObject({
+          alreadyRegistered: false,
+        });
+      } finally {
+        jest.setSystemTime(new Date('2026-11-26T15:00:00.000Z'));
       }
     });
 

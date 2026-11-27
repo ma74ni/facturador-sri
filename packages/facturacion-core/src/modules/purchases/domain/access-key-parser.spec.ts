@@ -1,5 +1,5 @@
 import { AccessKeyService } from '../../invoices/domain/services/access-key.service';
-import { module11, normalizeAccessKey, parseAccessKey } from './access-key-parser';
+import { daysSinceIssue, module11, normalizeAccessKey, parseAccessKey } from './access-key-parser';
 
 // Claves reales, armadas con el mismo generador que usan las facturas emitidas.
 const keyFor = (environment = 'PRODUCTION', documentType = '01') =>
@@ -83,5 +83,12 @@ describe('clave de acceso de una compra', () => {
     for (const key of [keyFor(), keyFor('TEST'), keyFor('PRODUCTION', '04')]) {
       expect(module11(key.slice(0, 48))).toBe(key[48]);
     }
+  });
+
+  it('cuenta los días desde la emisión con la fecha de Ecuador', () => {
+    expect(daysSinceIssue('2026-09-14', new Date('2026-11-26T15:00:00.000Z'))).toBe(73);
+    // 21:50 en Ecuador del 26 ya es 27 en UTC: sigue contando el 26.
+    expect(daysSinceIssue('2026-09-14', new Date('2026-11-27T02:50:00.000Z'))).toBe(73);
+    expect(daysSinceIssue('2026-11-26', new Date('2026-11-27T04:59:00.000Z'))).toBe(0);
   });
 });
