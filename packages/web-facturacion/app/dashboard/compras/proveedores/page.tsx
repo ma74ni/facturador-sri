@@ -38,6 +38,7 @@ import {
   useUpdateSupplier,
 } from '@/lib/hooks/use-suppliers';
 import { usePagination } from '@/lib/hooks/use-pagination';
+import { usePermissions } from '@/lib/hooks/use-company-users';
 
 /** Busca en razón social, nombre comercial e identificación, sin distinguir mayúsculas. */
 function matches(supplier: Supplier, search: string): boolean {
@@ -89,6 +90,7 @@ function Contact({ supplier }: { supplier: Supplier }) {
 
 /** Proveedores de la empresa (módulo Compras): mismo patrón que Clientes. */
 export default function ProveedoresPage() {
+  const { canEdit } = usePermissions();
   const { data: suppliers = [], isLoading } = useSuppliers();
   const create = useCreateSupplier();
   const update = useUpdateSupplier();
@@ -115,16 +117,20 @@ export default function ProveedoresPage() {
 
   const actions = (supplier: Supplier) => (
     <div className="flex items-center justify-end gap-1">
-      <IconButton label="Editar proveedor" onClick={() => openEdit(supplier)}>
-        <Edit />
-      </IconButton>
-      <IconButton
-        label="Eliminar proveedor"
-        tone="destructive"
-        onClick={() => setToDelete(supplier)}
-      >
-        <Trash2 />
-      </IconButton>
+      {canEdit && (
+        <IconButton label="Editar proveedor" onClick={() => openEdit(supplier)}>
+          <Edit />
+        </IconButton>
+      )}
+      {canEdit && (
+        <IconButton
+          label="Eliminar proveedor"
+          tone="destructive"
+          onClick={() => setToDelete(supplier)}
+        >
+          <Trash2 />
+        </IconButton>
+      )}
     </div>
   );
 
@@ -135,10 +141,12 @@ export default function ProveedoresPage() {
           <h1 className="text-headline-md text-on-surface">Proveedores</h1>
           <p className="text-body-md text-on-surface-variant">A quién le compras</p>
         </div>
-        <Button onClick={openCreate} className="w-full sm:w-auto">
-          <Plus />
-          Nuevo proveedor
-        </Button>
+        {canEdit && (
+          <Button onClick={openCreate} className="w-full sm:w-auto">
+            <Plus />
+            Nuevo proveedor
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -170,10 +178,12 @@ export default function ProveedoresPage() {
                   : 'Ningún proveedor coincide con la búsqueda.'}
               </p>
               {suppliers.length === 0 ? (
-                <Button onClick={openCreate}>
-                  <Plus />
-                  Nuevo proveedor
-                </Button>
+                canEdit && (
+                  <Button onClick={openCreate}>
+                    <Plus />
+                    Nuevo proveedor
+                  </Button>
+                )
               ) : (
                 <Button variant="outlined" onClick={() => setSearch('')}>
                   Limpiar búsqueda

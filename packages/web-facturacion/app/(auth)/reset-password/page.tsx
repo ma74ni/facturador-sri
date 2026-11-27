@@ -34,7 +34,10 @@ import { AlertCircle, CheckCircle2, KeyRound, Loader2, XCircle } from 'lucide-re
 
 function ResetPasswordContent() {
   const router = useRouter();
-  const token = useSearchParams().get('token');
+  const searchParams = useSearchParams();
+  const token = searchParams.get('token');
+  // El mismo enlace sirve para la invitación de un usuario nuevo (crea su primera contraseña).
+  const invitation = searchParams.get('invitacion') === '1';
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -87,7 +90,9 @@ function ResetPasswordContent() {
       <div className="flex flex-col items-center py-4 space-y-4 text-center">
         <CheckCircle2 className="h-12 w-12 text-success" />
         <p className="text-sm text-muted-foreground">
-          Tu contraseña fue actualizada. Las sesiones abiertas en otros dispositivos se cerraron.
+          {invitation
+            ? 'Tu contraseña quedó creada. Ya puedes entrar con tu correo.'
+            : 'Tu contraseña fue actualizada. Las sesiones abiertas en otros dispositivos se cerraron.'}
         </p>
         <Button className="w-full" onClick={() => router.push('/login')}>
           Iniciar sesión
@@ -108,6 +113,12 @@ function ResetPasswordContent() {
             </Link>
           </AlertDescription>
         </Alert>
+      )}
+
+      {invitation && (
+        <p className="text-body-md text-on-surface-variant">
+          Te invitaron a usar el facturador. Crea tu contraseña para entrar.
+        </p>
       )}
 
       <FormField label="Nueva contraseña" htmlFor="password" error={errors.password?.message}>

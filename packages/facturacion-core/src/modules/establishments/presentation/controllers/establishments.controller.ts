@@ -6,6 +6,7 @@ import { UpdateEstablishmentDto } from '../../application/dto/update-establishme
 import { CreateEmissionPointDto } from '../../application/dto/create-emission-point.dto';
 import { UpdateEmissionPointDto } from '../../application/dto/update-emission-point.dto';
 import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
+import { AdminGuard } from '../../../auth/infrastructure/guards/admin.guard';
 import {
   AuthenticatedUser,
   CurrentUser,
@@ -21,6 +22,8 @@ export class EstablishmentsController {
   // ==================== ESTABLISHMENTS ====================
 
   @Post()
+  // Los locales y puntos de emisión son configuración de la empresa: solo el administrador.
+  @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Crear establecimiento' })
   async createEstablishment(
     @Body() dto: CreateEstablishmentDto,
@@ -45,6 +48,7 @@ export class EstablishmentsController {
   }
 
   @Put(':id')
+  @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Actualizar establecimiento' })
   async updateEstablishment(
     @Param('id') id: string,
@@ -56,6 +60,7 @@ export class EstablishmentsController {
   }
 
   @Delete(':id')
+  @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Eliminar establecimiento' })
   async removeEstablishment(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     const { companyId } = user;
@@ -65,6 +70,7 @@ export class EstablishmentsController {
   // ==================== EMISSION POINTS ====================
 
   @Post(':establishmentId/emission-points')
+  @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Crear punto de emisión' })
   async createEmissionPoint(
     @Param('establishmentId') establishmentId: string,
@@ -97,6 +103,7 @@ export class EstablishmentsController {
   }
 
   @Put(':establishmentId/emission-points/:id')
+  @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Actualizar punto de emisión' })
   async updateEmissionPoint(
     @Param('establishmentId') establishmentId: string,
@@ -109,6 +116,7 @@ export class EstablishmentsController {
   }
 
   @Delete(':establishmentId/emission-points/:id')
+  @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Eliminar punto de emisión' })
   async removeEmissionPoint(
     @Param('establishmentId') establishmentId: string,

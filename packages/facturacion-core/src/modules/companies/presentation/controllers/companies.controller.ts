@@ -50,7 +50,7 @@ export class CompaniesController {
   ) {}
 
   @Post('certificate')
-  @UseGuards(EmailVerifiedGuard)
+  @UseGuards(AdminGuard, EmailVerifiedGuard)
   @ApiOperation({ summary: 'Subir certificado digital (.p12)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -98,7 +98,7 @@ export class CompaniesController {
   }
 
   @Delete('certificate')
-  @UseGuards(EmailVerifiedGuard)
+  @UseGuards(AdminGuard, EmailVerifiedGuard)
   @ApiOperation({ summary: 'Eliminar certificado digital' })
   async deleteCertificate(@CurrentUser() user: AuthenticatedUser) {
     const { companyId } = user;
@@ -139,6 +139,7 @@ export class CompaniesController {
   // ==================== LOGO ====================
 
   @Post('logo')
+  @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Subir logo de la empresa' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -195,12 +196,14 @@ export class CompaniesController {
   }
 
   @Delete('logo')
+  @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Eliminar logo de la empresa' })
   async deleteLogo(@CurrentUser() user: AuthenticatedUser) {
     const { companyId } = user;
     return this.companiesService.deleteLogo(companyId);
   }
   @Put('mailjet-config')
+  @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Configurar Mailjet de la empresa' })
   @ApiBody({
     schema: {
@@ -255,6 +258,7 @@ export class CompaniesController {
   }
 
   @Delete('mailjet-config')
+  @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Volver a usar email del sistema' })
   async resetToSystemEmail(@CurrentUser() user: AuthenticatedUser) {
     const { companyId } = user;
@@ -275,6 +279,7 @@ export class CompaniesController {
     };
   }
   @Post('mailjet-config/test')
+  @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Probar configuración de Mailjet' })
   async testMailjetConfig(@CurrentUser() user: AuthenticatedUser) {
     const { companyId } = user;

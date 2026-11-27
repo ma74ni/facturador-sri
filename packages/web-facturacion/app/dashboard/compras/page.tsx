@@ -69,6 +69,7 @@ import { usePagination } from '@/lib/hooks/use-pagination';
 import { RECEIVED_DOCUMENT_TYPES, TAX_SUPPORT_CODES } from '@/lib/sri-catalogs';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { cn } from '@/lib/utils';
+import { usePermissions } from '@/lib/hooks/use-company-users';
 
 const currentMonth = () => {
   const now = new Date();
@@ -124,6 +125,7 @@ function AccountCell({ document }: { document: ReceivedDocument }) {
 
 /** Compras de la empresa (módulo Compras): lista del mes, registro manual y cuentas de gasto. */
 export default function ComprasPage() {
+  const { canEdit } = usePermissions();
   const [month, setMonth] = useState(currentMonth);
   const [type, setType] = useState('');
   const [withoutAccount, setWithoutAccount] = useState(false);
@@ -291,7 +293,7 @@ export default function ComprasPage() {
     const pending = doc.status === 'PENDING_FETCH';
     return (
       <div className="flex items-center justify-end gap-1">
-        {pending && daysSince(doc.issueDate) <= SRI_QUERY_MAX_DAYS && (
+        {canEdit && pending && daysSince(doc.issueDate) <= SRI_QUERY_MAX_DAYS && (
           <IconButton
             label="Traer del SRI otra vez"
             disabled={retry.isPending && retry.variables === doc.id}
@@ -302,7 +304,7 @@ export default function ComprasPage() {
             />
           </IconButton>
         )}
-        {!voided && (
+        {canEdit && !voided && (
           <IconButton
             label={pending ? 'Completar a mano' : 'Editar compra'}
             onClick={() => openEdit(doc)}
@@ -319,7 +321,7 @@ export default function ComprasPage() {
                 Descargar XML
               </MenuItem>
             )}
-            {!voided && (
+            {canEdit && !voided && (
               <MenuItem
                 tone="destructive"
                 onSelect={() => {
@@ -338,7 +340,7 @@ export default function ComprasPage() {
   };
 
   const selectBox = (doc: ReceivedDocument) =>
-    doc.status === 'VOIDED' ? null : (
+    !canEdit || doc.status === 'VOIDED' ? null : (
       <input
         type="checkbox"
         className="h-4 w-4 accent-primary"
@@ -387,18 +389,20 @@ export default function ComprasPage() {
             Lo que te facturaron tus proveedores, para tus reportes al SRI
           </p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button variant="outlined" asChild className="w-full sm:w-auto">
-            <Link href="/dashboard/compras/importar">
-              <FileUp />
-              Importar del SRI
-            </Link>
-          </Button>
-          <Button onClick={openCreate} className="w-full sm:w-auto">
-            <Plus />
-            Registrar compra
-          </Button>
-        </div>
+        {canEdit && (
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button variant="outlined" asChild className="w-full sm:w-auto">
+              <Link href="/dashboard/compras/importar">
+                <FileUp />
+                Importar del SRI
+              </Link>
+            </Button>
+            <Button onClick={openCreate} className="w-full sm:w-auto">
+              <Plus />
+              Registrar compra
+            </Button>
+          </div>
+        )}
       </div>
 
       <div
@@ -590,10 +594,12 @@ export default function ComprasPage() {
                   : 'Ninguna compra coincide con los filtros.'}
               </p>
               {documents.length === 0 && !activeFilters ? (
-                <Button onClick={openCreate}>
-                  <Plus />
-                  Registrar compra
-                </Button>
+                canEdit && (
+                  <Button onClick={openCreate}>
+                    <Plus />
+                    Registrar compra
+                  </Button>
+                )
               ) : (
                 <Button
                   variant="outlined"
@@ -654,7 +660,7 @@ export default function ComprasPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-10">
-                        {pageSelectable.length > 0 && (
+                        {canEdit && pageSelectable.length > 0 && (
                           <input
                             type="checkbox"
                             className="h-4 w-4 accent-primary"

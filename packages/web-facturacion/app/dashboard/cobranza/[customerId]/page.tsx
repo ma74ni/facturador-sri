@@ -25,6 +25,7 @@ import { usePagination } from '@/lib/hooks/use-pagination';
 import { Pagination } from '@/components/ui/pagination';
 import { NativeSelect } from '@/components/ui/native-select';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { usePermissions } from '@/lib/hooks/use-company-users';
 
 type PaymentFilter = 'all' | 'withBalance' | InvoicePaymentStatus;
 
@@ -69,6 +70,7 @@ function AppliedInvoices({ allocations }: { allocations: Allocation[] }) {
 }
 
 export default function CobranzaClientePage() {
+  const { canEdit } = usePermissions();
   const { customerId } = useParams<{ customerId: string }>();
   const { data: statement, isLoading } = useAccountStatement(customerId);
   const deletePayment = useDeletePayment(customerId);
@@ -145,10 +147,12 @@ export default function CobranzaClientePage() {
               <Plus className="mr-2 h-4 w-4" />
               Agregar factura
             </Button>
-            <Button onClick={() => setDialogOpen(true)} className="w-full sm:w-auto">
-              <Plus className="mr-2 h-4 w-4" />
-              Registrar pago
-            </Button>
+            {canEdit && (
+              <Button onClick={() => setDialogOpen(true)} className="w-full sm:w-auto">
+                <Plus className="mr-2 h-4 w-4" />
+                Registrar pago
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -293,13 +297,15 @@ export default function CobranzaClientePage() {
                   </div>
                   <div className="flex items-center gap-1">
                     <p className="text-sm font-semibold">{formatCurrency(payment.totalAmount)}</p>
-                    <IconButton
-                      label="Eliminar pago"
-                      tone="destructive"
-                      onClick={() => deletePayment.mutate(payment.id)}
-                    >
-                      <Trash2 />
-                    </IconButton>
+                    {canEdit && (
+                      <IconButton
+                        label="Eliminar pago"
+                        tone="destructive"
+                        onClick={() => deletePayment.mutate(payment.id)}
+                      >
+                        <Trash2 />
+                      </IconButton>
+                    )}
                   </div>
                 </div>
                 <AppliedInvoices allocations={payment.allocations} />
@@ -338,13 +344,15 @@ export default function CobranzaClientePage() {
                       <AppliedInvoices allocations={payment.allocations} />
                     </TableCell>
                     <TableCell className="text-right">
-                      <IconButton
-                        label="Eliminar pago"
-                        tone="destructive"
-                        onClick={() => deletePayment.mutate(payment.id)}
-                      >
-                        <Trash2 />
-                      </IconButton>
+                      {canEdit && (
+                        <IconButton
+                          label="Eliminar pago"
+                          tone="destructive"
+                          onClick={() => deletePayment.mutate(payment.id)}
+                        >
+                          <Trash2 />
+                        </IconButton>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

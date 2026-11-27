@@ -35,6 +35,7 @@ import {
   useUpdateExpenseAccount,
 } from '@/lib/hooks/use-expense-accounts';
 import { usePagination } from '@/lib/hooks/use-pagination';
+import { usePermissions } from '@/lib/hooks/use-company-users';
 
 /** Busca en código y nombre, sin distinguir mayúsculas. */
 function matches(account: ExpenseAccount, search: string): boolean {
@@ -45,6 +46,7 @@ function matches(account: ExpenseAccount, search: string): boolean {
 
 /** Catálogo de cuentas de gasto de la empresa (módulo Compras). */
 export default function CuentasDeGastoPage() {
+  const { canEdit } = usePermissions();
   const [showInactive, setShowInactive] = useState(false);
   const { data: accounts = [], isLoading } = useExpenseAccounts(true);
   const create = useCreateExpenseAccount();
@@ -82,18 +84,22 @@ export default function CuentasDeGastoPage() {
 
   const actions = (account: ExpenseAccount) => (
     <div className="flex items-center justify-end gap-1">
-      <IconButton label="Editar cuenta" onClick={() => openEdit(account)}>
-        <Edit />
-      </IconButton>
+      {canEdit && (
+        <IconButton label="Editar cuenta" onClick={() => openEdit(account)}>
+          <Edit />
+        </IconButton>
+      )}
       <IconButton
         label={account.isActive ? 'Desactivar cuenta' : 'Activar cuenta'}
         onClick={() => toggleActive(account)}
       >
         {account.isActive ? <PowerOff /> : <Power />}
       </IconButton>
-      <IconButton label="Eliminar cuenta" tone="destructive" onClick={() => setToDelete(account)}>
-        <Trash2 />
-      </IconButton>
+      {canEdit && (
+        <IconButton label="Eliminar cuenta" tone="destructive" onClick={() => setToDelete(account)}>
+          <Trash2 />
+        </IconButton>
+      )}
     </div>
   );
 
@@ -113,10 +119,12 @@ export default function CuentasDeGastoPage() {
             <ClipboardPaste />
             Pegar lista del contador
           </Button>
-          <Button onClick={openCreate}>
-            <Plus />
-            Nueva cuenta
-          </Button>
+          {canEdit && (
+            <Button onClick={openCreate}>
+              <Plus />
+              Nueva cuenta
+            </Button>
+          )}
         </div>
       </div>
 

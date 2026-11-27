@@ -1,4 +1,5 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { Role } from '@prisma/client';
 
 /**
  * Usuario de la petición, tal como lo deja `JwtStrategy.validate` en `req.user`.
@@ -8,6 +9,8 @@ export interface AuthenticatedUser {
   userId: string;
   email: string;
   companyId: string;
+  /** Rol dentro de su empresa: el contador (VIEWER) solo lee. */
+  role: Role;
 }
 
 /**
