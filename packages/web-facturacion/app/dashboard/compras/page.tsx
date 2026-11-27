@@ -1,7 +1,17 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Ban, Edit, FolderOpen, Loader2, Plus, Receipt, ShoppingCart } from 'lucide-react';
+import {
+  Ban,
+  BadgeCheck,
+  Edit,
+  FileDown,
+  FolderOpen,
+  Loader2,
+  Plus,
+  Receipt,
+  ShoppingCart,
+} from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -15,6 +25,10 @@ import {
   FormField,
   IconButton,
   Input,
+  Menu,
+  MenuContent,
+  MenuIconTrigger,
+  MenuItem,
   NativeSelect,
   Pagination,
   StatCard,
@@ -33,7 +47,10 @@ import {
   formatDocumentNumber,
   ReceivedDocument,
   ReceivedDocumentInput,
+  receivedDocumentsApi,
 } from '@/lib/api/received-documents';
+import { useToast } from '@/hooks/use-toast';
+import { apiErrorMessage } from '@/lib/hooks/use-platform-admin';
 import {
   useAssignExpenseAccount,
   useCreateReceivedDocument,
@@ -66,6 +83,17 @@ const monthLabel = (month: string) => {
   return `${label} ${year}`;
 };
 
+function saveBlob(blob: Blob, filename: string) {
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
+
 function AccountCell({ document }: { document: ReceivedDocument }) {
   if (!document.expenseAccount) {
     return document.status === 'VOIDED' ? (
@@ -97,6 +125,7 @@ export default function ComprasPage() {
   const update = useUpdateReceivedDocument();
   const voidDocument = useVoidReceivedDocument();
   const assign = useAssignExpenseAccount();
+  const { toast } = useToast();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ReceivedDocument | null>(null);
@@ -186,24 +215,59 @@ export default function ComprasPage() {
   const summary = data?.summary;
   const activeFilters = (type ? 1 : 0) + (withoutAccount ? 1 : 0);
 
-  const actions = (doc: ReceivedDocument) =>
-    doc.status === 'VOIDED' ? null : (
+  const downloadXml = async (doc: ReceivedDocument) => {
+    try {
+      saveBlob(
+        await receivedDocumentsApi.downloadXml(doc.id),
+        `COMPRA_${formatDocumentNumber(doc)}.xml`,
+      );
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'No se pudo descargar el XML',
+        description: apiErrorMessage(error, ''),
+      });
+    }
+  };
+
+  const actions = (doc: ReceivedDocument) => {
+    const voided = doc.status === 'VOIDED';
+    // Una descartada solo conserva la descarga de su XML.
+    if (voided && !doc.xmlPath) return null;
+    const number = formatDocumentNumber(doc);
+    return (
       <div className="flex items-center justify-end gap-1">
-        <IconButton label="Editar compra" onClick={() => openEdit(doc)}>
-          <Edit />
-        </IconButton>
-        <IconButton
-          label="Descartar compra"
-          tone="destructive"
-          onClick={() => {
-            setVoidReason('');
-            setToVoid(doc);
-          }}
-        >
-          <Ban />
-        </IconButton>
+        {!voided && (
+          <IconButton label="Editar compra" onClick={() => openEdit(doc)}>
+            <Edit />
+          </IconButton>
+        )}
+        <Menu>
+          <MenuIconTrigger label={`Más acciones de la compra ${number}`} />
+          <MenuContent>
+            {doc.xmlPath && (
+              <MenuItem onSelect={() => downloadXml(doc)}>
+                <FileDown />
+                Descargar XML
+              </MenuItem>
+            )}
+            {!voided && (
+              <MenuItem
+                tone="destructive"
+                onSelect={() => {
+                  setVoidReason('');
+                  setToVoid(doc);
+                }}
+              >
+                <Ban />
+                Descartar
+              </MenuItem>
+            )}
+          </MenuContent>
+        </Menu>
       </div>
     );
+  };
 
   const selectBox = (doc: ReceivedDocument) =>
     doc.status === 'VOIDED' ? null : (
@@ -214,6 +278,14 @@ export default function ComprasPage() {
         checked={selected.has(doc.id)}
         onChange={() => toggle(doc.id)}
       />
+    );
+
+  const sourceBadge = (doc: ReceivedDocument) =>
+    doc.source !== 'MANUAL' && (
+      <Badge variant="info" className="mt-1 w-fit">
+        <BadgeCheck className="mr-1 h-3.5 w-3.5" aria-hidden />
+        Del SRI
+      </Badge>
     );
 
   const voidedNote = (doc: ReceivedDocument) =>
@@ -409,6 +481,7 @@ export default function ComprasPage() {
                             {RECEIVED_DOCUMENT_TYPES[doc.documentType]} {formatDocumentNumber(doc)}{' '}
                             · {formatIssueDate(doc.issueDate)}
                           </p>
+                          {sourceBadge(doc)}
                           {voidedNote(doc)}
                         </div>
                       </div>
@@ -473,6 +546,7 @@ export default function ComprasPage() {
                               {RECEIVED_DOCUMENT_TYPES[doc.documentType]}
                             </p>
                             <p className="font-mono text-body-sm">{formatDocumentNumber(doc)}</p>
+                            {sourceBadge(doc)}
                             {voidedNote(doc)}
                           </TableCell>
                           <TableCell className={cn('text-right', voided && 'line-through')}>
@@ -514,6 +588,7 @@ export default function ComprasPage() {
         document={editing}
         onSubmit={save}
         saving={create.isPending || update.isPending}
+        onShowExisting={openEdit}
       />
 
       <AlertDialog open={!!toVoid} onOpenChange={(open) => !open && setToVoid(null)}>

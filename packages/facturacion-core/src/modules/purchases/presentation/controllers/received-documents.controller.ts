@@ -7,8 +7,12 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import { Response } from 'express';
+import { Throttle } from '@nestjs/throttler';
+import { CompanyThrottlerGuard } from '../guards/company-throttler.guard';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
 import { EmailVerifiedGuard } from '../../../auth/infrastructure/guards/email-verified.guard';
@@ -21,11 +25,16 @@ import {
 import { COMPRAS_MODULE } from '../../../companies/domain/product-modules.catalog';
 import { ReceivedDocumentsService } from '../../application/services/received-documents.service';
 import { CreateReceivedDocumentDto } from '../../application/dto/create-received-document.dto';
+import { ReceivedDocumentsSriService } from '../../application/services/received-documents-sri.service';
+import { AccessKeyLookupDto, RegisterFromAccessKeyDto } from '../../application/dto/access-key.dto';
 import {
   AssignExpenseAccountDto,
   UpdateReceivedDocumentDto,
   VoidReceivedDocumentDto,
 } from '../../application/dto/received-document-actions.dto';
+
+// Cada consulta de una clave va al SRI de producción: unas pocas por minuto alcanzan a una persona.
+const SRI_QUERY_LIMIT = { default: { limit: 20, ttl: 60_000 } };
 
 @ApiTags('received-documents')
 @Controller('received-documents')
@@ -33,7 +42,10 @@ import {
 @RequireModule(COMPRAS_MODULE)
 @ApiBearerAuth()
 export class ReceivedDocumentsController {
-  constructor(private readonly documents: ReceivedDocumentsService) {}
+  constructor(
+    private readonly documents: ReceivedDocumentsService,
+    private readonly fromSri: ReceivedDocumentsSriService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Compras de la empresa, con los totales de las registradas' })
@@ -74,6 +86,20 @@ export class ReceivedDocumentsController {
     return this.documents.suggestionFor(supplierId, user.companyId);
   }
 
+  @Get(':id/xml')
+  @ApiOperation({ summary: 'Descargar el XML autorizado de una compra traída del SRI' })
+  @ApiResponse({ status: 404, description: 'No existe, es de otra empresa o se registró a mano' })
+  async downloadXml(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Res() res: Response,
+  ) {
+    const xml = await this.fromSri.getXml(id, user.companyId);
+    res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${xml.filename}"`);
+    res.send(xml.content);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Detalle de una compra con sus tarifas' })
   @ApiResponse({ status: 404, description: 'No existe o es de otra empresa' })
@@ -90,6 +116,47 @@ export class ReceivedDocumentsController {
   @ApiResponse({ status: 400, description: 'Número, fecha o montos que no cuadran' })
   async create(@Body() dto: CreateReceivedDocumentDto, @CurrentUser() user: AuthenticatedUser) {
     return this.documents.create(dto, user.companyId, user.userId);
+  }
+
+  @Post('lookup')
+  @HttpCode(200)
+  @UseGuards(CompanyThrottlerGuard)
+  @Throttle(SRI_QUERY_LIMIT)
+  @ApiOperation({ summary: 'Consultar una clave de acceso en el SRI (vista previa, no guarda)' })
+  @ApiResponse({
+    status: 200,
+    description: 'La vista previa, o la compra existente con alreadyRegistered: true',
+  })
+  @ApiResponse({ status: 400, description: 'Clave mal tipeada, que no es factura o de pruebas' })
+  @ApiResponse({
+    status: 422,
+    description: 'El SRI no la tiene, no es para la empresa o no cuadra',
+  })
+  @ApiResponse({ status: 429, description: 'Demasiadas consultas al SRI en un minuto' })
+  @ApiResponse({ status: 503, description: 'El SRI no responde' })
+  async lookup(@Body() dto: AccessKeyLookupDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.fromSri.lookup(dto.accessKey, user.companyId);
+  }
+
+  @Post('from-access-key')
+  @UseGuards(CompanyThrottlerGuard)
+  @Throttle(SRI_QUERY_LIMIT)
+  @ApiOperation({ summary: 'Registrar una compra con su clave de acceso, trayéndola del SRI' })
+  @ApiResponse({
+    status: 201,
+    description: 'Registrada, o la existente con alreadyRegistered: true si ya estaba',
+  })
+  @ApiResponse({
+    status: 422,
+    description: 'El SRI no la tiene, no es para la empresa o no cuadra',
+  })
+  @ApiResponse({ status: 429, description: 'Demasiadas consultas al SRI en un minuto' })
+  @ApiResponse({ status: 503, description: 'El SRI no responde' })
+  async fromAccessKey(
+    @Body() dto: RegisterFromAccessKeyDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.fromSri.register(dto, user.companyId, user.userId);
   }
 
   @Post('assign-account')
