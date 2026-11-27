@@ -367,6 +367,29 @@ describe('ReceivedDocumentsService', () => {
       ).rejects.toThrow('Una compra descartada no se edita');
     });
 
+    it('asigna el sustento a varias compras de la empresa, sin tocar las descartadas', async () => {
+      const { service, prisma } = setup();
+
+      await service.assignTaxSupport(['d-1', 'd-1', 'd-2'], '01', 'c-1');
+
+      expect(prisma.receivedDocument.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ['d-1', 'd-2'] }, companyId: 'c-1', status: { not: 'VOIDED' } },
+        data: { taxSupportCode: '01' },
+      });
+    });
+
+    it('filtra las que tienen IVA y no tienen sustento', async () => {
+      const { service, prisma } = setup();
+
+      await service.findAll('c-1', { withoutTaxSupport: 'true' });
+
+      expect(prisma.receivedDocument.findMany.mock.calls[0][0].where).toMatchObject({
+        companyId: 'c-1',
+        taxSupportCode: null,
+        taxes: { some: { ivaRate: { gt: 0 } } },
+      });
+    });
+
     it('asigna la cuenta solo a compras de la empresa que no estén descartadas', async () => {
       const { service, prisma } = setup();
 

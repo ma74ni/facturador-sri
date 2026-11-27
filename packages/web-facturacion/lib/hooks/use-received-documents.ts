@@ -10,12 +10,30 @@ import { useAuth } from '@/lib/context/auth-context';
 import { apiErrorMessage } from '@/lib/hooks/use-platform-admin';
 import { expenseAccountKeys } from '@/lib/hooks/use-expense-accounts';
 import { supplierKeys } from '@/lib/hooks/use-suppliers';
+import { purchaseReportsApi } from '@/lib/api/purchase-reports';
 
 export const receivedDocumentKeys = {
   all: (companyId?: string) => ['received-documents', companyId] as const,
   list: (companyId: string | undefined, filters: ReceivedDocumentFilters) =>
     ['received-documents', companyId, filters] as const,
 };
+
+export const purchaseReportKeys = {
+  all: (companyId?: string) => ['purchase-report', companyId] as const,
+  period: (companyId: string | undefined, period: { from: string; to: string } | null) =>
+    ['purchase-report', companyId, period] as const,
+};
+
+/** Reporte de compras del período (sin período: el último cerrado, según el perfil). */
+export function usePurchaseReport(period: { from: string; to: string } | null) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: purchaseReportKeys.period(user?.companyId, period),
+    queryFn: () => purchaseReportsApi.summary(period ?? undefined),
+    enabled: !!user?.companyId,
+    placeholderData: (previous) => previous,
+  });
+}
 
 /** Compras de la empresa (módulo Compras) con los totales del filtro. */
 export function useReceivedDocuments(filters: ReceivedDocumentFilters) {
@@ -44,6 +62,7 @@ function usePurchaseMutation<T, R>(
       // Un proveedor o una cuenta con compras ya no se pueden eliminar.
       queryClient.invalidateQueries({ queryKey: supplierKeys.all(user?.companyId) });
       queryClient.invalidateQueries({ queryKey: expenseAccountKeys.all(user?.companyId) });
+      queryClient.invalidateQueries({ queryKey: purchaseReportKeys.all(user?.companyId) });
       if (success) toast({ title: success(result) });
     },
     onError: (error) => {
@@ -126,5 +145,15 @@ export function useAssignExpenseAccount() {
     ({ updated }) =>
       updated === 1 ? 'Cuenta asignada a 1 compra' : `Cuenta asignada a ${updated} compras`,
     'No se pudo asignar la cuenta',
+  );
+}
+
+export function useAssignTaxSupport() {
+  return usePurchaseMutation(
+    ({ ids, taxSupportCode }: { ids: string[]; taxSupportCode: string | null }) =>
+      receivedDocumentsApi.assignTaxSupport(ids, taxSupportCode),
+    ({ updated }) =>
+      updated === 1 ? 'Sustento asignado a 1 compra' : `Sustento asignado a ${updated} compras`,
+    'No se pudo asignar el sustento',
   );
 }

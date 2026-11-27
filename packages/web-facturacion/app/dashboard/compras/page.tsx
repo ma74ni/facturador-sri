@@ -57,6 +57,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiErrorMessage } from '@/lib/hooks/use-platform-admin';
 import {
   useAssignExpenseAccount,
+  useAssignTaxSupport,
   useCreateReceivedDocument,
   useReceivedDocuments,
   useRetryFetch,
@@ -65,7 +66,7 @@ import {
 } from '@/lib/hooks/use-received-documents';
 import { useExpenseAccounts } from '@/lib/hooks/use-expense-accounts';
 import { usePagination } from '@/lib/hooks/use-pagination';
-import { RECEIVED_DOCUMENT_TYPES } from '@/lib/sri-catalogs';
+import { RECEIVED_DOCUMENT_TYPES, TAX_SUPPORT_CODES } from '@/lib/sri-catalogs';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { cn } from '@/lib/utils';
 
@@ -127,20 +128,26 @@ export default function ComprasPage() {
   const [type, setType] = useState('');
   const [withoutAccount, setWithoutAccount] = useState(false);
   const [pendingOnly, setPendingOnly] = useState(false);
+  const [withoutTaxSupport, setWithoutTaxSupport] = useState(false);
   const [search, setSearch] = useState('');
-  // Al volver de importar (/dashboard/compras?mes=2026-10) se abre el mes importado.
+  // Al volver de importar o del reporte (/dashboard/compras?mes=2026-10&sinSustento=1) se abre
+  // ese mes con ese filtro.
   useEffect(() => {
-    const requested = new URLSearchParams(window.location.search).get('mes');
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get('mes');
     if (requested && /^\d{4}-(0[1-9]|1[0-2])$/.test(requested)) setMonth(requested);
+    if (params.get('sinSustento') === '1') setWithoutTaxSupport(true);
+    if (params.get('pendientes') === '1') setPendingOnly(true);
   }, []);
   const filters = useMemo(
     () => ({
       month,
       type,
       withoutAccount,
+      withoutTaxSupport,
       status: pendingOnly ? ('PENDING_FETCH' as const) : undefined,
     }),
-    [month, type, withoutAccount, pendingOnly],
+    [month, type, withoutAccount, withoutTaxSupport, pendingOnly],
   );
 
   const { data, isLoading, isFetching } = useReceivedDocuments(filters);
@@ -149,6 +156,7 @@ export default function ComprasPage() {
   const update = useUpdateReceivedDocument();
   const voidDocument = useVoidReceivedDocument();
   const assign = useAssignExpenseAccount();
+  const assignSupport = useAssignTaxSupport();
   const retry = useRetryFetch();
   const { toast } = useToast();
 
@@ -158,6 +166,7 @@ export default function ComprasPage() {
   const [voidReason, setVoidReason] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkAccount, setBulkAccount] = useState('');
+  const [bulkSupport, setBulkSupport] = useState('');
 
   const documents = useMemo(() => data?.documents ?? [], [data]);
   // La búsqueda filtra en el navegador lo que ya trajo el mes: es inmediata.
@@ -176,7 +185,7 @@ export default function ComprasPage() {
   const pagination = usePagination(
     filtered,
     15,
-    `${search}|${month}|${type}|${withoutAccount}|${pendingOnly}`,
+    `${search}|${month}|${type}|${withoutAccount}|${withoutTaxSupport}|${pendingOnly}`,
   );
 
   const selectable = filtered.filter((doc) => doc.status !== 'VOIDED');
@@ -241,8 +250,23 @@ export default function ComprasPage() {
     }
   };
 
+  const applySupport = async () => {
+    if (selected.size === 0 || !bulkSupport) return;
+    try {
+      await assignSupport.mutateAsync({
+        ids: [...selected],
+        taxSupportCode: bulkSupport === 'none' ? null : bulkSupport,
+      });
+      setSelected(new Set());
+      setBulkSupport('');
+    } catch {
+      // El hook ya mostró el error.
+    }
+  };
+
   const summary = data?.summary;
-  const activeFilters = (type ? 1 : 0) + (withoutAccount ? 1 : 0) + (pendingOnly ? 1 : 0);
+  const activeFilters =
+    (type ? 1 : 0) + (withoutAccount ? 1 : 0) + (withoutTaxSupport ? 1 : 0) + (pendingOnly ? 1 : 0);
 
   const downloadXml = async (doc: ReceivedDocument) => {
     try {
@@ -443,6 +467,7 @@ export default function ComprasPage() {
             onClear={() => {
               setType('');
               setWithoutAccount(false);
+              setWithoutTaxSupport(false);
               setPendingOnly(false);
             }}
           >
@@ -478,41 +503,73 @@ export default function ComprasPage() {
               />
               Solo sin cuenta
             </label>
+            <label className="flex items-center gap-2 self-end pb-2 text-body-md text-on-surface">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-primary"
+                checked={withoutTaxSupport}
+                onChange={(e) => setWithoutTaxSupport(e.target.checked)}
+              />
+              Solo con IVA sin sustento
+            </label>
           </FilterBar>
 
           {selected.size > 0 && (
             <div
               role="region"
               aria-label="Acciones sobre las compras seleccionadas"
-              className="flex flex-col gap-3 rounded-lg bg-secondary-container p-3 text-on-secondary-container sm:flex-row sm:items-center"
+              className="flex flex-col gap-3 rounded-lg bg-secondary-container p-3 text-on-secondary-container lg:flex-row lg:flex-wrap lg:items-center"
             >
               <span className="text-label-lg">
                 {selected.size === 1
                   ? '1 compra seleccionada'
                   : `${selected.size} compras seleccionadas`}
               </span>
-              <NativeSelect
-                aria-label="Cuenta de gasto para las seleccionadas"
-                value={bulkAccount}
-                className="sm:w-72"
-                onChange={(e) => setBulkAccount(e.target.value)}
-              >
-                <option value="">Elige la cuenta…</option>
-                {accounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.code ? `${account.code} · ${account.name}` : account.name}
-                  </option>
-                ))}
-                <option value="none">Quitar la cuenta</option>
-              </NativeSelect>
-              <div className="flex gap-2 sm:ml-auto">
-                <Button variant="outlined" onClick={() => setSelected(new Set())}>
-                  Cancelar
-                </Button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <NativeSelect
+                  aria-label="Cuenta de gasto para las seleccionadas"
+                  value={bulkAccount}
+                  className="sm:w-64"
+                  onChange={(e) => setBulkAccount(e.target.value)}
+                >
+                  <option value="">Elige la cuenta…</option>
+                  {accounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.code ? `${account.code} · ${account.name}` : account.name}
+                    </option>
+                  ))}
+                  <option value="none">Quitar la cuenta</option>
+                </NativeSelect>
                 <Button onClick={applyBulk} disabled={!bulkAccount || assign.isPending}>
                   {assign.isPending ? 'Asignando…' : 'Asignar cuenta'}
                 </Button>
               </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <NativeSelect
+                  aria-label="Sustento tributario para las seleccionadas"
+                  value={bulkSupport}
+                  className="sm:w-64"
+                  onChange={(e) => setBulkSupport(e.target.value)}
+                >
+                  <option value="">Elige el sustento…</option>
+                  {Object.entries(TAX_SUPPORT_CODES).map(([code, label]) => (
+                    <option key={code} value={code}>
+                      {code} · {label}
+                    </option>
+                  ))}
+                  <option value="none">Quitar el sustento</option>
+                </NativeSelect>
+                <Button onClick={applySupport} disabled={!bulkSupport || assignSupport.isPending}>
+                  {assignSupport.isPending ? 'Asignando…' : 'Asignar sustento'}
+                </Button>
+              </div>
+              <Button
+                variant="outlined"
+                className="lg:ml-auto"
+                onClick={() => setSelected(new Set())}
+              >
+                Cancelar
+              </Button>
             </div>
           )}
 
@@ -544,6 +601,7 @@ export default function ComprasPage() {
                     setSearch('');
                     setType('');
                     setWithoutAccount(false);
+                    setWithoutTaxSupport(false);
                     setPendingOnly(false);
                   }}
                 >

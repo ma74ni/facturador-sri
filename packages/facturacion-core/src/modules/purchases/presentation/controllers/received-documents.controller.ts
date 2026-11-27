@@ -43,6 +43,7 @@ import { ReceivedDocumentsSriService } from '../../application/services/received
 import { AccessKeyLookupDto, RegisterFromAccessKeyDto } from '../../application/dto/access-key.dto';
 import {
   AssignExpenseAccountDto,
+  AssignTaxSupportDto,
   UpdateReceivedDocumentDto,
   VoidReceivedDocumentDto,
 } from '../../application/dto/received-document-actions.dto';
@@ -71,6 +72,11 @@ export class ReceivedDocumentsController {
   @ApiQuery({ name: 'type', required: false, description: '01 factura, 02 nota de venta' })
   @ApiQuery({ name: 'supplierId', required: false })
   @ApiQuery({ name: 'withoutAccount', required: false, description: '"true": solo sin cuenta' })
+  @ApiQuery({
+    name: 'withoutTaxSupport',
+    required: false,
+    description: '"true": solo las que tienen IVA y no tienen sustento (el 104 no puede ubicarlas)',
+  })
   @ApiQuery({ name: 'search', required: false, description: 'Proveedor, número o nota' })
   async findAll(
     @CurrentUser() user: AuthenticatedUser,
@@ -79,6 +85,7 @@ export class ReceivedDocumentsController {
     @Query('type') type?: unknown,
     @Query('supplierId') supplierId?: unknown,
     @Query('withoutAccount') withoutAccount?: unknown,
+    @Query('withoutTaxSupport') withoutTaxSupport?: unknown,
     @Query('search') search?: unknown,
   ) {
     return this.documents.findAll(user.companyId, {
@@ -87,6 +94,7 @@ export class ReceivedDocumentsController {
       type,
       supplierId,
       withoutAccount,
+      withoutTaxSupport,
       search,
     });
   }
@@ -233,6 +241,14 @@ export class ReceivedDocumentsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.documents.assignAccount(dto.ids, dto.expenseAccountId, user.companyId);
+  }
+
+  @Post('assign-tax-support')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Asignar el sustento tributario a varias compras a la vez' })
+  @ApiResponse({ status: 200, description: 'Cuántas compras se actualizaron' })
+  async assignTaxSupport(@Body() dto: AssignTaxSupportDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.documents.assignTaxSupport(dto.ids, dto.taxSupportCode, user.companyId);
   }
 
   @Patch(':id')

@@ -4,12 +4,14 @@ import {
   ArrayMaxSize,
   ArrayNotEmpty,
   IsArray,
+  IsIn,
   IsString,
   MaxLength,
   MinLength,
   ValidateIf,
 } from 'class-validator';
 import { CreateReceivedDocumentDto } from './create-received-document.dto';
+import { TAX_SUPPORT_CODE_LIST } from '../../domain/received-document';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 
@@ -41,4 +43,23 @@ export class AssignExpenseAccountDto {
   @ValidateIf((_, value) => value !== null)
   @IsString()
   expenseAccountId: string | null;
+}
+
+export class AssignTaxSupportDto {
+  @ApiProperty({ type: [String], description: 'Compras de la empresa (hasta 500)' })
+  @IsArray()
+  @ArrayNotEmpty({ message: 'Elige al menos una compra' })
+  @ArrayMaxSize(500)
+  @IsString({ each: true })
+  ids: string[];
+
+  @ApiProperty({
+    enum: TAX_SUPPORT_CODE_LIST,
+    nullable: true,
+    description: 'null quita el sustento',
+  })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() || null : value))
+  @ValidateIf((_, value) => value !== null)
+  @IsIn(TAX_SUPPORT_CODE_LIST, { message: 'Sustento tributario no válido' })
+  taxSupportCode: string | null;
 }

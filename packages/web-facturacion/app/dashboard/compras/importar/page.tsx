@@ -344,6 +344,19 @@ export default function ImportarComprasPage() {
               </ul>
             )}
 
+            {result.suggestedSupport > 0 && (
+              <Alert variant="info">
+                <Info />
+                <AlertDescription>
+                  {result.suggestedSupport === 1
+                    ? 'A 1 compra se le puso'
+                    : `A ${result.suggestedSupport} compras se les puso`}{' '}
+                  el sustento tributario y la cuenta de la última compra de su proveedor. Revísalas
+                  si ese proveedor te vende cosas distintas (por ejemplo, un activo fijo).
+                </AlertDescription>
+              </Alert>
+            )}
+
             {result.voided.length > 0 && (
               <Alert variant="destructive">
                 <AlertTriangle />

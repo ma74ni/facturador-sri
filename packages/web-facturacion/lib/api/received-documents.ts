@@ -69,6 +69,8 @@ export interface ReceivedDocumentFilters {
   month?: string; // AAAA-MM
   type?: string;
   withoutAccount?: boolean;
+  /** Con IVA y sin sustento: el reporte del 104 no puede ubicarlas. */
+  withoutTaxSupport?: boolean;
   status?: ReceivedDocumentStatus;
   search?: string;
 }
@@ -105,6 +107,8 @@ export interface ReportImportResult {
   }[];
   /** Las que el SRI rechazó (otro comprador, no autorizada…): quedan descartadas con el motivo. */
   voided: ReportImportResult['pending'];
+  /** Nuevas con el sustento copiado de la última compra del proveedor: conviene revisarlas. */
+  suggestedSupport: number;
 }
 
 export interface ReceivedDocumentInput {
@@ -193,6 +197,7 @@ export const receivedDocumentsApi = {
     if (filters.type) params.type = filters.type;
     if (filters.withoutAccount) params.withoutAccount = 'true';
     if (filters.status) params.status = filters.status;
+    if (filters.withoutTaxSupport) params.withoutTaxSupport = 'true';
     if (filters.search?.trim()) params.search = filters.search.trim();
     const response = await apiClient.get('/received-documents', { params });
     return response.data;
@@ -222,6 +227,17 @@ export const receivedDocumentsApi = {
     const response = await apiClient.post('/received-documents/assign-account', {
       ids,
       expenseAccountId,
+    });
+    return response.data;
+  },
+
+  assignTaxSupport: async (
+    ids: string[],
+    taxSupportCode: string | null,
+  ): Promise<{ updated: number }> => {
+    const response = await apiClient.post('/received-documents/assign-tax-support', {
+      ids,
+      taxSupportCode,
     });
     return response.data;
   },

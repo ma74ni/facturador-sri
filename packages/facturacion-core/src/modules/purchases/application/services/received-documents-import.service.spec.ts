@@ -81,7 +81,15 @@ const file = (name: string, ...rows: { text: string }[]) => ({
   buffer: Buffer.from([HEADER, ...rows.map((row) => row.text)].join('\n'), 'latin1'),
 });
 
-function setup({ docs = [] as Doc[], fails = new Map<string, Error>() } = {}) {
+function setup({
+  docs = [] as Doc[],
+  fails = new Map<string, Error>(),
+  lastPurchases = [] as {
+    supplierId: string;
+    taxSupportCode?: string;
+    expenseAccountId?: string;
+  }[],
+} = {}) {
   const suppliers = [{ id: 's-andina', identification: ANDINA, businessName: 'ANDINA' }];
   let next = 0;
   const prisma = {
@@ -107,6 +115,15 @@ function setup({ docs = [] as Doc[], fails = new Map<string, Error>() } = {}) {
                 byKey.accessKey.in.includes(d.accessKey) ||
                 (byNumber.supplier.identification.in.includes(d.supplier.identification) &&
                   byNumber.sequential.in.includes(d.sequential)),
+            ),
+          );
+        }
+        if (where.supplierId) {
+          // Última compra de cada proveedor, para sugerir sustento y cuenta.
+          const field = where.taxSupportCode ? 'taxSupportCode' : 'expenseAccountId';
+          return Promise.resolve(
+            lastPurchases.filter(
+              (row) => where.supplierId.in.includes(row.supplierId) && row[field],
             ),
           );
         }
@@ -350,5 +367,33 @@ describe('importación del listado de comprobantes recibidos', () => {
       `importa hasta ${MAX_NEW_ROWS} a la vez`,
     );
     expect(prisma.receivedDocument.createMany).not.toHaveBeenCalled();
+  });
+
+  it('propone el sustento y la cuenta de la última compra del proveedor', async () => {
+    const andina = line(ANDINA, 'ANDINA', '2026-10-02', '000000001');
+    const norte = line(NORTE, 'NORTE', '2026-10-03', '000000002');
+    const { service, prisma } = setup({
+      // El sustento y la cuenta pueden venir de compras distintas.
+      lastPurchases: [
+        { supplierId: 's-andina', expenseAccountId: 'a-1' },
+        { supplierId: 's-andina', taxSupportCode: '06' },
+      ],
+    });
+
+    const result = await service.import([file('mes.txt', andina, norte)], 'c-1', 'u-1', false);
+    expect(result.suggestedSupport).toBe(1);
+
+    const [first, second] = prisma.receivedDocument.createMany.mock.calls[0][0].data;
+    expect(first).toMatchObject({ taxSupportCode: '06', expenseAccountId: 'a-1' });
+    // Proveedor nuevo: sin nada que proponer.
+    expect(second).toMatchObject({ taxSupportCode: null, expenseAccountId: null });
+    const accountQuery = prisma.receivedDocument.findMany.mock.calls.find(
+      ([args]) => args.where.expenseAccount,
+    )![0];
+    expect(accountQuery.where).toMatchObject({
+      companyId: 'c-1',
+      status: 'REGISTERED',
+      expenseAccount: { isActive: true },
+    });
   });
 });
