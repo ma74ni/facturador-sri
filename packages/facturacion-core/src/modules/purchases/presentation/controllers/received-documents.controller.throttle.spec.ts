@@ -7,6 +7,7 @@ import { EmailVerifiedGuard } from '../../../auth/infrastructure/guards/email-ve
 import { RequireModuleGuard } from '../../../auth/infrastructure/guards/require-module.guard';
 import { ReceivedDocumentsService } from '../../application/services/received-documents.service';
 import { ReceivedDocumentsSriService } from '../../application/services/received-documents-sri.service';
+import { ReceivedDocumentsImportService } from '../../application/services/received-documents-import.service';
 import { ReceivedDocumentsController } from './received-documents.controller';
 
 describe('ReceivedDocumentsController: límite de consultas al SRI', () => {
@@ -27,6 +28,7 @@ describe('ReceivedDocumentsController: límite de consultas al SRI', () => {
           provide: ReceivedDocumentsSriService,
           useValue: { lookup: jest.fn().mockResolvedValue({ alreadyRegistered: false }) },
         },
+        { provide: ReceivedDocumentsImportService, useValue: {} },
       ],
     })
       .overrideGuard(JwtAuthGuard)

@@ -12,3 +12,5 @@ const uploadLimit = (fileSize: number): MulterOptions => ({ limits: { fileSize, 
 export const CERTIFICATE_UPLOAD = uploadLimit(1 * MB);
 export const LOGO_UPLOAD = uploadLimit(5 * MB);
 export const IMPORT_UPLOAD = uploadLimit(10 * MB);
+/** Listados del SRI: uno por mes (unos 20 KB por 100 facturas), varios a la vez (C3 de compras). */
+export const REPORTS_UPLOAD: MulterOptions = { limits: { fileSize: 2 * MB, files: 12 } };

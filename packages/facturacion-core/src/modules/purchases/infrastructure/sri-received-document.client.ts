@@ -18,6 +18,28 @@ const NOT_FOUND_READS = 3;
 /** Pasado este tiempo no se empieza otro intento (el que esté en curso aún puede tardar TIMEOUT_MS). */
 const BUDGET_MS = 25_000;
 const RETRY_DELAY_MS = 500;
+/**
+ * Consultas al SRI a la vez en todo el proceso, sumando todas las empresas e importaciones: es el
+ * mismo servicio que autoriza las facturas, y no se le manda más que esto.
+ */
+const MAX_PARALLEL = 6;
+let active = 0;
+const waiting: (() => void)[] = [];
+
+async function acquire() {
+  if (active < MAX_PARALLEL) {
+    active++;
+    return;
+  }
+  // El que libera le pasa su lugar directamente.
+  await new Promise<void>((resolve) => waiting.push(resolve));
+}
+
+function release() {
+  const next = waiting.shift();
+  if (next) next();
+  else active--;
+}
 
 export type SriQueryResult =
   | {
@@ -47,6 +69,18 @@ export class SriReceivedDocumentClient {
   private readonly clients = new Map<string, Promise<soap.Client>>();
 
   async fetch(accessKey: string, environment: 'TEST' | 'PRODUCTION'): Promise<SriQueryResult> {
+    await acquire();
+    try {
+      return await this.query(accessKey, environment);
+    } finally {
+      release();
+    }
+  }
+
+  private async query(
+    accessKey: string,
+    environment: 'TEST' | 'PRODUCTION',
+  ): Promise<SriQueryResult> {
     const url =
       environment === 'PRODUCTION'
         ? process.env.SRI_QUERY_AUTHORIZATION_URL || process.env.SRI_AUTHORIZATION_URL_PROD
