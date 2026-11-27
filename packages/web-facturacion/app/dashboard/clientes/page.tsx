@@ -41,10 +41,12 @@ import {
   identificationTypeLabel,
   toIdentificationTypeCode,
 } from '@/lib/identification-types';
+import { usePermissions } from '@/lib/hooks/use-company-users';
 
 type CustomerSort = 'recent' | 'name';
 
 export default function ClientesPage() {
+  const { canEdit } = usePermissions();
   const [searchTerm, setSearchTerm] = useState('');
   const [idTypeFilter, setIdTypeFilter] = useState('all');
   const [sortBy, setSortBy] = useState<CustomerSort>('recent');
@@ -146,10 +148,12 @@ export default function ClientesPage() {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Clientes</h1>
           <p className="text-sm sm:text-base text-muted-foreground">Gestiona tu base de clientes</p>
         </div>
-        <Button onClick={handleCreate} className="w-full sm:w-auto">
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo Cliente
-        </Button>
+        {canEdit && (
+          <Button onClick={handleCreate} className="w-full sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo Cliente
+          </Button>
+        )}
       </div>
 
       {/* Clientes Table */}
@@ -252,16 +256,20 @@ export default function ClientesPage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        <IconButton label="Editar cliente" onClick={() => handleEdit(customer)}>
-                          <Edit />
-                        </IconButton>
-                        <IconButton
-                          label="Eliminar cliente"
-                          tone="destructive"
-                          onClick={() => handleDeleteClick(customer)}
-                        >
-                          <Trash2 />
-                        </IconButton>
+                        {canEdit && (
+                          <IconButton label="Editar cliente" onClick={() => handleEdit(customer)}>
+                            <Edit />
+                          </IconButton>
+                        )}
+                        {canEdit && (
+                          <IconButton
+                            label="Eliminar cliente"
+                            tone="destructive"
+                            onClick={() => handleDeleteClick(customer)}
+                          >
+                            <Trash2 />
+                          </IconButton>
+                        )}
                       </div>
                     </div>
                     {(customer.email || customer.phone || customer.address) && (
@@ -352,16 +360,23 @@ export default function ClientesPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <IconButton label="Editar cliente" onClick={() => handleEdit(customer)}>
-                              <Edit />
-                            </IconButton>
-                            <IconButton
-                              label="Eliminar cliente"
-                              tone="destructive"
-                              onClick={() => handleDeleteClick(customer)}
-                            >
-                              <Trash2 />
-                            </IconButton>
+                            {canEdit && (
+                              <IconButton
+                                label="Editar cliente"
+                                onClick={() => handleEdit(customer)}
+                              >
+                                <Edit />
+                              </IconButton>
+                            )}
+                            {canEdit && (
+                              <IconButton
+                                label="Eliminar cliente"
+                                tone="destructive"
+                                onClick={() => handleDeleteClick(customer)}
+                              >
+                                <Trash2 />
+                              </IconButton>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

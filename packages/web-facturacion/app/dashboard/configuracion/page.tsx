@@ -8,14 +8,6 @@ import { IconButton } from '@facturador-sri/ui';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
@@ -41,8 +33,6 @@ import {
   X,
   Info,
   Key,
-  Mail,
-  User,
 } from 'lucide-react';
 import {
   Establishment,
@@ -63,18 +53,11 @@ import {
   useCreateEmissionPoint,
   useDeleteEmissionPoint,
 } from '@/lib/hooks/use-establishments';
-import { usePagination } from '@/lib/hooks/use-pagination';
-import { Pagination } from '@/components/ui/pagination';
-
-interface UserData {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  role: string;
-}
+import { usePermissions } from '@/lib/hooks/use-company-users';
+import { CompanyUsersCard } from '@/components/company/company-users-card';
 
 export default function ConfiguracionPage() {
+  const { canEdit, isAdmin } = usePermissions();
   const { user } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<
@@ -102,11 +85,6 @@ export default function ConfiguracionPage() {
     id: string;
     name: string;
   } | null>(null);
-
-  const users: UserData[] = [
-    // Lista vacía por ahora - pendiente implementar
-  ];
-  const usersPage = usePagination(users, 10);
 
   // Establishment handlers
   const handleCreateEstablishment = () => {
@@ -180,8 +158,9 @@ export default function ConfiguracionPage() {
 
   const tabs = [
     { id: 'establishments' as const, label: 'Establecimientos', icon: Building },
-    { id: 'certificate' as const, label: 'Certificado Digital', icon: Key },
-    { id: 'users' as const, label: 'Usuarios', icon: Users },
+    // El certificado lo sube y lo quita solo el administrador.
+    ...(isAdmin ? [{ id: 'certificate' as const, label: 'Certificado Digital', icon: Key }] : []),
+    ...(isAdmin ? [{ id: 'users' as const, label: 'Usuarios', icon: Users }] : []),
     { id: 'security' as const, label: 'Seguridad', icon: Shield },
   ];
 
@@ -240,10 +219,12 @@ export default function ConfiguracionPage() {
                   <CardTitle>Establecimientos</CardTitle>
                   <CardDescription>Administra las ubicaciones de tu empresa</CardDescription>
                 </div>
-                <Button onClick={handleCreateEstablishment} className="w-full sm:w-auto">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Nuevo Establecimiento
-                </Button>
+                {canEdit && (
+                  <Button onClick={handleCreateEstablishment} className="w-full sm:w-auto">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Nuevo Establecimiento
+                  </Button>
+                )}
               </div>
             </CardHeader>
             <CardContent>
@@ -283,19 +264,23 @@ export default function ConfiguracionPage() {
                           </div>
                         </div>
                         <div className="flex gap-2 sm:flex-shrink-0">
-                          <IconButton
-                            label="Editar establecimiento"
-                            onClick={() => handleEditEstablishment(establishment)}
-                          >
-                            <Edit />
-                          </IconButton>
-                          <IconButton
-                            label="Eliminar establecimiento"
-                            tone="destructive"
-                            onClick={() => setDeleteEstablishmentId(establishment.id)}
-                          >
-                            <Trash2 />
-                          </IconButton>
+                          {canEdit && (
+                            <IconButton
+                              label="Editar establecimiento"
+                              onClick={() => handleEditEstablishment(establishment)}
+                            >
+                              <Edit />
+                            </IconButton>
+                          )}
+                          {canEdit && (
+                            <IconButton
+                              label="Eliminar establecimiento"
+                              tone="destructive"
+                              onClick={() => setDeleteEstablishmentId(establishment.id)}
+                            >
+                              <Trash2 />
+                            </IconButton>
+                          )}
                         </div>
                       </div>
 
@@ -388,187 +373,14 @@ export default function ConfiguracionPage() {
       )}
 
       {/* Certificate Tab */}
-      {activeTab === 'certificate' && (
+      {activeTab === 'certificate' && isAdmin && (
         <div className="space-y-4 sm:space-y-6">
           <CertificateManager />
         </div>
       )}
 
       {/* Users Tab */}
-      {activeTab === 'users' && (
-        <div className="space-y-4 sm:space-y-6">
-          <Alert variant="info">
-            <Info className="h-4 w-4" />
-            <AlertTitle>Gestión de Usuarios</AlertTitle>
-            <AlertDescription>
-              Administra los usuarios que tienen acceso al sistema. Los usuarios ADMIN tienen acceso
-              completo, mientras que los OPERADOR tienen permisos limitados.
-            </AlertDescription>
-          </Alert>
-
-          <Card>
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <CardTitle>Usuarios del Sistema</CardTitle>
-                  <CardDescription>Usuarios con acceso a tu empresa</CardDescription>
-                </div>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Invitar Usuario
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {users.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <div className="rounded-full bg-surface-container-high p-6 mb-4">
-                    <Users className="h-12 w-12 text-on-surface-variant" />
-                  </div>
-                  <h3 className="text-lg font-semibold mb-2">Solo tú tienes acceso</h3>
-                  <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-                    Invita a otros usuarios de tu empresa para que puedan usar el sistema.
-                  </p>
-                  <Button>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Invitar Primer Usuario
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  {/* Vista mobile: una card por usuario */}
-                  <div className="md:hidden space-y-3">
-                    {usersPage.pageItems.map((userData) => (
-                      <div key={userData.id} className="border rounded-lg p-4 space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-sm">
-                                {userData.firstName} {userData.lastName}
-                              </span>
-                              {userData.id === user?.id && (
-                                <Badge variant="outline" className="text-xs">
-                                  Tú
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
-                              <Mail className="h-3 w-3 flex-shrink-0" />
-                              <span className="truncate">{userData.email}</span>
-                            </div>
-                          </div>
-                          <Badge variant={userData.role === 'ADMIN' ? 'default' : 'secondary'}>
-                            {userData.role}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center justify-end gap-1 border-t pt-2">
-                          <IconButton label="Editar usuario">
-                            <Edit />
-                          </IconButton>
-                          {userData.id !== user?.id && (
-                            <IconButton label="Eliminar usuario" tone="destructive">
-                              <Trash2 />
-                            </IconButton>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Vista desktop: tabla */}
-                  <div className="hidden md:block">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Usuario</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Rol</TableHead>
-                          <TableHead className="text-right">Acciones</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {usersPage.pageItems.map((userData) => (
-                          <TableRow key={userData.id}>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <User className="h-4 w-4 text-muted-foreground" />
-                                <span className="font-medium">
-                                  {userData.firstName} {userData.lastName}
-                                </span>
-                                {userData.id === user?.id && (
-                                  <Badge variant="outline" className="text-xs">
-                                    Tú
-                                  </Badge>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center text-sm text-muted-foreground">
-                                <Mail className="mr-1 h-3 w-3" />
-                                {userData.email}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={userData.role === 'ADMIN' ? 'default' : 'secondary'}>
-                                {userData.role}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <Button variant="ghost" size="sm">
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                {userData.id !== user?.id && (
-                                  <Button variant="ghost" size="sm">
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-
-                  <Pagination {...usersPage} onPageChange={usersPage.setPage} />
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Roles Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Roles y Permisos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex gap-3 p-3 border rounded-lg">
-                  <Badge variant="default">ADMIN</Badge>
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Administrador</p>
-                    <p className="text-xs text-muted-foreground">
-                      Acceso completo al sistema: emitir facturas, gestionar clientes/productos,
-                      configurar establecimientos, invitar usuarios, ver reportes.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-3 p-3 border rounded-lg">
-                  <Badge variant="secondary">OPERADOR</Badge>
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Operador</p>
-                    <p className="text-xs text-muted-foreground">
-                      Puede emitir facturas, consultar clientes/productos. No puede modificar
-                      configuraciones ni invitar usuarios.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      {activeTab === 'users' && isAdmin && <CompanyUsersCard />}
 
       {/* Security Tab */}
       {activeTab === 'security' && (

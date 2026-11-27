@@ -27,7 +27,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, email: true, companyId: true, isActive: true, passwordChangedAt: true },
+      select: {
+        id: true,
+        email: true,
+        companyId: true,
+        role: true,
+        isActive: true,
+        passwordChangedAt: true,
+      },
     });
 
     // Desactivar un usuario corta también las sesiones que ya tenía abiertas.
@@ -46,6 +53,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     // Los logs y los errores de esta petición quedan con su empresa y su usuario.
     setRequestUser(user.id, user.companyId);
-    return { userId: user.id, email: user.email, companyId: user.companyId };
+    return { userId: user.id, email: user.email, companyId: user.companyId, role: user.role };
   }
 }

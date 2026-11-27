@@ -59,7 +59,8 @@ export class PlanUsageService {
     const [documents, extra, users, emissionPoints] = await Promise.all([
       this.countDocuments(db, companyId, period.start),
       this.extraDocuments(db, companyId, period),
-      db.user.count({ where: { companyId, isActive: true } }),
+      // El contador (solo lectura) no cuenta para el plan.
+      db.user.count({ where: { companyId, isActive: true, role: { not: 'VIEWER' } } }),
       db.emissionPoint.count({ where: { establishment: { companyId } } }),
     ]);
 

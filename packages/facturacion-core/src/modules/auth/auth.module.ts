@@ -1,9 +1,13 @@
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './presentation/controllers/auth.controller';
+import { CompanyUsersController } from './presentation/controllers/company-users.controller';
+import { CompanyUsersService } from './application/services/company-users.service';
+import { ReadOnlyRoleInterceptor } from './infrastructure/interceptors/read-only-role.interceptor';
 import { AuthService } from './application/services/auth.service';
 import { SessionService } from './application/services/session.service';
 import { JwtStrategy } from './infrastructure/strategies/jwt.strategy';
@@ -29,8 +33,18 @@ import { PlansModule } from '../plans/plans.module';
       inject: [ConfigService],
     }),
   ],
-  controllers: [AuthController],
-  providers: [AuthService, SessionService, JwtStrategy, EmailVerifiedGuard, RequireModuleGuard, PrismaService],
+  controllers: [AuthController, CompanyUsersController],
+  providers: [
+    AuthService,
+    SessionService,
+    CompanyUsersService,
+    JwtStrategy,
+    EmailVerifiedGuard,
+    RequireModuleGuard,
+    PrismaService,
+    // El contador (VIEWER) solo lee, en todas las rutas.
+    { provide: APP_INTERCEPTOR, useClass: ReadOnlyRoleInterceptor },
+  ],
   exports: [AuthService, EmailVerifiedGuard, RequireModuleGuard],
 })
 export class AuthModule {}

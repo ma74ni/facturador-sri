@@ -72,6 +72,7 @@ import {
 import { formatCurrency } from '@/lib/utils/formatters';
 import { SriStatusBadge } from '@/components/shared/sri-status-badge';
 import { PlanLimitBanner } from '@/components/plans/plan-limit-banner';
+import { usePermissions } from '@/lib/hooks/use-company-users';
 
 type InvoiceSort = 'recent' | 'oldest' | 'amountDesc' | 'amountAsc';
 
@@ -95,6 +96,7 @@ function sriResultToast(result: Awaited<ReturnType<typeof invoicesApi.sendToSri>
 }
 
 export default function FacturasPage() {
+  const { canEdit } = usePermissions();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -369,7 +371,11 @@ export default function FacturasPage() {
     return (
       <>
         {canSend && (
-          <IconButton label="Enviar al SRI" tone="primary" onClick={() => handleSendToSri(factura.id)}>
+          <IconButton
+            label="Enviar al SRI"
+            tone="primary"
+            onClick={() => handleSendToSri(factura.id)}
+          >
             <Send />
           </IconButton>
         )}
@@ -446,10 +452,12 @@ export default function FacturasPage() {
             Gestiona y emite facturas electrónicas
           </p>
         </div>
-        <Button onClick={() => setInvoiceDialogOpen(true)} className="w-full sm:w-auto">
-          <Plus className="mr-2 h-4 w-4" />
-          Nueva Factura
-        </Button>
+        {canEdit && (
+          <Button onClick={() => setInvoiceDialogOpen(true)} className="w-full sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            Nueva Factura
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -671,7 +679,10 @@ export default function FacturasPage() {
                         {/* Nombres largos: se parten en líneas (máx. 2), nunca empujan la tabla. */}
                         <TableCell className="whitespace-normal min-w-[10rem] max-w-[18rem]">
                           <div className="flex flex-col gap-1">
-                            <span className="text-sm break-words line-clamp-2" title={factura.customerName}>
+                            <span
+                              className="text-sm break-words line-clamp-2"
+                              title={factura.customerName}
+                            >
                               {factura.customerName}
                             </span>
                             {/* RUC/CI debajo del nombre cuando no hay columna RUC/CI */}

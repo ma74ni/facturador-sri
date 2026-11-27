@@ -15,6 +15,7 @@ import { CertificateAlertBanner } from '@/components/shared/certificate-alert-ba
 import { formatCurrency } from '@/lib/utils/formatters';
 import { SriStatusBadge } from '@/components/shared/sri-status-badge';
 import { PlanLimitBanner } from '@/components/plans/plan-limit-banner';
+import { usePermissions } from '@/lib/hooks/use-company-users';
 
 interface RecentInvoice {
   id: string;
@@ -26,6 +27,7 @@ interface RecentInvoice {
 }
 
 export default function DashboardPage() {
+  const { canEdit } = usePermissions();
   const { user, company } = useAuth();
   const router = useRouter();
 
@@ -99,14 +101,16 @@ export default function DashboardPage() {
             Bienvenido, {user?.firstName} {user?.lastName}
           </p>
         </div>
-        <Button
-          onClick={() => router.push('/dashboard/facturas')}
-          size="lg"
-          className="w-full md:w-auto"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Nueva Factura
-        </Button>
+        {canEdit && (
+          <Button
+            onClick={() => router.push('/dashboard/facturas')}
+            size="lg"
+            className="w-full md:w-auto"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Nueva Factura
+          </Button>
+        )}
       </div>
 
       {/* Stats Grid */}

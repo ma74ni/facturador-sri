@@ -326,7 +326,8 @@ export default function EmpresaPage() {
 
       <PlanUsageCard />
 
-      <LogoManager />
+      {/* Subir o quitar el logo es configuración de la empresa: solo el administrador. */}
+      {isAdmin && <LogoManager />}
 
       {/* SRI Configuration */}
       <Card>

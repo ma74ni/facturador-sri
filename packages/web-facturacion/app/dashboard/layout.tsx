@@ -28,6 +28,7 @@ import {
 import { usePathname } from 'next/navigation';
 import { EmailVerificationBanner } from '@/components/shared/email-verification-banner';
 import { CompanyStatusBanners } from '@/components/shared/company-status-banners';
+import { ReadOnlyBanner } from '@/components/shared/read-only-banner';
 import { COBRANZA_MODULE, COMPRAS_MODULE, hasModule } from '@/lib/product-modules';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -179,6 +180,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           {/* Company Status Banners */}
           <CompanyStatusBanners />
+
+          <ReadOnlyBanner />
 
           {children}
         </main>

@@ -38,6 +38,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { FilterBar, FilterField } from '@/components/ui/filter-bar';
 import { NativeSelect } from '@/components/ui/native-select';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { usePermissions } from '@/lib/hooks/use-company-users';
 
 type ProductSort = 'recent' | 'name' | 'priceAsc' | 'priceDesc';
 
@@ -54,6 +55,7 @@ function getMargenColor(margen: number) {
 }
 
 export default function ProductosPage() {
+  const { canEdit } = usePermissions();
   const [searchTerm, setSearchTerm] = useState('');
   const [taxFilter, setTaxFilter] = useState('all');
   const [sortBy, setSortBy] = useState<ProductSort>('recent');
@@ -155,10 +157,12 @@ export default function ProductosPage() {
             Administra tu catálogo de productos y servicios
           </p>
         </div>
-        <Button onClick={handleCreate} className="w-full sm:w-auto">
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo Producto
-        </Button>
+        {canEdit && (
+          <Button onClick={handleCreate} className="w-full sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo Producto
+          </Button>
+        )}
       </div>
 
       {/* Productos Table */}
@@ -273,16 +277,20 @@ export default function ProductosPage() {
                           )}
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
-                          <IconButton label="Editar producto" onClick={() => handleEdit(product)}>
-                            <Edit />
-                          </IconButton>
-                          <IconButton
-                            label="Eliminar producto"
-                            tone="destructive"
-                            onClick={() => handleDeleteClick(product)}
-                          >
-                            <Trash2 />
-                          </IconButton>
+                          {canEdit && (
+                            <IconButton label="Editar producto" onClick={() => handleEdit(product)}>
+                              <Edit />
+                            </IconButton>
+                          )}
+                          {canEdit && (
+                            <IconButton
+                              label="Eliminar producto"
+                              tone="destructive"
+                              onClick={() => handleDeleteClick(product)}
+                            >
+                              <Trash2 />
+                            </IconButton>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -345,19 +353,23 @@ export default function ProductosPage() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
-                              <IconButton
-                                label="Editar producto"
-                                onClick={() => handleEdit(product)}
-                              >
-                                <Edit />
-                              </IconButton>
-                              <IconButton
-                                label="Eliminar producto"
-                                tone="destructive"
-                                onClick={() => handleDeleteClick(product)}
-                              >
-                                <Trash2 />
-                              </IconButton>
+                              {canEdit && (
+                                <IconButton
+                                  label="Editar producto"
+                                  onClick={() => handleEdit(product)}
+                                >
+                                  <Edit />
+                                </IconButton>
+                              )}
+                              {canEdit && (
+                                <IconButton
+                                  label="Eliminar producto"
+                                  tone="destructive"
+                                  onClick={() => handleDeleteClick(product)}
+                                >
+                                  <Trash2 />
+                                </IconButton>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>

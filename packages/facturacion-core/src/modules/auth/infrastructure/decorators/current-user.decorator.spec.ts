@@ -4,7 +4,12 @@ import { Test } from '@nestjs/testing';
 import * as request from 'supertest';
 import { AuthenticatedUser, CurrentUser } from './current-user.decorator';
 
-const user: AuthenticatedUser = { userId: 'u1', email: 'ana@empresa.ec', companyId: 'c1' };
+const user: AuthenticatedUser = {
+  userId: 'u1',
+  email: 'ana@empresa.ec',
+  companyId: 'c1',
+  role: 'ADMIN',
+};
 
 // Hace lo mismo que JwtAuthGuard: deja el usuario validado en req.user.
 class FakeJwtGuard implements CanActivate {
