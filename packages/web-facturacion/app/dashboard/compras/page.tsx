@@ -1,7 +1,21 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Ban, Edit, FolderOpen, Loader2, Plus, Receipt, ShoppingCart } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import {
+  Ban,
+  BadgeCheck,
+  Clock,
+  Edit,
+  FileDown,
+  FileUp,
+  FolderOpen,
+  Loader2,
+  Plus,
+  Receipt,
+  RefreshCw,
+  ShoppingCart,
+} from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -15,6 +29,10 @@ import {
   FormField,
   IconButton,
   Input,
+  Menu,
+  MenuContent,
+  MenuIconTrigger,
+  MenuItem,
   NativeSelect,
   Pagination,
   StatCard,
@@ -33,11 +51,15 @@ import {
   formatDocumentNumber,
   ReceivedDocument,
   ReceivedDocumentInput,
+  receivedDocumentsApi,
 } from '@/lib/api/received-documents';
+import { useToast } from '@/hooks/use-toast';
+import { apiErrorMessage } from '@/lib/hooks/use-platform-admin';
 import {
   useAssignExpenseAccount,
   useCreateReceivedDocument,
   useReceivedDocuments,
+  useRetryFetch,
   useUpdateReceivedDocument,
   useVoidReceivedDocument,
 } from '@/lib/hooks/use-received-documents';
@@ -58,6 +80,11 @@ const formatIssueDate = (iso: string) => {
   return `${day}/${month}/${year}`;
 };
 
+/** El SRI entrega el detalle de una factura solo unos 2 meses: después se completa a mano. */
+const SRI_QUERY_MAX_DAYS = 60;
+const daysSince = (iso: string) =>
+  Math.floor((Date.now() - Date.parse(`${iso.slice(0, 10)}T05:00:00.000Z`)) / 86_400_000);
+
 const monthLabel = (month: string) => {
   const [year, index] = month.split('-').map(Number);
   const label = new Intl.DateTimeFormat('es-EC', { month: 'long', timeZone: 'UTC' }).format(
@@ -65,6 +92,17 @@ const monthLabel = (month: string) => {
   );
   return `${label} ${year}`;
 };
+
+function saveBlob(blob: Blob, filename: string) {
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
 
 function AccountCell({ document }: { document: ReceivedDocument }) {
   if (!document.expenseAccount) {
@@ -88,8 +126,22 @@ export default function ComprasPage() {
   const [month, setMonth] = useState(currentMonth);
   const [type, setType] = useState('');
   const [withoutAccount, setWithoutAccount] = useState(false);
+  const [pendingOnly, setPendingOnly] = useState(false);
   const [search, setSearch] = useState('');
-  const filters = useMemo(() => ({ month, type, withoutAccount }), [month, type, withoutAccount]);
+  // Al volver de importar (/dashboard/compras?mes=2026-10) se abre el mes importado.
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get('mes');
+    if (requested && /^\d{4}-(0[1-9]|1[0-2])$/.test(requested)) setMonth(requested);
+  }, []);
+  const filters = useMemo(
+    () => ({
+      month,
+      type,
+      withoutAccount,
+      status: pendingOnly ? ('PENDING_FETCH' as const) : undefined,
+    }),
+    [month, type, withoutAccount, pendingOnly],
+  );
 
   const { data, isLoading, isFetching } = useReceivedDocuments(filters);
   const { data: accounts = [] } = useExpenseAccounts();
@@ -97,6 +149,8 @@ export default function ComprasPage() {
   const update = useUpdateReceivedDocument();
   const voidDocument = useVoidReceivedDocument();
   const assign = useAssignExpenseAccount();
+  const retry = useRetryFetch();
+  const { toast } = useToast();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ReceivedDocument | null>(null);
@@ -119,7 +173,11 @@ export default function ComprasPage() {
       ].some((value) => value.toLowerCase().includes(term)),
     );
   }, [documents, search]);
-  const pagination = usePagination(filtered, 15, `${search}|${month}|${type}|${withoutAccount}`);
+  const pagination = usePagination(
+    filtered,
+    15,
+    `${search}|${month}|${type}|${withoutAccount}|${pendingOnly}`,
+  );
 
   const selectable = filtered.filter((doc) => doc.status !== 'VOIDED');
   const pageSelectable = pagination.pageItems.filter((doc) => doc.status !== 'VOIDED');
@@ -184,26 +242,76 @@ export default function ComprasPage() {
   };
 
   const summary = data?.summary;
-  const activeFilters = (type ? 1 : 0) + (withoutAccount ? 1 : 0);
+  const activeFilters = (type ? 1 : 0) + (withoutAccount ? 1 : 0) + (pendingOnly ? 1 : 0);
 
-  const actions = (doc: ReceivedDocument) =>
-    doc.status === 'VOIDED' ? null : (
+  const downloadXml = async (doc: ReceivedDocument) => {
+    try {
+      saveBlob(
+        await receivedDocumentsApi.downloadXml(doc.id),
+        `COMPRA_${formatDocumentNumber(doc)}.xml`,
+      );
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'No se pudo descargar el XML',
+        description: apiErrorMessage(error, ''),
+      });
+    }
+  };
+
+  const actions = (doc: ReceivedDocument) => {
+    const voided = doc.status === 'VOIDED';
+    // Una descartada solo conserva la descarga de su XML.
+    if (voided && !doc.xmlPath) return null;
+    const number = formatDocumentNumber(doc);
+    const pending = doc.status === 'PENDING_FETCH';
+    return (
       <div className="flex items-center justify-end gap-1">
-        <IconButton label="Editar compra" onClick={() => openEdit(doc)}>
-          <Edit />
-        </IconButton>
-        <IconButton
-          label="Descartar compra"
-          tone="destructive"
-          onClick={() => {
-            setVoidReason('');
-            setToVoid(doc);
-          }}
-        >
-          <Ban />
-        </IconButton>
+        {pending && daysSince(doc.issueDate) <= SRI_QUERY_MAX_DAYS && (
+          <IconButton
+            label="Traer del SRI otra vez"
+            disabled={retry.isPending && retry.variables === doc.id}
+            onClick={() => retry.mutate(doc.id)}
+          >
+            <RefreshCw
+              className={cn(retry.isPending && retry.variables === doc.id && 'animate-spin')}
+            />
+          </IconButton>
+        )}
+        {!voided && (
+          <IconButton
+            label={pending ? 'Completar a mano' : 'Editar compra'}
+            onClick={() => openEdit(doc)}
+          >
+            <Edit />
+          </IconButton>
+        )}
+        <Menu>
+          <MenuIconTrigger label={`Más acciones de la compra ${number}`} />
+          <MenuContent>
+            {doc.xmlPath && (
+              <MenuItem onSelect={() => downloadXml(doc)}>
+                <FileDown />
+                Descargar XML
+              </MenuItem>
+            )}
+            {!voided && (
+              <MenuItem
+                tone="destructive"
+                onSelect={() => {
+                  setVoidReason('');
+                  setToVoid(doc);
+                }}
+              >
+                <Ban />
+                Descartar
+              </MenuItem>
+            )}
+          </MenuContent>
+        </Menu>
       </div>
     );
+  };
 
   const selectBox = (doc: ReceivedDocument) =>
     doc.status === 'VOIDED' ? null : (
@@ -214,6 +322,26 @@ export default function ComprasPage() {
         checked={selected.has(doc.id)}
         onChange={() => toggle(doc.id)}
       />
+    );
+
+  const sourceBadge = (doc: ReceivedDocument) =>
+    doc.status === 'PENDING_FETCH' ? (
+      <span className="mt-1 block">
+        <Badge variant="warning" className="w-fit">
+          <Clock className="mr-1 h-3.5 w-3.5" aria-hidden />
+          Falta el detalle
+        </Badge>
+        {doc.fetchError && (
+          <span className="mt-1 block text-body-sm text-on-surface-variant">{doc.fetchError}</span>
+        )}
+      </span>
+    ) : (
+      doc.source !== 'MANUAL' && (
+        <Badge variant="info" className="mt-1 w-fit">
+          <BadgeCheck className="mr-1 h-3.5 w-3.5" aria-hidden />
+          Del SRI
+        </Badge>
+      )
     );
 
   const voidedNote = (doc: ReceivedDocument) =>
@@ -235,17 +363,30 @@ export default function ComprasPage() {
             Lo que te facturaron tus proveedores, para tus reportes al SRI
           </p>
         </div>
-        <Button onClick={openCreate} className="w-full sm:w-auto">
-          <Plus />
-          Registrar compra
-        </Button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button variant="outlined" asChild className="w-full sm:w-auto">
+            <Link href="/dashboard/compras/importar">
+              <FileUp />
+              Importar del SRI
+            </Link>
+          </Button>
+          <Button onClick={openCreate} className="w-full sm:w-auto">
+            <Plus />
+            Registrar compra
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div
+        className={cn(
+          'grid grid-cols-1 gap-4',
+          summary?.pending || pendingOnly ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3',
+        )}
+      >
         <StatCard
           title={`Compras de ${monthLabel(month)}`}
           value={formatCurrency(summary?.total)}
-          description={`${summary?.registered ?? 0} comprobantes registrados`}
+          description={`${summary?.registered ?? 0} ${summary?.registered === 1 ? 'comprobante registrado' : 'comprobantes registrados'}`}
           icon={ShoppingCart}
         />
         <StatCard
@@ -269,6 +410,27 @@ export default function ComprasPage() {
             className={cn(withoutAccount && 'ring-2 ring-primary')}
           />
         </button>
+        {(!!summary?.pending || pendingOnly) && (
+          <button
+            type="button"
+            className="text-left"
+            aria-pressed={pendingOnly}
+            onClick={() => setPendingOnly((value) => !value)}
+          >
+            <StatCard
+              title="Falta el detalle"
+              value={summary?.pending ?? 0}
+              description={
+                pendingOnly
+                  ? 'Mostrando solo estas'
+                  : `${formatCurrency(summary?.pendingTotal)} que no cuentan en tus reportes todavía`
+              }
+              icon={Clock}
+              tone={summary?.pending ? 'warning' : undefined}
+              className={cn(pendingOnly && 'ring-2 ring-primary')}
+            />
+          </button>
+        )}
       </div>
 
       <Card>
@@ -281,6 +443,7 @@ export default function ComprasPage() {
             onClear={() => {
               setType('');
               setWithoutAccount(false);
+              setPendingOnly(false);
             }}
           >
             <FormField label="Mes" htmlFor="purchases-month">
@@ -381,6 +544,7 @@ export default function ComprasPage() {
                     setSearch('');
                     setType('');
                     setWithoutAccount(false);
+                    setPendingOnly(false);
                   }}
                 >
                   Limpiar filtros
@@ -409,6 +573,7 @@ export default function ComprasPage() {
                             {RECEIVED_DOCUMENT_TYPES[doc.documentType]} {formatDocumentNumber(doc)}{' '}
                             · {formatIssueDate(doc.issueDate)}
                           </p>
+                          {sourceBadge(doc)}
                           {voidedNote(doc)}
                         </div>
                       </div>
@@ -473,6 +638,7 @@ export default function ComprasPage() {
                               {RECEIVED_DOCUMENT_TYPES[doc.documentType]}
                             </p>
                             <p className="font-mono text-body-sm">{formatDocumentNumber(doc)}</p>
+                            {sourceBadge(doc)}
                             {voidedNote(doc)}
                           </TableCell>
                           <TableCell className={cn('text-right', voided && 'line-through')}>
@@ -514,6 +680,7 @@ export default function ComprasPage() {
         document={editing}
         onSubmit={save}
         saving={create.isPending || update.isPending}
+        onShowExisting={openEdit}
       />
 
       <AlertDialog open={!!toVoid} onOpenChange={(open) => !open && setToVoid(null)}>

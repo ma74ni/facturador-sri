@@ -1,0 +1,456 @@
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
+import { Prisma, ReceivedDocumentSource, ReceivedDocumentStatus } from '@prisma/client';
+import { PrismaService } from '../../../../shared/database/prisma.service';
+import { R2StorageService } from '../../../../shared/storage/r2-storage.service';
+import { errorMessage } from '../../../../shared/errors/error-message';
+import { SRI_PAYMENT_METHOD_CODES } from '../../../invoices/domain/payment-methods';
+import {
+  AccessKeyParts,
+  daysSinceIssue,
+  documentTypeName,
+  parseAccessKey,
+  SRI_QUERY_MAX_DAYS,
+} from '../../domain/access-key-parser';
+import {
+  accessKeyMismatch,
+  computeReceivedTotals,
+  isBuyer,
+  formatDocumentNumber,
+  ReceivedTotals,
+} from '../../domain/received-document';
+import { ReceivedInvoice, readReceivedInvoice } from '../../domain/received-invoice';
+import {
+  SriReceivedDocumentClient,
+  SriUnavailableError,
+} from '../../infrastructure/sri-received-document.client';
+import { RegisterFromAccessKeyDto } from '../dto/access-key.dto';
+import { RECEIVED_DOCUMENT_INCLUDE, ReceivedDocumentsService } from './received-documents.service';
+
+const RUC_TYPE = '04';
+
+/**
+ * El SRI respondió algo que no cambia al reintentar: la factura no es una compra válida de esta
+ * empresa (es de otro comprador, no está autorizada o el SRI tiene otra con esa clave).
+ */
+export class SriRejectedError extends UnprocessableEntityException {}
+const TRY_MANUAL = 'prueba en unos minutos o regístrala a mano';
+
+/** Lo que el SRI dijo de una clave, ya validado para esta empresa. */
+interface Resolved {
+  parts: AccessKeyParts;
+  invoice: ReceivedInvoice;
+  totals: ReceivedTotals;
+  xml: string;
+  authorizationNumber: string;
+  authorizationDate: Date | null;
+  supplier: { id: string; businessName: string } | null;
+}
+
+/**
+ * C2: compras registradas con la clave de acceso. El número, la fecha y los montos salen del XML
+ * autorizado por el SRI, que se guarda tal cual; quien compra solo pone la forma de pago, la
+ * cuenta, el sustento y la nota. Todo va filtrado por `companyId`.
+ */
+@Injectable()
+export class ReceivedDocumentsSriService {
+  private readonly logger = new Logger(ReceivedDocumentsSriService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: R2StorageService,
+    private readonly sri: SriReceivedDocumentClient,
+    private readonly documents: ReceivedDocumentsService,
+  ) {}
+
+  /** Vista previa sin guardar nada. Si ya estaba registrada, devuelve esa compra. */
+  async lookup(accessKey: string, companyId: string) {
+    const found = await this.resolve(accessKey, companyId);
+    if ('existing' in found) {
+      return { alreadyRegistered: true, document: found.existing };
+    }
+    const { parts, invoice, totals, supplier } = found;
+    const suggestion = supplier
+      ? await this.documents.suggestionFor(supplier.id, companyId)
+      : { expenseAccountId: null, taxSupportCode: null, paymentMethodCode: null };
+    return {
+      alreadyRegistered: false,
+      accessKey: parts.accessKey,
+      environment: parts.environment,
+      documentType: parts.documentType,
+      number: formatDocumentNumber(invoice),
+      issueDate: invoice.issueDate,
+      authorizationNumber: found.authorizationNumber,
+      authorizationDate: found.authorizationDate,
+      supplier: {
+        id: supplier?.id ?? null,
+        identification: invoice.issuer.ruc,
+        businessName: supplier?.businessName ?? supplierName(invoice),
+        tradeName: invoice.issuer.tradeName,
+      },
+      ...amounts(totals),
+      totalDiscount: invoice.totalDiscount,
+      taxes: totals.taxes,
+      paymentMethodCode: paymentMethod(invoice.paymentMethodCode),
+      suggestion,
+      items: invoice.items,
+      itemCount: invoice.itemCount,
+      warnings: invoice.warnings,
+    };
+  }
+
+  /**
+   * Trae la factura del SRI otra vez (no confía en la vista previa del cliente) y la registra.
+   * Crea el proveedor si falta. Idempotente: una clave ya registrada devuelve la existente.
+   */
+  async register(dto: RegisterFromAccessKeyDto, companyId: string, userId: string) {
+    const found = await this.resolve(dto.accessKey, companyId);
+    if ('existing' in found) {
+      return { ...found.existing, alreadyRegistered: true };
+    }
+    await this.documents.assertAccount(dto.expenseAccountId, companyId);
+    const { parts, invoice, totals } = found;
+    const supplierId = found.supplier?.id ?? (await this.createSupplier(invoice, companyId));
+
+    const xmlPath = await this.saveXml(found.xml, parts.accessKey, companyId);
+
+    try {
+      const document = await this.prisma.receivedDocument.create({
+        data: {
+          documentType: parts.documentType,
+          establishmentCode: invoice.establishmentCode,
+          emissionPointCode: invoice.emissionPointCode,
+          sequential: invoice.sequential,
+          issueDate: new Date(`${invoice.issueDate}T00:00:00.000Z`),
+          accessKey: parts.accessKey,
+          authorizationNumber: found.authorizationNumber,
+          authorizationDate: found.authorizationDate,
+          source: ReceivedDocumentSource.SRI_ACCESS_KEY,
+          status: ReceivedDocumentStatus.REGISTERED,
+          ...amounts(totals),
+          totalDiscount: invoice.totalDiscount,
+          paymentMethodCode:
+            dto.paymentMethodCode !== undefined
+              ? dto.paymentMethodCode
+              : paymentMethod(invoice.paymentMethodCode),
+          taxSupportCode: dto.taxSupportCode ?? null,
+          description: dto.description ?? null,
+          xmlPath,
+          supplierId,
+          expenseAccountId: dto.expenseAccountId ?? null,
+          companyId,
+          createdById: userId,
+          taxes: { create: totals.taxes },
+        },
+        include: RECEIVED_DOCUMENT_INCLUDE,
+      });
+      return { ...document, alreadyRegistered: false };
+    } catch (error) {
+      // La misma clave registrada dos veces a la vez: el índice único frena la segunda.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const winner = await this.findExisting(companyId, parts);
+        if (winner) return { ...winner, alreadyRegistered: true };
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Completa una compra importada del listado (`PENDING_FETCH`): trae su XML del SRI y le pone
+   * las bases por tarifa, la autorización y la forma de pago. Si falla, lanza el mismo error que
+   * la consulta por clave (quien llama lo guarda en `fetchError`).
+   */
+  async completePending(id: string, companyId: string) {
+    const pending = await this.prisma.receivedDocument.findFirst({
+      where: { id, companyId },
+      select: { id: true, status: true, accessKey: true, paymentMethodCode: true },
+    });
+    if (!pending) {
+      throw new NotFoundException('Compra no encontrada');
+    }
+    if (pending.status !== ReceivedDocumentStatus.PENDING_FETCH || !pending.accessKey) {
+      throw new BadRequestException('Esta compra ya tiene su detalle');
+    }
+    const found = await this.resolve(pending.accessKey, companyId, pending.id);
+    if ('existing' in found) {
+      throw new ConflictException('Esa factura ya está registrada en otra compra: descarta esta');
+    }
+    const { parts, invoice, totals } = found;
+    const xmlPath = await this.saveXml(found.xml, parts.accessKey, companyId);
+
+    await this.prisma.$transaction(async (tx) => {
+      // Condicional: si alguien la descartó o la completó mientras tanto, no se toca.
+      const { count } = await tx.receivedDocument.updateMany({
+        where: { id: pending.id, companyId, status: ReceivedDocumentStatus.PENDING_FETCH },
+        data: {
+          status: ReceivedDocumentStatus.REGISTERED,
+          fetchError: null,
+          authorizationNumber: found.authorizationNumber,
+          authorizationDate: found.authorizationDate,
+          ...amounts(totals),
+          totalDiscount: invoice.totalDiscount,
+          paymentMethodCode: pending.paymentMethodCode ?? paymentMethod(invoice.paymentMethodCode),
+          xmlPath,
+        },
+      });
+      if (count === 0) {
+        throw new ConflictException('La compra cambió mientras se traía del SRI');
+      }
+      await tx.receivedDocumentTax.deleteMany({ where: { receivedDocumentId: pending.id } });
+      await tx.receivedDocumentTax.createMany({
+        data: totals.taxes.map((tax) => ({ ...tax, receivedDocumentId: pending.id })),
+      });
+    });
+    return this.documents.findOne(pending.id, companyId);
+  }
+
+  /** El XML autorizado, tal como lo devolvió el SRI. */
+  async getXml(id: string, companyId: string) {
+    const document = await this.prisma.receivedDocument.findFirst({
+      where: { id, companyId },
+      select: { xmlPath: true, accessKey: true },
+    });
+    if (!document) {
+      throw new NotFoundException('Compra no encontrada');
+    }
+    if (!document.xmlPath) {
+      throw new NotFoundException('Esta compra no tiene XML: se registró a mano');
+    }
+    return {
+      content: await this.storage.downloadXml(document.xmlPath),
+      filename: `${document.accessKey ?? id}.xml`,
+    };
+  }
+
+  private async resolve(
+    input: string,
+    companyId: string,
+    excludeId?: string,
+  ): Promise<
+    Resolved | { existing: Awaited<ReturnType<ReceivedDocumentsSriService['findExisting']>> }
+  > {
+    const { parts, error } = parseAccessKey(input);
+    if (!parts) {
+      throw new BadRequestException(error);
+    }
+    if (parts.documentType !== '01') {
+      const name = documentTypeName(parts.documentType) ?? 'otro tipo de comprobante';
+      throw new BadRequestException(
+        `Esta clave es de ${name}: por ahora con la clave solo se registran facturas`,
+      );
+    }
+
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { ruc: true, environment: true },
+    });
+    if (!company) {
+      throw new NotFoundException('Empresa no encontrada');
+    }
+    if (parts.issuerRuc === company.ruc) {
+      throw new BadRequestException(
+        'Esta factura la emitió tu empresa: es una venta, no una compra',
+      );
+    }
+    // Una clave de pruebas no es una factura de verdad; solo sirve a una empresa que está probando.
+    if (parts.environment === 'TEST' && company.environment !== 'TEST') {
+      throw new BadRequestException(
+        'Esta clave es del ambiente de pruebas del SRI: no es una factura válida para tus compras',
+      );
+    }
+
+    const existing = await this.findExisting(companyId, parts, excludeId);
+    if (existing) {
+      return { existing };
+    }
+
+    const answer = await this.fetchFromSri(parts);
+    let invoice: ReceivedInvoice;
+    try {
+      invoice = readReceivedInvoice(answer.xml);
+    } catch (error) {
+      this.logger.warn(`XML del SRI que no se pudo leer: ${errorMessage(error)}`);
+      throw new UnprocessableEntityException(
+        'No pudimos leer la factura que devolvió el SRI: regístrala a mano',
+      );
+    }
+    // El XML tiene que ser el de esta clave: mismo RUC, número y fecha (y la misma clave, si la trae).
+    const mismatch =
+      (invoice.accessKey && invoice.accessKey !== parts.accessKey) ||
+      accessKeyMismatch(parts.accessKey, {
+        issueDate: invoice.issueDate,
+        documentType: parts.documentType,
+        supplierIdentification: invoice.issuer.ruc,
+        establishmentCode: invoice.establishmentCode,
+        emissionPointCode: invoice.emissionPointCode,
+        sequential: invoice.sequential,
+      });
+    if (mismatch) {
+      throw new SriRejectedError('El SRI devolvió otra factura para esta clave: regístrala a mano');
+    }
+    if (!isBuyer(invoice.buyerIdentification, company.ruc)) {
+      throw new SriRejectedError(
+        // Sin la identificación del comprador: es un dato de un tercero.
+        `Esta factura no está emitida a tu empresa (RUC ${company.ruc}). No se puede registrar como compra tuya`,
+      );
+    }
+
+    const result = computeReceivedTotals({
+      documentType: '01',
+      taxes: invoice.taxes,
+      iceValue: invoice.iceValue,
+      otherCharges: invoice.otherCharges,
+      total: invoice.total,
+    });
+    if (!result.totals) {
+      throw new UnprocessableEntityException(
+        `Los valores de la factura del SRI no cuadran (${result.errors.join('. ')}): regístrala a mano con lo que dice el RIDE`,
+      );
+    }
+
+    const supplier = await this.prisma.supplier.findFirst({
+      where: { companyId, identification: invoice.issuer.ruc },
+      select: { id: true, businessName: true },
+    });
+    return {
+      parts,
+      invoice,
+      totals: result.totals,
+      xml: answer.xml,
+      authorizationNumber: answer.authorizationNumber,
+      authorizationDate: answer.authorizationDate,
+      supplier,
+    };
+  }
+
+  private async fetchFromSri(parts: AccessKeyParts) {
+    // Una factura vieja que el SRI no devuelve no es un problema de conexión: ya no la entrega.
+    const tooOld = daysSinceIssue(parts.issueDate) > SRI_QUERY_MAX_DAYS;
+    const tooOldError = () => {
+      const [year, month, day] = parts.issueDate.split('-');
+      return new UnprocessableEntityException(
+        `El SRI solo entrega las facturas de los últimos 2 meses y esta es del ${day}/${month}/${year}: regístrala a mano`,
+      );
+    };
+    let answer;
+    try {
+      answer = await this.sri.fetch(parts.accessKey, parts.environment);
+    } catch (error) {
+      if (error instanceof SriUnavailableError) {
+        if (tooOld) throw tooOldError();
+        throw new ServiceUnavailableException(`El SRI no responde: ${TRY_MANUAL}`);
+      }
+      this.logger.error(`Respuesta inesperada del SRI: ${errorMessage(error)}`);
+      throw new ServiceUnavailableException(
+        `El SRI respondió algo que no entendimos: ${TRY_MANUAL}`,
+      );
+    }
+    if (answer.status === 'NOT_FOUND') {
+      if (tooOld) throw tooOldError();
+      throw new UnprocessableEntityException(
+        `El SRI no tiene autorizada esta clave (o no existe). Si el proveedor la emitió hoy, ${TRY_MANUAL}`,
+      );
+    }
+    if (answer.status === 'PENDING') {
+      throw new UnprocessableEntityException(
+        `El SRI todavía está procesando esta factura: ${TRY_MANUAL}`,
+      );
+    }
+    if (answer.status === 'NOT_AUTHORIZED') {
+      throw new SriRejectedError(
+        `El SRI no autorizó esta factura (${answer.state.toLowerCase() || 'sin estado'}): no cuenta como compra`,
+      );
+    }
+    return answer;
+  }
+
+  /** La misma clave, o el mismo número del mismo proveedor registrado antes a mano. */
+  private findExisting(companyId: string, parts: AccessKeyParts, excludeId?: string) {
+    return this.prisma.receivedDocument.findFirst({
+      where: {
+        companyId,
+        ...(excludeId ? { NOT: { id: excludeId } } : {}),
+        OR: [
+          { accessKey: parts.accessKey },
+          {
+            supplier: { identification: parts.issuerRuc },
+            documentType: parts.documentType,
+            establishmentCode: parts.establishmentCode,
+            emissionPointCode: parts.emissionPointCode,
+            sequential: parts.sequential,
+          },
+        ],
+      },
+      include: RECEIVED_DOCUMENT_INCLUDE,
+    });
+  }
+
+  private async saveXml(xml: string, accessKey: string, companyId: string) {
+    const xmlPath = `purchases/received/${companyId}/${accessKey}.xml`;
+    try {
+      await this.storage.uploadFile({
+        buffer: Buffer.from(xml, 'utf-8'),
+        key: xmlPath,
+        contentType: 'application/xml',
+        metadata: { companyId, accessKey },
+      });
+    } catch (error) {
+      this.logger.error(`No se pudo guardar el XML de una compra: ${errorMessage(error)}`);
+      throw new ServiceUnavailableException(
+        'No pudimos guardar el XML de la factura: prueba otra vez',
+      );
+    }
+    return xmlPath;
+  }
+
+  private async createSupplier(invoice: ReceivedInvoice, companyId: string) {
+    try {
+      const supplier = await this.prisma.supplier.create({
+        data: {
+          identificationType: RUC_TYPE,
+          identification: invoice.issuer.ruc,
+          businessName: supplierName(invoice),
+          tradeName: invoice.issuer.tradeName,
+          companyId,
+        },
+        select: { id: true },
+      });
+      return supplier.id;
+    } catch (error) {
+      // Otra compra del mismo proveedor lo creó al mismo tiempo.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const supplier = await this.prisma.supplier.findFirst({
+          where: { companyId, identification: invoice.issuer.ruc },
+          select: { id: true },
+        });
+        if (supplier) return supplier.id;
+      }
+      throw error;
+    }
+  }
+}
+
+function supplierName(invoice: ReceivedInvoice): string {
+  return invoice.issuer.businessName || invoice.issuer.tradeName || invoice.issuer.ruc;
+}
+
+function paymentMethod(code: string | null): string | null {
+  return code && (SRI_PAYMENT_METHOD_CODES as string[]).includes(code) ? code : null;
+}
+
+function amounts(totals: ReceivedTotals) {
+  return {
+    subtotal: totals.subtotal,
+    ivaValue: totals.ivaValue,
+    iceValue: totals.iceValue,
+    otherCharges: totals.otherCharges,
+    total: totals.total,
+  };
+}

@@ -16,7 +16,9 @@ import {
   NativeSelect,
   SearchableSelect,
 } from '@facturador-sri/ui';
+import { KeyRound, PencilLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { AccessKeyPurchase } from '@/components/purchases/access-key-purchase';
 import { SupplierDialog } from '@/components/suppliers/supplier-dialog';
 import {
   formatDocumentNumber,
@@ -39,6 +41,7 @@ import {
   ZERO_RATE_CODE,
 } from '@/lib/sri-catalogs';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { cn } from '@/lib/utils';
 
 interface ReceivedDocumentDialogProps {
   open: boolean;
@@ -47,7 +50,11 @@ interface ReceivedDocumentDialogProps {
   document?: ReceivedDocument | null;
   onSubmit: (data: ReceivedDocumentInput) => Promise<unknown>;
   saving?: boolean;
+  /** Con la clave de una compra que ya estaba registrada: abrirla. */
+  onShowExisting?: (document: ReceivedDocument) => void;
 }
+
+type Mode = 'key' | 'manual';
 
 interface Form {
   supplierId: string;
@@ -146,6 +153,7 @@ export function ReceivedDocumentDialog({
   document,
   onSubmit,
   saving,
+  onShowExisting,
 }: ReceivedDocumentDialogProps) {
   const { data: suppliers = [] } = useSuppliers();
   const { data: accounts = [] } = useExpenseAccounts();
@@ -158,17 +166,26 @@ export function ReceivedDocumentDialog({
   const [totalTouched, setTotalTouched] = useState(false);
   const [suggested, setSuggested] = useState(false);
   const [supplierDialogOpen, setSupplierDialogOpen] = useState(false);
+  // Una compra nueva empieza por la clave de acceso: la mayoría de facturas son electrónicas.
+  const [mode, setMode] = useState<Mode>('key');
 
   const editing = !!document;
-  const lockedAmounts = !!document && document.source !== 'MANUAL';
+  const byKey = !editing && mode === 'key';
+  // Importada del listado sin su detalle (C3): el comprobante es del SRI, los montos por tarifa se
+  // completan aquí.
+  const completing = document?.status === 'PENDING_FETCH';
+  const lockedDocument = !!document && document.source !== 'MANUAL';
+  const lockedAmounts = lockedDocument && !completing;
 
   useEffect(() => {
     if (!open) return;
     setForm(document ? fromDocument(document) : emptyForm());
-    setIvaTouched(!!document);
+    // Al completar una importada, el IVA se calcula de la base que se escribe.
+    setIvaTouched(!!document && document.status !== 'PENDING_FETCH');
     setTotalTouched(!!document);
     setSuggested(false);
     setErrors({});
+    setMode('key');
   }, [open, document]);
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) => {
@@ -275,20 +292,25 @@ export function ReceivedDocumentDialog({
       expenseAccountId: form.expenseAccountId || null,
       description: form.description.trim() || null,
     };
+    const amounts = {
+      taxes,
+      iceValue: ice,
+      otherCharges: toNumber(form.otherCharges),
+      total: round2(total),
+    };
     const data: ReceivedDocumentInput = lockedAmounts
       ? (common as ReceivedDocumentInput)
-      : {
-          ...common,
-          supplierId: form.supplierId,
-          documentType: form.documentType,
-          number: form.number.trim(),
-          issueDate: form.issueDate,
-          authorizationNumber: form.authorizationNumber.trim() || null,
-          taxes,
-          iceValue: ice,
-          otherCharges: toNumber(form.otherCharges),
-          total: round2(total),
-        };
+      : completing
+        ? ({ ...common, ...amounts } as ReceivedDocumentInput)
+        : {
+            ...common,
+            supplierId: form.supplierId,
+            documentType: form.documentType,
+            number: form.number.trim(),
+            issueDate: form.issueDate,
+            authorizationNumber: form.authorizationNumber.trim() || null,
+            ...amounts,
+          };
     try {
       await onSubmit(data);
       onOpenChange(false);
@@ -313,275 +335,329 @@ export function ReceivedDocumentDialog({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-3xl">
-          <form onSubmit={submit} className="contents">
-            <DialogHeader>
-              <DialogTitle>{editing ? 'Editar compra' : 'Registrar compra'}</DialogTitle>
-              <DialogDescription>
-                Copia los datos del comprobante que te dio el proveedor.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogBody className="space-y-6">
-              <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <FormField
-                  label="Proveedor *"
-                  htmlFor="purchase-supplier"
-                  error={errors.supplierId}
-                  className="sm:col-span-2"
-                >
-                  <SearchableSelect
-                    id="purchase-supplier"
-                    items={suppliers}
-                    value={form.supplierId}
-                    onChange={chooseSupplier}
-                    getId={(supplier) => supplier.id}
-                    getLabel={supplierLabel}
-                    getSubLabel={(supplier) => supplier.identification}
-                    placeholder="Elige el proveedor"
-                    searchPlaceholder="Buscar por nombre o RUC…"
-                    emptyMessage="Ningún proveedor coincide"
-                    onAddNew={lockedAmounts ? undefined : () => setSupplierDialogOpen(true)}
-                    addNewLabel="Nuevo proveedor"
-                    disabled={lockedAmounts}
-                    error={!!errors.supplierId}
-                  />
-                </FormField>
-                <FormField label="Comprobante *" htmlFor="purchase-type">
-                  <NativeSelect
-                    id="purchase-type"
-                    value={form.documentType}
-                    disabled={lockedAmounts}
-                    onChange={(e) => set('documentType', e.target.value)}
+          <DialogHeader>
+            <DialogTitle>
+              {completing ? 'Completar compra' : editing ? 'Editar compra' : 'Registrar compra'}
+            </DialogTitle>
+            <DialogDescription>
+              {byKey
+                ? 'Pega la clave de acceso de la factura y traemos los datos del SRI.'
+                : completing
+                  ? 'El listado del SRI no separa la base por tarifa: cópiala del RIDE. Con eso cuenta en tus reportes.'
+                  : lockedAmounts
+                    ? 'Los datos del comprobante vienen del SRI: aquí solo cambias cómo la registras.'
+                    : 'Copia los datos del comprobante que te dio el proveedor.'}
+            </DialogDescription>
+            {!editing && (
+              <div
+                role="radiogroup"
+                aria-label="Cómo registrar la compra"
+                className="mt-3 inline-flex w-fit overflow-hidden rounded-full border border-outline"
+              >
+                {(
+                  [
+                    ['key', 'Con clave de acceso', KeyRound],
+                    ['manual', 'Manual', PencilLine],
+                  ] as const
+                ).map(([value, label, Icon]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={mode === value}
+                    onClick={() => setMode(value)}
+                    className={cn(
+                      'flex h-9 items-center gap-2 px-4 text-label-lg transition-colors',
+                      'border-outline first:border-r',
+                      mode === value
+                        ? 'bg-secondary-container text-on-secondary-container'
+                        : 'text-on-surface',
+                    )}
                   >
-                    {Object.entries(RECEIVED_DOCUMENT_TYPES).map(([code, label]) => (
-                      <option key={code} value={code}>
-                        {label}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </FormField>
-                <FormField label="Número *" htmlFor="purchase-number" error={errors.number}>
-                  <Input
-                    id="purchase-number"
-                    value={form.number}
-                    placeholder="001-001-000000123"
-                    inputMode="numeric"
-                    maxLength={17}
-                    disabled={lockedAmounts}
-                    onChange={(e) => set('number', e.target.value)}
-                  />
-                </FormField>
-                <FormField
-                  label="Fecha de emisión *"
-                  htmlFor="purchase-date"
-                  error={errors.issueDate}
-                >
-                  <Input
-                    id="purchase-date"
-                    type="date"
-                    value={form.issueDate}
-                    max={todayLocal()}
-                    disabled={lockedAmounts}
-                    onChange={(e) => set('issueDate', e.target.value)}
-                  />
-                </FormField>
-                <FormField
-                  label="Autorización"
-                  htmlFor="purchase-authorization"
-                  error={errors.authorizationNumber}
-                  hint={
-                    isSaleNote
-                      ? 'La de la imprenta: 10 dígitos'
-                      : 'De la imprenta (10 dígitos) o la clave de acceso (49)'
-                  }
-                >
-                  <Input
-                    id="purchase-authorization"
-                    value={form.authorizationNumber}
-                    inputMode="numeric"
-                    maxLength={49}
-                    placeholder="Opcional"
-                    disabled={lockedAmounts}
-                    onChange={(e) => set('authorizationNumber', e.target.value)}
-                  />
-                </FormField>
-              </section>
-
-              <section className="space-y-3">
-                <h3 className="text-title-sm text-on-surface">Valores</h3>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  {!isSaleNote && (
-                    <>
-                      <FormField label="Base con IVA" htmlFor="purchase-taxed">
-                        <div className="flex gap-2">
-                          <NativeSelect
-                            aria-label="Tarifa de IVA"
-                            value={form.taxedCode}
-                            disabled={lockedAmounts}
-                            className="w-24 shrink-0"
-                            onChange={(e) => set('taxedCode', e.target.value)}
-                          >
-                            {TAXED_IVA_RATES.map((option) => (
-                              <option key={option.code} value={option.code}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </NativeSelect>
-                          {amountInput('taxedBase', 'purchase-taxed')}
-                        </div>
-                      </FormField>
-                      <FormField
-                        label="IVA"
-                        htmlFor="purchase-iva"
-                        hint={
-                          ivaOff
-                            ? `Con ${rate.label} daría ${formatCurrency(expectedIva)}: revisa si el comprobante dice otra cosa`
-                            : ivaTouched
-                              ? undefined
-                              : 'Calculado; cámbialo si el comprobante dice otro valor'
-                        }
-                      >
-                        <Input
-                          id="purchase-iva"
-                          value={ivaTouched ? form.iva : amountText(expectedIva)}
-                          inputMode="decimal"
-                          placeholder="0.00"
-                          disabled={lockedAmounts}
-                          className="text-right"
-                          onChange={(e) => {
-                            setIvaTouched(true);
-                            set('iva', e.target.value);
-                          }}
-                        />
-                      </FormField>
-                    </>
-                  )}
+                    <Icon className="h-4 w-4" aria-hidden />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </DialogHeader>
+          {byKey ? (
+            <AccessKeyPurchase
+              onDone={() => onOpenChange(false)}
+              onCancel={() => onOpenChange(false)}
+              onManual={() => setMode('manual')}
+              onShowExisting={(existing) => onShowExisting?.(existing)}
+            />
+          ) : (
+            <form onSubmit={submit} className="contents">
+              <DialogBody className="space-y-6">
+                <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <FormField
-                    label={isSaleNote ? 'Valor de la nota de venta' : 'Base 0 %'}
-                    htmlFor="purchase-zero"
+                    label="Proveedor *"
+                    htmlFor="purchase-supplier"
+                    error={errors.supplierId}
+                    className="sm:col-span-2"
                   >
-                    {amountInput('zeroBase', 'purchase-zero')}
-                  </FormField>
-                  <FormField label="No objeto de IVA" htmlFor="purchase-not-subject">
-                    {amountInput('notSubjectBase', 'purchase-not-subject')}
-                  </FormField>
-                  <FormField label="Exento de IVA" htmlFor="purchase-exempt">
-                    {amountInput('exemptBase', 'purchase-exempt')}
-                  </FormField>
-                  {!isSaleNote && (
-                    <FormField label="ICE" htmlFor="purchase-ice" hint="Bebidas, cigarrillos…">
-                      {amountInput('iceValue', 'purchase-ice')}
-                    </FormField>
-                  )}
-                  <FormField label="Otros valores" htmlFor="purchase-other" hint="Propina u otros">
-                    {amountInput('otherCharges', 'purchase-other')}
-                  </FormField>
-                  <FormField
-                    label="Total del comprobante *"
-                    htmlFor="purchase-total"
-                    error={errors.total}
-                    className="sm:col-start-3"
-                  >
-                    <Input
-                      id="purchase-total"
-                      value={totalTouched ? form.total : amountText(computedTotal)}
-                      inputMode="decimal"
-                      placeholder="0.00"
-                      disabled={lockedAmounts}
-                      className="text-right text-title-md"
-                      onChange={(e) => {
-                        setTotalTouched(true);
-                        set('total', e.target.value);
-                      }}
+                    <SearchableSelect
+                      id="purchase-supplier"
+                      items={suppliers}
+                      value={form.supplierId}
+                      onChange={chooseSupplier}
+                      getId={(supplier) => supplier.id}
+                      getLabel={supplierLabel}
+                      getSubLabel={(supplier) => supplier.identification}
+                      placeholder="Elige el proveedor"
+                      searchPlaceholder="Buscar por nombre o RUC…"
+                      emptyMessage="Ningún proveedor coincide"
+                      onAddNew={lockedDocument ? undefined : () => setSupplierDialogOpen(true)}
+                      addNewLabel="Nuevo proveedor"
+                      disabled={lockedDocument}
+                      error={!!errors.supplierId}
                     />
                   </FormField>
-                </div>
-              </section>
+                  <FormField label="Comprobante *" htmlFor="purchase-type">
+                    <NativeSelect
+                      id="purchase-type"
+                      value={form.documentType}
+                      disabled={lockedDocument}
+                      onChange={(e) => set('documentType', e.target.value)}
+                    >
+                      {Object.entries(RECEIVED_DOCUMENT_TYPES).map(([code, label]) => (
+                        <option key={code} value={code}>
+                          {label}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </FormField>
+                  <FormField label="Número *" htmlFor="purchase-number" error={errors.number}>
+                    <Input
+                      id="purchase-number"
+                      value={form.number}
+                      placeholder="001-001-000000123"
+                      inputMode="numeric"
+                      maxLength={17}
+                      disabled={lockedDocument}
+                      onChange={(e) => set('number', e.target.value)}
+                    />
+                  </FormField>
+                  <FormField
+                    label="Fecha de emisión *"
+                    htmlFor="purchase-date"
+                    error={errors.issueDate}
+                  >
+                    <Input
+                      id="purchase-date"
+                      type="date"
+                      value={form.issueDate}
+                      max={todayLocal()}
+                      disabled={lockedDocument}
+                      onChange={(e) => set('issueDate', e.target.value)}
+                    />
+                  </FormField>
+                  <FormField
+                    label="Autorización"
+                    htmlFor="purchase-authorization"
+                    error={errors.authorizationNumber}
+                    hint={
+                      isSaleNote
+                        ? 'La de la imprenta: 10 dígitos'
+                        : 'De la imprenta (10 dígitos) o la clave de acceso (49)'
+                    }
+                  >
+                    <Input
+                      id="purchase-authorization"
+                      value={form.authorizationNumber}
+                      inputMode="numeric"
+                      maxLength={49}
+                      placeholder="Opcional"
+                      disabled={lockedDocument}
+                      onChange={(e) => set('authorizationNumber', e.target.value)}
+                    />
+                  </FormField>
+                </section>
 
-              <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <FormField label="Forma de pago" htmlFor="purchase-payment">
-                  <NativeSelect
-                    id="purchase-payment"
-                    value={form.paymentMethodCode}
-                    onChange={(e) => set('paymentMethodCode', e.target.value)}
+                <section className="space-y-3">
+                  <h3 className="text-title-sm text-on-surface">Valores</h3>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    {!isSaleNote && (
+                      <>
+                        <FormField label="Base con IVA" htmlFor="purchase-taxed">
+                          <div className="flex gap-2">
+                            <NativeSelect
+                              aria-label="Tarifa de IVA"
+                              value={form.taxedCode}
+                              disabled={lockedAmounts}
+                              className="w-24 shrink-0"
+                              onChange={(e) => set('taxedCode', e.target.value)}
+                            >
+                              {TAXED_IVA_RATES.map((option) => (
+                                <option key={option.code} value={option.code}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </NativeSelect>
+                            {amountInput('taxedBase', 'purchase-taxed')}
+                          </div>
+                        </FormField>
+                        <FormField
+                          label="IVA"
+                          htmlFor="purchase-iva"
+                          hint={
+                            ivaOff
+                              ? `Con ${rate.label} daría ${formatCurrency(expectedIva)}: revisa si el comprobante dice otra cosa`
+                              : ivaTouched
+                                ? undefined
+                                : 'Calculado; cámbialo si el comprobante dice otro valor'
+                          }
+                        >
+                          <Input
+                            id="purchase-iva"
+                            value={ivaTouched ? form.iva : amountText(expectedIva)}
+                            inputMode="decimal"
+                            placeholder="0.00"
+                            disabled={lockedAmounts}
+                            className="text-right"
+                            onChange={(e) => {
+                              setIvaTouched(true);
+                              set('iva', e.target.value);
+                            }}
+                          />
+                        </FormField>
+                      </>
+                    )}
+                    <FormField
+                      label={isSaleNote ? 'Valor de la nota de venta' : 'Base 0 %'}
+                      htmlFor="purchase-zero"
+                    >
+                      {amountInput('zeroBase', 'purchase-zero')}
+                    </FormField>
+                    <FormField label="No objeto de IVA" htmlFor="purchase-not-subject">
+                      {amountInput('notSubjectBase', 'purchase-not-subject')}
+                    </FormField>
+                    <FormField label="Exento de IVA" htmlFor="purchase-exempt">
+                      {amountInput('exemptBase', 'purchase-exempt')}
+                    </FormField>
+                    {!isSaleNote && (
+                      <FormField label="ICE" htmlFor="purchase-ice" hint="Bebidas, cigarrillos…">
+                        {amountInput('iceValue', 'purchase-ice')}
+                      </FormField>
+                    )}
+                    <FormField
+                      label="Otros valores"
+                      htmlFor="purchase-other"
+                      hint="Propina u otros"
+                    >
+                      {amountInput('otherCharges', 'purchase-other')}
+                    </FormField>
+                    <FormField
+                      label="Total del comprobante *"
+                      htmlFor="purchase-total"
+                      error={errors.total}
+                      hint={completing ? 'El que autorizó el SRI' : undefined}
+                      className="sm:col-start-3"
+                    >
+                      <Input
+                        id="purchase-total"
+                        value={totalTouched ? form.total : amountText(computedTotal)}
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        disabled={lockedAmounts || completing}
+                        className="text-right text-title-md"
+                        onChange={(e) => {
+                          setTotalTouched(true);
+                          set('total', e.target.value);
+                        }}
+                      />
+                    </FormField>
+                  </div>
+                </section>
+
+                <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <FormField label="Forma de pago" htmlFor="purchase-payment">
+                    <NativeSelect
+                      id="purchase-payment"
+                      value={form.paymentMethodCode}
+                      onChange={(e) => set('paymentMethodCode', e.target.value)}
+                    >
+                      <option value="">Sin especificar</option>
+                      {PAYMENT_METHODS.map((method) => (
+                        <option key={method.code} value={method.code}>
+                          {method.label}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </FormField>
+                  <FormField
+                    label="Cuenta de gasto"
+                    htmlFor="purchase-account"
+                    hint={suggested ? 'La de la última compra a este proveedor' : undefined}
                   >
-                    <option value="">Sin especificar</option>
-                    {PAYMENT_METHODS.map((method) => (
-                      <option key={method.code} value={method.code}>
-                        {method.label}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </FormField>
-                <FormField
-                  label="Cuenta de gasto"
-                  htmlFor="purchase-account"
-                  hint={suggested ? 'La de la última compra a este proveedor' : undefined}
-                >
-                  <NativeSelect
-                    id="purchase-account"
-                    value={form.expenseAccountId}
-                    onChange={(e) => {
-                      setSuggested(false);
-                      set('expenseAccountId', e.target.value);
-                    }}
+                    <NativeSelect
+                      id="purchase-account"
+                      value={form.expenseAccountId}
+                      onChange={(e) => {
+                        setSuggested(false);
+                        set('expenseAccountId', e.target.value);
+                      }}
+                    >
+                      <option value="">Sin cuenta (asignar después)</option>
+                      {accountOptions.map((account) => (
+                        <option key={account.id} value={account.id}>
+                          {accountLabel(account)}
+                          {account.isActive ? '' : ' (inactiva)'}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </FormField>
+                  {cashOverLimit && (
+                    <Alert variant="warning" className="sm:col-span-2">
+                      <AlertDescription>
+                        Una compra de más de {formatCurrency(CASH_PAYMENT_LIMIT)} pagada en efectivo
+                        no es deducible ni da crédito tributario de IVA. Si la pagaste por el banco,
+                        elige esa forma de pago.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  <FormField
+                    label="Sustento tributario"
+                    htmlFor="purchase-support"
+                    hint="Para el ATS; tu contador te dice cuál usar"
+                    className="sm:col-span-2"
                   >
-                    <option value="">Sin cuenta (asignar después)</option>
-                    {accountOptions.map((account) => (
-                      <option key={account.id} value={account.id}>
-                        {accountLabel(account)}
-                        {account.isActive ? '' : ' (inactiva)'}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </FormField>
-                {cashOverLimit && (
-                  <Alert variant="warning" className="sm:col-span-2">
-                    <AlertDescription>
-                      Una compra de más de {formatCurrency(CASH_PAYMENT_LIMIT)} pagada en efectivo
-                      no es deducible ni da crédito tributario de IVA. Si la pagaste por el banco,
-                      elige esa forma de pago.
-                    </AlertDescription>
-                  </Alert>
-                )}
-                <FormField
-                  label="Sustento tributario"
-                  htmlFor="purchase-support"
-                  hint="Para el ATS; tu contador te dice cuál usar"
-                  className="sm:col-span-2"
-                >
-                  <NativeSelect
-                    id="purchase-support"
-                    value={form.taxSupportCode}
-                    onChange={(e) => set('taxSupportCode', e.target.value)}
-                  >
-                    <option value="">Sin especificar</option>
-                    {Object.entries(TAX_SUPPORT_CODES).map(([code, label]) => (
-                      <option key={code} value={code}>
-                        {code} · {label}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </FormField>
-                <FormField label="Nota" htmlFor="purchase-description" className="sm:col-span-2">
-                  <Input
-                    id="purchase-description"
-                    value={form.description}
-                    maxLength={300}
-                    placeholder="Opcional: qué compraste"
-                    onChange={(e) => set('description', e.target.value)}
-                  />
-                </FormField>
-              </section>
-            </DialogBody>
-            <DialogFooter>
-              <Button type="button" variant="outlined" onClick={() => onOpenChange(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={saving}>
-                {saving ? 'Guardando…' : editing ? 'Guardar' : 'Registrar'}
-              </Button>
-            </DialogFooter>
-          </form>
+                    <NativeSelect
+                      id="purchase-support"
+                      value={form.taxSupportCode}
+                      onChange={(e) => set('taxSupportCode', e.target.value)}
+                    >
+                      <option value="">Sin especificar</option>
+                      {Object.entries(TAX_SUPPORT_CODES).map(([code, label]) => (
+                        <option key={code} value={code}>
+                          {code} · {label}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </FormField>
+                  <FormField label="Nota" htmlFor="purchase-description" className="sm:col-span-2">
+                    <Input
+                      id="purchase-description"
+                      value={form.description}
+                      maxLength={300}
+                      placeholder="Opcional: qué compraste"
+                      onChange={(e) => set('description', e.target.value)}
+                    />
+                  </FormField>
+                </section>
+              </DialogBody>
+              <DialogFooter>
+                <Button type="button" variant="outlined" onClick={() => onOpenChange(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={saving}>
+                  {saving ? 'Guardando…' : editing ? 'Guardar' : 'Registrar'}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
 

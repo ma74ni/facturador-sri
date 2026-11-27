@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AccessKeyRegistration,
   ReceivedDocumentFilters,
   ReceivedDocumentInput,
   receivedDocumentsApi,
@@ -59,6 +60,45 @@ export function useCreateReceivedDocument() {
         ? 'Esa compra ya estaba registrada: no se duplicó'
         : 'Compra registrada',
     'No se pudo registrar la compra',
+  );
+}
+
+/** Vista previa de una clave de acceso: los errores los muestra el diálogo, no un toast. */
+export function useAccessKeyLookup() {
+  return useMutation({ mutationFn: (accessKey: string) => receivedDocumentsApi.lookup(accessKey) });
+}
+
+export function useRegisterFromAccessKey() {
+  return usePurchaseMutation(
+    (data: AccessKeyRegistration) => receivedDocumentsApi.fromAccessKey(data),
+    (result) =>
+      result.alreadyRegistered
+        ? 'Esa factura ya estaba registrada: no se duplicó'
+        : 'Compra registrada con los datos del SRI',
+    'No se pudo registrar la compra',
+  );
+}
+
+/** Vista previa de los listados: el resultado lo muestra la página, sin toast. */
+export function useReportPreview() {
+  return useMutation({
+    mutationFn: (files: File[]) => receivedDocumentsApi.importReports(files, true),
+  });
+}
+
+export function useImportReports() {
+  return usePurchaseMutation(
+    (files: File[]) => receivedDocumentsApi.importReports(files, false),
+    null,
+    'No se pudo importar',
+  );
+}
+
+export function useRetryFetch() {
+  return usePurchaseMutation(
+    (id: string) => receivedDocumentsApi.retryFetch(id),
+    () => 'Compra completada con los datos del SRI',
+    'El SRI no la entregó',
   );
 }
 

@@ -302,6 +302,54 @@ describe('ReceivedDocumentsService', () => {
       ).resolves.toBeDefined();
     });
 
+    it('una importada del listado sin su XML se completa a mano con sus montos y pasa a contar', async () => {
+      const pending = {
+        ...document,
+        source: 'SRI_REPORT',
+        status: 'PENDING_FETCH',
+        accessKey: ACCESS_KEY,
+        authorizationNumber: ACCESS_KEY,
+      };
+      const { service, tx } = setup({ found: pending });
+
+      await service.update(
+        'd-1',
+        {
+          taxes: [
+            { ivaCode: '4', taxBase: 60, ivaValue: 9 },
+            { ivaCode: '0', taxBase: 46, ivaValue: 0 },
+          ],
+          total: 115,
+          expenseAccountId: 'a-1',
+        },
+        'c-1',
+      );
+
+      expect(tx.receivedDocument.updateMany.mock.calls[0][0].data).toMatchObject({
+        subtotal: 106,
+        ivaValue: 9,
+        total: 115,
+        status: 'REGISTERED',
+        fetchError: null,
+      });
+      expect(tx.receivedDocument.updateMany.mock.calls[0][0]).toMatchObject({
+        where: { status: 'PENDING_FETCH' },
+        data: { source: 'MANUAL' },
+      });
+      // El total es el que autorizó el SRI: solo se reparte la base.
+      await expect(
+        setup({ found: pending }).service.update(
+          'd-1',
+          { taxes: [{ ivaCode: '4', taxBase: 110, ivaValue: 16.5 }], total: 126.5 },
+          'c-1',
+        ),
+      ).rejects.toThrow('El total tiene que ser el que dice el SRI: 115.00');
+      // El número, la fecha y el proveedor son los del SRI: no se cambian.
+      await expect(
+        setup({ found: pending }).service.update('d-1', { issueDate: '2026-11-04' }, 'c-1'),
+      ).rejects.toThrow('De una compra importada del SRI solo se completan los montos');
+    });
+
     it('descartar guarda el motivo; una descartada no se edita ni se descarta otra vez', async () => {
       const { service, prisma } = setup();
       await service.void('d-1', 'Registrada dos veces', 'c-1');

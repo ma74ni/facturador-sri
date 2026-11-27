@@ -21,7 +21,7 @@ import { UpdateReceivedDocumentDto } from '../dto/received-document-actions.dto'
 const LIST_LIMIT = 1000;
 const ECUADOR_OFFSET_MS = -5 * 60 * 60 * 1000;
 
-const INCLUDE = {
+export const RECEIVED_DOCUMENT_INCLUDE = {
   supplier: {
     select: { id: true, businessName: true, identification: true, isPopularBusiness: true },
   },
@@ -69,10 +69,10 @@ export class ReceivedDocumentsService {
       ...this.buildWhere(companyId, { month: filters.month }),
       status: ReceivedDocumentStatus.REGISTERED,
     };
-    const [documents, sums, withoutAccount] = await Promise.all([
+    const [documents, sums, withoutAccount, pending] = await Promise.all([
       this.prisma.receivedDocument.findMany({
         where,
-        include: INCLUDE,
+        include: RECEIVED_DOCUMENT_INCLUDE,
         orderBy: [{ issueDate: 'desc' }, { createdAt: 'desc' }],
         take: LIST_LIMIT,
       }),
@@ -82,6 +82,12 @@ export class ReceivedDocumentsService {
         _count: true,
       }),
       this.prisma.receivedDocument.count({ where: { ...registered, expenseAccountId: null } }),
+      // Importadas del listado sin su detalle (C3): no cuentan hasta completarlas.
+      this.prisma.receivedDocument.aggregate({
+        where: { ...registered, status: ReceivedDocumentStatus.PENDING_FETCH },
+        _sum: { total: true },
+        _count: true,
+      }),
     ]);
     return {
       count: documents.length,
@@ -92,6 +98,8 @@ export class ReceivedDocumentsService {
         ivaValue: sums._sum.ivaValue ?? 0,
         total: sums._sum.total ?? 0,
         withoutAccount,
+        pending: pending._count,
+        pendingTotal: pending._sum.total ?? 0,
       },
     };
   }
@@ -99,7 +107,7 @@ export class ReceivedDocumentsService {
   async findOne(id: string, companyId: string) {
     const document = await this.prisma.receivedDocument.findFirst({
       where: { id, companyId },
-      include: INCLUDE,
+      include: RECEIVED_DOCUMENT_INCLUDE,
     });
     if (!document) {
       throw new NotFoundException('Compra no encontrada');
@@ -155,7 +163,7 @@ export class ReceivedDocumentsService {
           createdById: userId,
           taxes: { create: totals.taxes },
         },
-        include: INCLUDE,
+        include: RECEIVED_DOCUMENT_INCLUDE,
       });
       return { ...document, alreadyRegistered: false };
     } catch (error) {
@@ -179,11 +187,18 @@ export class ReceivedDocumentsService {
       throw new BadRequestException('Una compra descartada no se edita');
     }
     const sent = Object.entries(dto).filter(([, value]) => value !== undefined);
+    // Una importada del listado sin su XML (C3) se completa a mano: solo sus montos por tarifa.
+    const completing = current.status === ReceivedDocumentStatus.PENDING_FETCH;
     if (current.source !== ReceivedDocumentSource.MANUAL) {
-      const locked = sent.filter(([key]) => !ALWAYS_EDITABLE.has(key)).map(([key]) => key);
+      const editable = (key: string) =>
+        ALWAYS_EDITABLE.has(key) ||
+        (completing && (AMOUNT_FIELDS as readonly string[]).includes(key));
+      const locked = sent.filter(([key]) => !editable(key)).map(([key]) => key);
       if (locked.length > 0) {
         throw new BadRequestException(
-          'Esta compra vino del SRI: solo se editan la forma de pago, el sustento, la cuenta y la nota',
+          completing
+            ? 'De una compra importada del SRI solo se completan los montos por tarifa, la forma de pago, el sustento, la cuenta y la nota'
+            : 'Esta compra vino del SRI: solo se editan la forma de pago, el sustento, la cuenta y la nota',
         );
       }
     }
@@ -248,7 +263,20 @@ export class ReceivedDocumentsService {
         otherCharges: dto.otherCharges,
         total: dto.total,
       });
+      // El total del listado es el que autorizó el SRI: completar a mano solo reparte la base.
+      if (completing && Math.abs(totals.total - Number(current.total)) > 0.01) {
+        throw new BadRequestException(
+          `El total tiene que ser el que dice el SRI: ${Number(current.total).toFixed(2)}`,
+        );
+      }
       Object.assign(data, this.amounts(totals));
+      if (completing) {
+        // Con sus montos por tarifa ya cuenta en los reportes. Los montos los puso una persona, no
+        // el SRI: queda como manual, sin la insignia "Del SRI".
+        data.status = ReceivedDocumentStatus.REGISTERED;
+        data.source = ReceivedDocumentSource.MANUAL;
+        data.fetchError = null;
+      }
     } else if (documentType !== current.documentType) {
       this.computeTotals(documentType, {
         taxes: current.taxes.map((tax) => ({
@@ -279,12 +307,24 @@ export class ReceivedDocumentsService {
     try {
       await this.prisma.$transaction(async (tx) => {
         // Condicional: si alguien la descartó mientras tanto, no se toca.
+        // Una pendiente que se completa a mano no debe pisar la que el SRI completó mientras tanto.
         const { count } = await tx.receivedDocument.updateMany({
-          where: { id: current.id, companyId, status: { not: ReceivedDocumentStatus.VOIDED } },
+          where: {
+            id: current.id,
+            companyId,
+            status:
+              data.status === ReceivedDocumentStatus.REGISTERED
+                ? ReceivedDocumentStatus.PENDING_FETCH
+                : { not: ReceivedDocumentStatus.VOIDED },
+          },
           data: data as Prisma.ReceivedDocumentUncheckedUpdateManyInput,
         });
         if (count === 0) {
-          throw new ConflictException('La compra se descartó mientras la editabas');
+          throw new ConflictException(
+            data.status === ReceivedDocumentStatus.REGISTERED
+              ? 'La compra cambió mientras la completabas (quizá ya llegó del SRI): ábrela otra vez'
+              : 'La compra se descartó mientras la editabas',
+          );
         }
         if (totals) {
           await tx.receivedDocumentTax.deleteMany({ where: { receivedDocumentId: current.id } });
@@ -311,7 +351,7 @@ export class ReceivedDocumentsService {
     return this.prisma.receivedDocument.update({
       where: { id: document.id },
       data: { status: ReceivedDocumentStatus.VOIDED, voidedAt: new Date(), voidReason: reason },
-      include: INCLUDE,
+      include: RECEIVED_DOCUMENT_INCLUDE,
     });
   }
 
@@ -426,7 +466,7 @@ export class ReceivedDocumentsService {
   }
 
   /** La cuenta tiene que ser de la empresa y estar activa; null o vacío = sin cuenta. */
-  private async assertAccount(expenseAccountId: string | null | undefined, companyId: string) {
+  async assertAccount(expenseAccountId: string | null | undefined, companyId: string) {
     if (!expenseAccountId) return;
     const account = await this.prisma.expenseAccount.findFirst({
       where: { id: expenseAccountId, companyId },
@@ -507,7 +547,7 @@ export class ReceivedDocumentsService {
         ...(excludeId ? { NOT: { id: excludeId } } : {}),
         OR: [number, ...(accessKey ? [{ accessKey }] : [])],
       },
-      include: INCLUDE,
+      include: RECEIVED_DOCUMENT_INCLUDE,
     });
   }
 }
