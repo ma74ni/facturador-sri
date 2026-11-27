@@ -27,6 +27,8 @@ export interface ReceivedDocument {
   xmlPath: string | null;
   source: 'MANUAL' | 'SRI_ACCESS_KEY' | 'SRI_REPORT';
   status: ReceivedDocumentStatus;
+  /** Importada del listado sin su detalle (PENDING_FETCH): por qué no se trajo del SRI. */
+  fetchError: string | null;
   subtotal: Money;
   ivaValue: Money;
   iceValue: Money;
@@ -57,6 +59,9 @@ export interface ReceivedDocumentList {
     ivaValue: Money;
     total: Money;
     withoutAccount: number;
+    /** Importadas del listado del SRI a las que les falta el detalle: no cuentan todavía. */
+    pending: number;
+    pendingTotal: Money;
   };
 }
 
@@ -64,7 +69,42 @@ export interface ReceivedDocumentFilters {
   month?: string; // AAAA-MM
   type?: string;
   withoutAccount?: boolean;
+  status?: ReceivedDocumentStatus;
   search?: string;
+}
+
+/** Lo que dejó (o dejaría, en la vista previa) importar listados del SRI. */
+export interface ReportImportResult {
+  dryRun: boolean;
+  files: {
+    name: string;
+    months: string[];
+    rows: number;
+    newRows: number;
+    existing: number;
+    problems: { line: number; reason: string }[];
+    /** Problemas que no se listan, pasado el máximo. */
+    moreProblems: number;
+    error: string | null;
+  }[];
+  newRows: number;
+  newTotal: number;
+  existing: number;
+  problems: number;
+  /** Nuevas con más de 2 meses: el SRI ya no las entrega y quedan para completar a mano. */
+  tooOld: number;
+  created: number;
+  registered: number;
+  pending: {
+    id: string;
+    supplierName: string;
+    number: string;
+    issueDate: string;
+    total: number;
+    reason: string;
+  }[];
+  /** Las que el SRI rechazó (otro comprador, no autorizada…): quedan descartadas con el motivo. */
+  voided: ReportImportResult['pending'];
 }
 
 export interface ReceivedDocumentInput {
@@ -152,6 +192,7 @@ export const receivedDocumentsApi = {
     if (filters.month) params.month = filters.month;
     if (filters.type) params.type = filters.type;
     if (filters.withoutAccount) params.withoutAccount = 'true';
+    if (filters.status) params.status = filters.status;
     if (filters.search?.trim()) params.search = filters.search.trim();
     const response = await apiClient.get('/received-documents', { params });
     return response.data;
@@ -196,6 +237,25 @@ export const receivedDocumentsApi = {
     data: AccessKeyRegistration,
   ): Promise<ReceivedDocument & { alreadyRegistered: boolean }> => {
     const response = await apiClient.post('/received-documents/from-access-key', data);
+    return response.data;
+  },
+
+  /** Sube los listados del SRI; con dryRun solo devuelve qué se importaría. */
+  importReports: async (files: File[], dryRun: boolean): Promise<ReportImportResult> => {
+    const formData = new FormData();
+    for (const file of files) formData.append('files', file);
+    const response = await apiClient.post(
+      `/received-documents/import?dryRun=${dryRun}`,
+      formData,
+      // Traer del SRI unas 60 facturas toma alrededor de 20 s, y hasta un minuto si está lento.
+      { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 150_000 },
+    );
+    return response.data;
+  },
+
+  /** Vuelve a traer del SRI el detalle de una compra importada. */
+  retryFetch: async (id: string): Promise<ReceivedDocument> => {
+    const response = await apiClient.post(`/received-documents/${id}/retry-fetch`);
     return response.data;
   },
 

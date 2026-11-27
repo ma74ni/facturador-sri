@@ -79,6 +79,29 @@ export function useRegisterFromAccessKey() {
   );
 }
 
+/** Vista previa de los listados: el resultado lo muestra la página, sin toast. */
+export function useReportPreview() {
+  return useMutation({
+    mutationFn: (files: File[]) => receivedDocumentsApi.importReports(files, true),
+  });
+}
+
+export function useImportReports() {
+  return usePurchaseMutation(
+    (files: File[]) => receivedDocumentsApi.importReports(files, false),
+    null,
+    'No se pudo importar',
+  );
+}
+
+export function useRetryFetch() {
+  return usePurchaseMutation(
+    (id: string) => receivedDocumentsApi.retryFetch(id),
+    () => 'Compra completada con los datos del SRI',
+    'El SRI no la entregó',
+  );
+}
+
 export function useUpdateReceivedDocument() {
   return usePurchaseMutation(
     ({ id, data }: { id: string; data: Partial<ReceivedDocumentInput> }) =>

@@ -201,3 +201,12 @@ export function computeReceivedTotals(input: {
     errors: [],
   };
 }
+
+/**
+ * El comprador es la empresa: su RUC, o la cédula del dueño cuando la empresa es una persona
+ * natural (RUC = cédula + 001), que algunos proveedores ponen en lugar del RUC.
+ */
+export function isBuyer(buyerIdentification: string, companyRuc: string): boolean {
+  if (buyerIdentification === companyRuc) return true;
+  return /^\d{10}001$/.test(companyRuc) && buyerIdentification === companyRuc.slice(0, 10);
+}

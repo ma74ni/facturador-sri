@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -8,12 +9,25 @@ import {
   Post,
   Query,
   Res,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { CompanyThrottlerGuard } from '../guards/company-throttler.guard';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import { REPORTS_UPLOAD } from '../../../../shared/http/upload-limits';
+import { ReceivedDocumentsImportService } from '../../application/services/received-documents-import.service';
 import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
 import { EmailVerifiedGuard } from '../../../auth/infrastructure/guards/email-verified.guard';
 import { RequireModuleGuard } from '../../../auth/infrastructure/guards/require-module.guard';
@@ -35,6 +49,8 @@ import {
 
 // Cada consulta de una clave va al SRI de producción: unas pocas por minuto alcanzan a una persona.
 const SRI_QUERY_LIMIT = { default: { limit: 20, ttl: 60_000 } };
+// Importar un listado trae del SRI decenas de facturas: alcanza con unas pocas por minuto.
+const IMPORT_LIMIT = { default: { limit: 6, ttl: 60_000 } };
 
 @ApiTags('received-documents')
 @Controller('received-documents')
@@ -45,6 +61,7 @@ export class ReceivedDocumentsController {
   constructor(
     private readonly documents: ReceivedDocumentsService,
     private readonly fromSri: ReceivedDocumentsSriService,
+    private readonly importer: ReceivedDocumentsImportService,
   ) {}
 
   @Get()
@@ -157,6 +174,54 @@ export class ReceivedDocumentsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.fromSri.register(dto, user.companyId, user.userId);
+  }
+
+  @Post('import')
+  @HttpCode(200)
+  @UseGuards(CompanyThrottlerGuard)
+  @Throttle(IMPORT_LIMIT)
+  @UseInterceptors(FilesInterceptor('files', 12, REPORTS_UPLOAD))
+  @ApiOperation({
+    summary:
+      'Importa el listado de comprobantes recibidos del portal del SRI (.txt, uno o varios meses). Con dryRun=true solo muestra qué se importaría; si no, crea las facturas nuevas y trae del SRI el detalle de las de hasta 60 días',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { files: { type: 'array', items: { type: 'string', format: 'binary' } } },
+    },
+  })
+  @ApiQuery({ name: 'dryRun', required: false, description: '"true": vista previa sin guardar' })
+  @ApiResponse({ status: 429, description: 'Demasiadas importaciones en un minuto' })
+  async import(
+    @UploadedFiles() files: Express.Multer.File[] | undefined,
+    @Query('dryRun') dryRun: string | undefined,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('Elige al menos un listado (.txt) del SRI');
+    }
+    return this.importer.import(
+      files.map((file) => ({
+        // multer entrega el nombre en latin1.
+        name: Buffer.from(file.originalname, 'latin1').toString('utf8'),
+        buffer: file.buffer,
+      })),
+      user.companyId,
+      user.userId,
+      dryRun === 'true',
+    );
+  }
+
+  @Post(':id/retry-fetch')
+  @UseGuards(CompanyThrottlerGuard)
+  @Throttle(SRI_QUERY_LIMIT)
+  @ApiOperation({ summary: 'Vuelve a traer del SRI el detalle de una compra importada pendiente' })
+  @ApiResponse({ status: 422, description: 'El SRI no tiene la factura o no cuadra' })
+  @ApiResponse({ status: 503, description: 'El SRI no responde' })
+  retryFetch(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.importer.retry(id, user.companyId);
   }
 
   @Post('assign-account')

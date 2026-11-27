@@ -69,6 +69,11 @@ function setup({
       create: jest.fn((args) => Promise.resolve({ id: 'new', ...args.data })),
     },
   };
+  const tx = {
+    receivedDocument: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    receivedDocumentTax: { deleteMany: jest.fn(), createMany: jest.fn() },
+  };
+  Object.assign(prisma, { $transaction: jest.fn((fn: (client: typeof tx) => unknown) => fn(tx)) });
   const storage = {
     uploadFile: jest.fn().mockResolvedValue('ok'),
     downloadXml: jest.fn().mockResolvedValue('<factura/>'),
@@ -85,7 +90,7 @@ function setup({
     sri as never,
     documents,
   );
-  return { service, prisma, storage, sri };
+  return { service, prisma, storage, sri, tx };
 }
 
 describe('ReceivedDocumentsSriService', () => {
@@ -391,6 +396,70 @@ describe('ReceivedDocumentsSriService', () => {
         'No pudimos guardar el XML de la factura: prueba otra vez',
       );
       expect(prisma.receivedDocument.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('completar una importada del listado', () => {
+    const pending = {
+      id: 'd-9',
+      status: 'PENDING_FETCH',
+      accessKey: ACCESS_KEY,
+      paymentMethodCode: null,
+    };
+
+    it('trae el XML, pone las tarifas y la deja registrada', async () => {
+      const { service, prisma, storage, tx } = setup();
+      // La compra pendiente; la búsqueda de otra con la misma clave no la cuenta a ella.
+      prisma.receivedDocument.findFirst.mockImplementation((args: { where: { id?: string } }) =>
+        Promise.resolve(args.where.id ? pending : null),
+      );
+      jest.spyOn(service['documents'], 'findOne').mockResolvedValue({ id: 'd-9' } as never);
+
+      await service.completePending('d-9', 'c-1');
+
+      expect(prisma.receivedDocument.findFirst.mock.calls[1][0].where).toMatchObject({
+        companyId: 'c-1',
+        NOT: { id: 'd-9' },
+      });
+      expect(storage.uploadFile).toHaveBeenCalledWith(
+        expect.objectContaining({ key: `purchases/received/c-1/${ACCESS_KEY}.xml` }),
+      );
+      expect(tx.receivedDocument.updateMany.mock.calls[0][0]).toMatchObject({
+        where: { id: 'd-9', companyId: 'c-1', status: 'PENDING_FETCH' },
+        data: {
+          status: 'REGISTERED',
+          fetchError: null,
+          subtotal: 120,
+          ivaValue: 18,
+          total: 138,
+          paymentMethodCode: '20',
+          xmlPath: `purchases/received/c-1/${ACCESS_KEY}.xml`,
+        },
+      });
+      expect(tx.receivedDocumentTax.createMany.mock.calls[0][0].data).toEqual([
+        expect.objectContaining({
+          ivaCode: '4',
+          taxBase: 120,
+          ivaValue: 18,
+          receivedDocumentId: 'd-9',
+        }),
+      ]);
+    });
+
+    it('una que ya tiene su detalle, o de otra empresa, no se toca', async () => {
+      const done = setup();
+      done.prisma.receivedDocument.findFirst.mockResolvedValue({
+        ...pending,
+        status: 'REGISTERED',
+      });
+      await expect(done.service.completePending('d-9', 'c-1')).rejects.toThrow(
+        'Esta compra ya tiene su detalle',
+      );
+
+      const other = setup();
+      other.prisma.receivedDocument.findFirst.mockResolvedValue(null);
+      await expect(other.service.completePending('d-9', 'c-2')).rejects.toThrow(NotFoundException);
+      expect(other.sri.fetch).not.toHaveBeenCalled();
     });
   });
 

@@ -171,12 +171,17 @@ export function ReceivedDocumentDialog({
 
   const editing = !!document;
   const byKey = !editing && mode === 'key';
-  const lockedAmounts = !!document && document.source !== 'MANUAL';
+  // Importada del listado sin su detalle (C3): el comprobante es del SRI, los montos por tarifa se
+  // completan aquí.
+  const completing = document?.status === 'PENDING_FETCH';
+  const lockedDocument = !!document && document.source !== 'MANUAL';
+  const lockedAmounts = lockedDocument && !completing;
 
   useEffect(() => {
     if (!open) return;
     setForm(document ? fromDocument(document) : emptyForm());
-    setIvaTouched(!!document);
+    // Al completar una importada, el IVA se calcula de la base que se escribe.
+    setIvaTouched(!!document && document.status !== 'PENDING_FETCH');
     setTotalTouched(!!document);
     setSuggested(false);
     setErrors({});
@@ -287,20 +292,25 @@ export function ReceivedDocumentDialog({
       expenseAccountId: form.expenseAccountId || null,
       description: form.description.trim() || null,
     };
+    const amounts = {
+      taxes,
+      iceValue: ice,
+      otherCharges: toNumber(form.otherCharges),
+      total: round2(total),
+    };
     const data: ReceivedDocumentInput = lockedAmounts
       ? (common as ReceivedDocumentInput)
-      : {
-          ...common,
-          supplierId: form.supplierId,
-          documentType: form.documentType,
-          number: form.number.trim(),
-          issueDate: form.issueDate,
-          authorizationNumber: form.authorizationNumber.trim() || null,
-          taxes,
-          iceValue: ice,
-          otherCharges: toNumber(form.otherCharges),
-          total: round2(total),
-        };
+      : completing
+        ? ({ ...common, ...amounts } as ReceivedDocumentInput)
+        : {
+            ...common,
+            supplierId: form.supplierId,
+            documentType: form.documentType,
+            number: form.number.trim(),
+            issueDate: form.issueDate,
+            authorizationNumber: form.authorizationNumber.trim() || null,
+            ...amounts,
+          };
     try {
       await onSubmit(data);
       onOpenChange(false);
@@ -326,13 +336,17 @@ export function ReceivedDocumentDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Editar compra' : 'Registrar compra'}</DialogTitle>
+            <DialogTitle>
+              {completing ? 'Completar compra' : editing ? 'Editar compra' : 'Registrar compra'}
+            </DialogTitle>
             <DialogDescription>
               {byKey
                 ? 'Pega la clave de acceso de la factura y traemos los datos del SRI.'
-                : lockedAmounts
-                  ? 'Los datos del comprobante vienen del SRI: aquí solo cambias cómo la registras.'
-                  : 'Copia los datos del comprobante que te dio el proveedor.'}
+                : completing
+                  ? 'El listado del SRI no separa la base por tarifa: cópiala del RIDE. Con eso cuenta en tus reportes.'
+                  : lockedAmounts
+                    ? 'Los datos del comprobante vienen del SRI: aquí solo cambias cómo la registras.'
+                    : 'Copia los datos del comprobante que te dio el proveedor.'}
             </DialogDescription>
             {!editing && (
               <div
@@ -395,9 +409,9 @@ export function ReceivedDocumentDialog({
                       placeholder="Elige el proveedor"
                       searchPlaceholder="Buscar por nombre o RUC…"
                       emptyMessage="Ningún proveedor coincide"
-                      onAddNew={lockedAmounts ? undefined : () => setSupplierDialogOpen(true)}
+                      onAddNew={lockedDocument ? undefined : () => setSupplierDialogOpen(true)}
                       addNewLabel="Nuevo proveedor"
-                      disabled={lockedAmounts}
+                      disabled={lockedDocument}
                       error={!!errors.supplierId}
                     />
                   </FormField>
@@ -405,7 +419,7 @@ export function ReceivedDocumentDialog({
                     <NativeSelect
                       id="purchase-type"
                       value={form.documentType}
-                      disabled={lockedAmounts}
+                      disabled={lockedDocument}
                       onChange={(e) => set('documentType', e.target.value)}
                     >
                       {Object.entries(RECEIVED_DOCUMENT_TYPES).map(([code, label]) => (
@@ -422,7 +436,7 @@ export function ReceivedDocumentDialog({
                       placeholder="001-001-000000123"
                       inputMode="numeric"
                       maxLength={17}
-                      disabled={lockedAmounts}
+                      disabled={lockedDocument}
                       onChange={(e) => set('number', e.target.value)}
                     />
                   </FormField>
@@ -436,7 +450,7 @@ export function ReceivedDocumentDialog({
                       type="date"
                       value={form.issueDate}
                       max={todayLocal()}
-                      disabled={lockedAmounts}
+                      disabled={lockedDocument}
                       onChange={(e) => set('issueDate', e.target.value)}
                     />
                   </FormField>
@@ -456,7 +470,7 @@ export function ReceivedDocumentDialog({
                       inputMode="numeric"
                       maxLength={49}
                       placeholder="Opcional"
-                      disabled={lockedAmounts}
+                      disabled={lockedDocument}
                       onChange={(e) => set('authorizationNumber', e.target.value)}
                     />
                   </FormField>
@@ -539,6 +553,7 @@ export function ReceivedDocumentDialog({
                       label="Total del comprobante *"
                       htmlFor="purchase-total"
                       error={errors.total}
+                      hint={completing ? 'El que autorizó el SRI' : undefined}
                       className="sm:col-start-3"
                     >
                       <Input
@@ -546,7 +561,7 @@ export function ReceivedDocumentDialog({
                         value={totalTouched ? form.total : amountText(computedTotal)}
                         inputMode="decimal"
                         placeholder="0.00"
-                        disabled={lockedAmounts}
+                        disabled={lockedAmounts || completing}
                         className="text-right text-title-md"
                         onChange={(e) => {
                           setTotalTouched(true);
