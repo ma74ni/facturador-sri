@@ -317,7 +317,7 @@ export default function ComprasPage() {
         <StatCard
           title={`Compras de ${monthLabel(month)}`}
           value={formatCurrency(summary?.total)}
-          description={`${summary?.registered ?? 0} comprobantes registrados`}
+          description={`${summary?.registered ?? 0} ${summary?.registered === 1 ? 'comprobante registrado' : 'comprobantes registrados'}`}
           icon={ShoppingCart}
         />
         <StatCard

@@ -1,7 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, ArrowLeft, CheckCircle2, CloudOff, Info, ScanLine } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle2,
+  CloudOff,
+  History,
+  Info,
+  ScanLine,
+} from 'lucide-react';
 import {
   Alert,
   AlertDescription,
@@ -41,7 +49,7 @@ interface AccessKeyPurchaseProps {
   onShowExisting: (document: ReceivedDocument) => void;
 }
 
-type Problem = { kind: 'key' | 'blocked' | 'retry'; message: string };
+type Problem = { kind: 'key' | 'blocked' | 'retry' | 'manual'; message: string };
 
 const onlyDigits = (value: string) => value.replace(/\D/g, '');
 
@@ -132,17 +140,19 @@ export function AccessKeyPurchase({
       const status = (error as { response?: { status?: number } })?.response?.status;
       const message = apiErrorMessage(error, 'No se pudo consultar la clave en el SRI');
       setProblem({
-        // 400: la clave en sí; SRI caído, en proceso, sin la clave o demasiadas consultas: se reintenta
-        // o se registra a mano.
+        // 400: la clave en sí; factura de más de 2 meses: solo a mano; SRI caído, en proceso, sin la
+        // clave o demasiadas consultas: se reintenta o se registra a mano.
         kind:
           status === 400
             ? 'key'
-            : status === 503 ||
-                status === 429 ||
-                message.includes('no tiene autorizada') ||
-                message.includes('todavía está procesando')
-              ? 'retry'
-              : 'blocked',
+            : message.includes('últimos 2 meses')
+              ? 'manual'
+              : status === 503 ||
+                  status === 429 ||
+                  message.includes('no tiene autorizada') ||
+                  message.includes('todavía está procesando')
+                ? 'retry'
+                : 'blocked',
         message,
       });
     }
@@ -259,9 +269,9 @@ export function AccessKeyPurchase({
                 <AlertDescription>{problem.message}</AlertDescription>
               </Alert>
             )}
-            {problem?.kind === 'retry' && (
+            {(problem?.kind === 'retry' || problem?.kind === 'manual') && (
               <Alert variant="warning">
-                <CloudOff />
+                {problem.kind === 'manual' ? <History /> : <CloudOff />}
                 <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
                   <span>{problem.message}</span>
                   <Button type="button" variant="text" size="sm" onClick={onManual}>

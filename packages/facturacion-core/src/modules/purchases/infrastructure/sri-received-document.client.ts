@@ -4,8 +4,20 @@ import { classifyAuthorizationState } from '../../invoices/infrastructure/sri/sr
 import { errorMessage } from '../../../shared/errors/error-message';
 
 /** Cuánto se espera al SRI en cada intento: lo llama una persona que está mirando la pantalla. */
-const TIMEOUT_MS = 20_000;
-const ATTEMPTS = 2;
+const TIMEOUT_MS = 15_000;
+/**
+ * Fallos de transporte que se reintentan: el SRI a veces contesta con una página HTML "302 Found"
+ * en lugar de SOAP, o corta la conexión (ECONNRESET), y al intento siguiente responde bien.
+ */
+const ATTEMPTS = 4;
+/**
+ * Lecturas cuando el SRI dice que no tiene la clave. Reparte las consultas entre servidores que no
+ * siempre tienen lo mismo: con facturas de ~70 días, uno dice 0 y el siguiente la devuelve.
+ */
+const NOT_FOUND_READS = 3;
+/** Pasado este tiempo no se empieza otro intento (el que esté en curso aún puede tardar TIMEOUT_MS). */
+const BUDGET_MS = 25_000;
+const RETRY_DELAY_MS = 500;
 
 export type SriQueryResult =
   | {
@@ -44,22 +56,37 @@ export class SriReceivedDocumentClient {
       throw new SriUnavailableError('La consulta al SRI no está configurada');
     }
 
+    const started = Date.now();
+    let failures = 0;
+    let notFound = 0;
     let lastError = '';
-    for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+    for (;;) {
       try {
         const client = await this.client(url);
         const [result] = await withTimeout<[unknown]>(
           client.autorizacionComprobanteAsync({ claveAccesoComprobante: accessKey }),
         );
-        return toResult(result, accessKey);
+        const answer = toResult(result, accessKey);
+        if (answer.status !== 'NOT_FOUND' || ++notFound >= NOT_FOUND_READS) return answer;
       } catch (error) {
+        failures++;
         lastError = errorMessage(error);
         // Un cliente SOAP que falló (WSDL a medias) no se reutiliza.
         this.clients.delete(url);
-        this.logger.warn(`Consulta al SRI, intento ${attempt}/${ATTEMPTS}: ${lastError}`);
+        this.logger.warn(`Consulta al SRI, intento ${failures}/${ATTEMPTS}: ${lastError}`);
+        if (failures >= ATTEMPTS) break;
       }
+      if (Date.now() - started >= BUDGET_MS) break;
+      await this.wait(RETRY_DELAY_MS);
     }
-    throw new SriUnavailableError(lastError);
+    // Si alguna vez contestó que no la tiene, eso vale más que los fallos de después.
+    if (notFound > 0) return { status: 'NOT_FOUND' };
+    throw new SriUnavailableError(lastError || 'el SRI no respondió a tiempo');
+  }
+
+  /** Pausa entre intentos (los tests la anulan). */
+  protected wait(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /** El WSDL se baja una vez por URL: crear el cliente es lo más lento de cada consulta. */
