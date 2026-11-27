@@ -60,6 +60,9 @@ services:
         value: https://cel.sri.gob.ec/comprobantes-electronicos-ws/RecepcionComprobantesOffline?wsdl
       - key: SRI_AUTHORIZATION_URL_PROD
         value: https://cel.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline?wsdl
+      # Solo consulta de facturas de proveedores (Compras, C2); la emisión no la usa.
+      - key: SRI_QUERY_AUTHORIZATION_URL
+        value: https://cel.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline?wsdl
       # --- secrets: cargar en el dashboard ---
       - key: DATABASE_URL # Neon, POOLED (?pgbouncer=true&connection_limit=1)
         sync: false
@@ -146,6 +149,10 @@ services:
         value: https://celcer.sri.gob.ec/comprobantes-electronicos-ws/RecepcionComprobantesOffline?wsdl
       - key: SRI_AUTHORIZATION_URL_TEST
         value: https://celcer.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline?wsdl
+      # Producción, solo para consultar facturas reales de proveedores (Compras, C2). Staging
+      # no tiene SRI_*_PROD a propósito: con esta no puede emitir allí.
+      - key: SRI_QUERY_AUTHORIZATION_URL
+        value: https://cel.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline?wsdl
       - key: DATABASE_URL # rama staging de Neon, POOLED
         sync: false
       - key: DIRECT_URL

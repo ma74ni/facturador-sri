@@ -1,4 +1,5 @@
 import { findIvaRate, IvaTreatment } from '../../tax-codes/domain/iva-rate.catalog';
+import { module11 } from './access-key-parser';
 
 /** Tabla 3 del SRI: los comprobantes de compra que se registran en C1. */
 export const RECEIVED_DOCUMENT_TYPES = {
@@ -55,18 +56,6 @@ export function authorizationError(documentType: string, authorization: string):
   return /^(\d{10}|\d{37}|\d{49})$/.test(authorization)
     ? null
     : 'La autorización tiene 10 dígitos (imprenta), 37 (electrónica anterior) o 49 (clave de acceso)';
-}
-
-/** Dígito verificador módulo 11 de la ficha técnica (el mismo de AccessKeyService). */
-function module11(digits: string): string {
-  let sum = 0;
-  let factor = 2;
-  for (let i = digits.length - 1; i >= 0; i--) {
-    sum += Number(digits[i]) * factor;
-    factor = factor === 7 ? 2 : factor + 1;
-  }
-  const check = 11 - (sum % 11);
-  return check === 11 ? '0' : check === 10 ? '1' : String(check);
 }
 
 /**

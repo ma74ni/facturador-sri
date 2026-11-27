@@ -22,6 +22,9 @@ export interface ReceivedDocument {
   issueDate: string;
   accessKey: string | null;
   authorizationNumber: string | null;
+  authorizationDate: string | null;
+  /** Solo las traídas del SRI: el XML autorizado, descargable. */
+  xmlPath: string | null;
   source: 'MANUAL' | 'SRI_ACCESS_KEY' | 'SRI_REPORT';
   status: ReceivedDocumentStatus;
   subtotal: Money;
@@ -86,6 +89,57 @@ export interface PurchaseSuggestion {
   paymentMethodCode: string | null;
 }
 
+export interface AccessKeyItem {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  discount: number;
+  total: number;
+}
+
+/** Lo que el SRI dijo de una clave de acceso, antes de registrarla. */
+export interface AccessKeyPreview {
+  alreadyRegistered: false;
+  accessKey: string;
+  environment: 'TEST' | 'PRODUCTION';
+  documentType: string;
+  number: string;
+  issueDate: string; // AAAA-MM-DD
+  authorizationNumber: string;
+  authorizationDate: string | null;
+  /** Sin id: el proveedor todavía no existe y se crea al registrar. */
+  supplier: {
+    id: string | null;
+    identification: string;
+    businessName: string;
+    tradeName: string | null;
+  };
+  subtotal: number;
+  totalDiscount: number;
+  ivaValue: number;
+  iceValue: number;
+  otherCharges: number;
+  total: number;
+  taxes: { ivaCode: string; ivaRate: number; taxBase: number; ivaValue: number }[];
+  paymentMethodCode: string | null;
+  suggestion: PurchaseSuggestion;
+  items: AccessKeyItem[];
+  itemCount: number;
+  warnings: string[];
+}
+
+export type AccessKeyLookup =
+  | AccessKeyPreview
+  | { alreadyRegistered: true; document: ReceivedDocument };
+
+export interface AccessKeyRegistration {
+  accessKey: string;
+  paymentMethodCode?: string | null;
+  taxSupportCode?: string | null;
+  expenseAccountId?: string | null;
+  description?: string | null;
+}
+
 export const formatDocumentNumber = (doc: {
   establishmentCode: string;
   emissionPointCode: string;
@@ -127,6 +181,27 @@ export const receivedDocumentsApi = {
     const response = await apiClient.post('/received-documents/assign-account', {
       ids,
       expenseAccountId,
+    });
+    return response.data;
+  },
+
+  /** Consulta la clave en el SRI sin guardar nada. */
+  lookup: async (accessKey: string): Promise<AccessKeyLookup> => {
+    const response = await apiClient.post('/received-documents/lookup', { accessKey });
+    return response.data;
+  },
+
+  /** Trae la factura del SRI y la registra (idempotente). */
+  fromAccessKey: async (
+    data: AccessKeyRegistration,
+  ): Promise<ReceivedDocument & { alreadyRegistered: boolean }> => {
+    const response = await apiClient.post('/received-documents/from-access-key', data);
+    return response.data;
+  },
+
+  downloadXml: async (id: string): Promise<Blob> => {
+    const response = await apiClient.get(`/received-documents/${id}/xml`, {
+      responseType: 'blob',
     });
     return response.data;
   },

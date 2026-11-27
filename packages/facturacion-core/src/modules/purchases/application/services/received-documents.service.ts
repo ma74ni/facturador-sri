@@ -21,7 +21,7 @@ import { UpdateReceivedDocumentDto } from '../dto/received-document-actions.dto'
 const LIST_LIMIT = 1000;
 const ECUADOR_OFFSET_MS = -5 * 60 * 60 * 1000;
 
-const INCLUDE = {
+export const RECEIVED_DOCUMENT_INCLUDE = {
   supplier: {
     select: { id: true, businessName: true, identification: true, isPopularBusiness: true },
   },
@@ -72,7 +72,7 @@ export class ReceivedDocumentsService {
     const [documents, sums, withoutAccount] = await Promise.all([
       this.prisma.receivedDocument.findMany({
         where,
-        include: INCLUDE,
+        include: RECEIVED_DOCUMENT_INCLUDE,
         orderBy: [{ issueDate: 'desc' }, { createdAt: 'desc' }],
         take: LIST_LIMIT,
       }),
@@ -99,7 +99,7 @@ export class ReceivedDocumentsService {
   async findOne(id: string, companyId: string) {
     const document = await this.prisma.receivedDocument.findFirst({
       where: { id, companyId },
-      include: INCLUDE,
+      include: RECEIVED_DOCUMENT_INCLUDE,
     });
     if (!document) {
       throw new NotFoundException('Compra no encontrada');
@@ -155,7 +155,7 @@ export class ReceivedDocumentsService {
           createdById: userId,
           taxes: { create: totals.taxes },
         },
-        include: INCLUDE,
+        include: RECEIVED_DOCUMENT_INCLUDE,
       });
       return { ...document, alreadyRegistered: false };
     } catch (error) {
@@ -311,7 +311,7 @@ export class ReceivedDocumentsService {
     return this.prisma.receivedDocument.update({
       where: { id: document.id },
       data: { status: ReceivedDocumentStatus.VOIDED, voidedAt: new Date(), voidReason: reason },
-      include: INCLUDE,
+      include: RECEIVED_DOCUMENT_INCLUDE,
     });
   }
 
@@ -426,7 +426,7 @@ export class ReceivedDocumentsService {
   }
 
   /** La cuenta tiene que ser de la empresa y estar activa; null o vacío = sin cuenta. */
-  private async assertAccount(expenseAccountId: string | null | undefined, companyId: string) {
+  async assertAccount(expenseAccountId: string | null | undefined, companyId: string) {
     if (!expenseAccountId) return;
     const account = await this.prisma.expenseAccount.findFirst({
       where: { id: expenseAccountId, companyId },
@@ -507,7 +507,7 @@ export class ReceivedDocumentsService {
         ...(excludeId ? { NOT: { id: excludeId } } : {}),
         OR: [number, ...(accessKey ? [{ accessKey }] : [])],
       },
-      include: INCLUDE,
+      include: RECEIVED_DOCUMENT_INCLUDE,
     });
   }
 }

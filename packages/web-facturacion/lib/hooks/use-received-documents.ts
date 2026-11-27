@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AccessKeyRegistration,
   ReceivedDocumentFilters,
   ReceivedDocumentInput,
   receivedDocumentsApi,
@@ -58,6 +59,22 @@ export function useCreateReceivedDocument() {
       result.alreadyRegistered
         ? 'Esa compra ya estaba registrada: no se duplicó'
         : 'Compra registrada',
+    'No se pudo registrar la compra',
+  );
+}
+
+/** Vista previa de una clave de acceso: los errores los muestra el diálogo, no un toast. */
+export function useAccessKeyLookup() {
+  return useMutation({ mutationFn: (accessKey: string) => receivedDocumentsApi.lookup(accessKey) });
+}
+
+export function useRegisterFromAccessKey() {
+  return usePurchaseMutation(
+    (data: AccessKeyRegistration) => receivedDocumentsApi.fromAccessKey(data),
+    (result) =>
+      result.alreadyRegistered
+        ? 'Esa factura ya estaba registrada: no se duplicó'
+        : 'Compra registrada con los datos del SRI',
     'No se pudo registrar la compra',
   );
 }
